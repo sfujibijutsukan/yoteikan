@@ -164,4 +164,54 @@ final class YoteikanUITests: XCTestCase {
         XCTAssertEqual(placement(of: restored).start, before.start - 30)
         XCTAssertEqual(placement(of: restored).duration, 60)
     }
+    func test10SwipeDaysAndKeepEachDaysPlan() {
+        launch(["--reset-test-data"])
+        let task = createAndPlaceSticky()
+        let originalPlacement = task.value as? String
+        let date = app.staticTexts["selectedDate"]
+        let today = date.label
+        app.buttons["次の日"].tap()
+        let nextDay = date.label
+        app.buttons["todayButton"].tap()
+        app.buttons["前の日"].tap()
+        let previousDay = date.label
+        app.buttons["todayButton"].tap()
+
+        let navigation = app.otherElements["dayNavigation"]
+        navigation.swipeLeft()
+        XCTAssertEqual(date.label, nextDay)
+        XCTAssertFalse(task.exists)
+        XCTAssertFalse(app.staticTexts["企画を考える日"].exists)
+        XCTAssertFalse(app.descendants(matching: .any).matching(identifier: "fixed-チームミーティング").firstMatch.exists)
+        shot("10-swipe-next-day")
+        navigation.swipeRight()
+        XCTAssertEqual(date.label, today)
+        XCTAssertEqual(task.value as? String, originalPlacement)
+        navigation.swipeRight()
+        XCTAssertEqual(date.label, previousDay)
+        XCTAssertFalse(task.exists)
+        navigation.swipeLeft()
+        XCTAssertEqual(date.label, today)
+
+        let timeline = app.scrollViews["timeline"]
+        let left = timeline.coordinate(withNormalizedOffset: CGVector(dx: 0.15, dy: 0.1))
+        let right = timeline.coordinate(withNormalizedOffset: CGVector(dx: 0.85, dy: 0.1))
+        right.press(forDuration: 0.01, thenDragTo: left)
+        XCTAssertEqual(date.label, nextDay)
+        left.press(forDuration: 0.01, thenDragTo: right)
+        XCTAssertEqual(date.label, today)
+        XCTAssertEqual(task.value as? String, originalPlacement)
+    }
+    func test11VerticalScrollAndInboxSwipeKeepDate() {
+        launch()
+        let date = app.staticTexts["selectedDate"].label
+        app.otherElements["inboxTray"].scrollViews.firstMatch.swipeLeft()
+        XCTAssertEqual(app.staticTexts["selectedDate"].label, date)
+        let timeline = app.scrollViews["timeline"]
+        let bottom = timeline.coordinate(withNormalizedOffset: CGVector(dx: 0.08, dy: 0.85))
+        let top = timeline.coordinate(withNormalizedOffset: CGVector(dx: 0.08, dy: 0.2))
+        bottom.press(forDuration: 0.01, thenDragTo: top)
+        XCTAssertEqual(app.staticTexts["selectedDate"].label, date)
+        XCTAssertFalse(app.staticTexts["08:00"].isHittable)
+    }
 }

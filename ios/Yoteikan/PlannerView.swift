@@ -76,11 +76,14 @@ struct PlannerView: View {
     private var dateBar: some View {
         HStack(spacing: 9) {
             Button { changeDay(-1) } label: { Image(systemName: "chevron.left").frame(width: 32, height: 36) }.accessibilityLabel("前の日")
-            Text(plans.date, format: .dateTime.month().day().weekday(.wide)).font(.system(size: 15, weight: .semibold))
+            Text(plans.date, format: .dateTime.month().day().weekday(.wide)).font(.system(size: 15, weight: .semibold)).accessibilityIdentifier("selectedDate")
             Button { changeDay(1) } label: { Image(systemName: "chevron.right").frame(width: 32, height: 36) }.accessibilityLabel("次の日")
             Spacer(minLength: 0)
             Button { plans.date = Date() } label: { Text("今日").font(.system(size: 11, weight: .semibold)).padding(.horizontal, 10).padding(.vertical, 7).background(.white, in: Capsule()) }.accessibilityIdentifier("todayButton")
         }.padding(.horizontal, 12)
+            .contentShape(Rectangle())
+            .simultaneousGesture(daySwipeGesture)
+            .accessibilityElement(children: .contain).accessibilityIdentifier("dayNavigation")
     }
     private var stats: some View {
         HStack(spacing: 0) {
@@ -103,7 +106,7 @@ struct PlannerView: View {
                         ForEach(6...24, id: \.self) { hour in
                             HStack(alignment: .center, spacing: 10) { Text(String(format: "%02d:00", hour)).font(.system(size: 10, weight: .medium, design: .monospaced)).foregroundStyle(ink.opacity(0.4)).frame(width: 43, alignment: .trailing); Rectangle().fill(ink.opacity(0.09)).frame(height: 1) }.frame(height: 60 * scale, alignment: .top).id(hour)
                         }
-                        }
+                        }.contentShape(Rectangle()).simultaneousGesture(daySwipeGesture)
                         ForEach(fixed.filter { !$0.allDay && $0.end > PlannerMath.first }) { event in
                             let start = max(PlannerMath.first, event.start)
                             let slot = slots["fixed-" + event.id] ?? TimelineSlot(column: 0, columns: 1)
@@ -283,6 +286,14 @@ struct PlannerView: View {
             }
             Button { showNew = true } label: { Label("付箋をつくる", systemImage: "plus").font(.system(size: 12, weight: .semibold)).padding(.horizontal, 17).frame(height: 42).background(accent, in: Capsule()).foregroundStyle(.white) }.accessibilityIdentifier("newStickyButton")
         }.padding(.horizontal, 22).padding(.top, 9).padding(.bottom, 5).background(paper)
+    }
+    private var daySwipeGesture: some Gesture {
+        DragGesture(minimumDistance: 30).onEnded { value in
+            let horizontal = value.translation.width
+            let vertical = value.translation.height
+            guard abs(horizontal) >= 60, abs(horizontal) > abs(vertical) * 1.5 else { return }
+            changeDay(horizontal < 0 ? 1 : -1)
+        }
     }
     private func changeDay(_ offset: Int) { plans.date = Calendar.current.date(byAdding: .day, value: offset, to: plans.date)! }
     private func conflicts(_ task: Sticky) -> Bool {

@@ -65,15 +65,19 @@ import EventKit
         }
         let day = Calendar.current.startOfDay(for: Date())
         let predicate = store.predicateForEvents(withStart: day, end: day.addingTimeInterval(86400), calendars: [calendar])
-        if store.events(matching: predicate).isEmpty {
+        let existing = store.events(matching: predicate)
+        if existing.isEmpty {
             for (title, hour, minutes) in [("チームミーティング", 10, 60), ("打ち合わせ", 14, 60)] {
                 let event = EKEvent(eventStore: store); event.calendar = calendar; event.title = title
                 event.startDate = Calendar.current.date(bySettingHour: hour, minute: 0, second: 0, of: day)!
                 event.endDate = event.startDate.addingTimeInterval(Double(minutes * 60)); try store.save(event, span: .thisEvent)
             }
-            let event = EKEvent(eventStore: store); event.calendar = calendar; event.title = "企画を考える日"; event.isAllDay = true
-            event.startDate = day; event.endDate = Calendar.current.date(byAdding: .day, value: 1, to: day)!; try store.save(event, span: .thisEvent)
         }
+        let allDay = existing.first(where: { $0.title == "企画を考える日" }) ?? EKEvent(eventStore: store)
+        allDay.calendar = calendar; allDay.title = "企画を考える日"; allDay.isAllDay = true
+        // EventKit treats the end date of an all-day event as its final included day.
+        allDay.startDate = day; allDay.endDate = day
+        try store.save(allDay, span: .thisEvent)
         enabled.insert(calendar.calendarIdentifier); UserDefaults.standard.set(Array(enabled), forKey: "calendar.enabled")
     }
     #endif
