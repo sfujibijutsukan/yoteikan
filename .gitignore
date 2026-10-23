@@ -1,0 +1,14 @@
+.DS_Store
+
+# Local builds, logs, and XCTest result bundles
+/artifacts/
+/DerivedData/
+/.build/
+/bin/
+
+# Xcode user settings
+**/xcuserdata/
+*.xcuserstate
+
+# Swift package state
+.swiftpm/

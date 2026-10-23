@@ -1,0 +1,34 @@
+予定館 / 検証結果の抜粋
+実行日: 2026-10-23
+環境: iPhone 17e Simulator / iOS 27.0
+
+=== verified.log ===
+Test Case '-[YoteikanTests.PlanTests testDateSeparationAndIndependentPresetCopies]' passed (0.004 seconds).
+Test Case '-[YoteikanTests.PlanTests testMovingOneStickyLeavesOthersAndPresetUnchanged]' passed (0.004 seconds).
+Test Case '-[YoteikanTests.PlanTests testOverlapColumnsCoverTransitiveGroupsAndReuseLanes]' passed (0.001 seconds).
+Test Case '-[YoteikanTests.PlanTests testSnappingBoundsAndOverlapUnion]' passed (0.001 seconds).
+Test Case '-[YoteikanTests.PlanTests testThreeSimultaneousEventsHaveSeparateColumns]' passed (0.001 seconds).
+Test Case '-[YoteikanTests.PlanTests testUndoAndPersistenceAndUnplace]' passed (0.004 seconds).
+	 Executed 6 tests, with 0 failures (0 unexpected) in 0.015 (0.017) seconds
+	 Executed 6 tests, with 0 failures (0 unexpected) in 0.015 (0.018) seconds
+	 Executed 6 tests, with 0 failures (0 unexpected) in 0.015 (0.018) seconds
+Test Case '-[YoteikanUITests.YoteikanUITests test01DemoAndPresets]' passed (7.804 seconds).
+Test Case '-[YoteikanUITests.YoteikanUITests test02CreatePersistEditAndUndo]' passed (19.418 seconds).
+Test Case '-[YoteikanUITests.YoteikanUITests test03DragResizeAndUnplace]' passed (16.047 seconds).
+Test Case '-[YoteikanUITests.YoteikanUITests test04InboxDropAndOverview]' passed (10.086 seconds).
+Test Case '-[YoteikanUITests.YoteikanUITests test05CalendarAccessAndRealEventKitRead]' passed (9.375 seconds).
+Test Case '-[YoteikanUITests.YoteikanUITests test06CreatePresetAndReuseItToday]' passed (12.878 seconds).
+Test Case '-[YoteikanUITests.YoteikanUITests test07CalendarSelectionChangesVisibleEvents]' passed (14.503 seconds).
+	 Executed 7 tests, with 0 failures (0 unexpected) in 90.111 (90.120) seconds
+	 Executed 7 tests, with 0 failures (0 unexpected) in 90.111 (90.121) seconds
+	 Executed 7 tests, with 0 failures (0 unexpected) in 90.111 (90.122) seconds
+** TEST SUCCEEDED **
+
+=== visual-check.log ===
+Test Case '-[YoteikanUITests.YoteikanUITests test01DemoAndPresets]' passed (10.579 seconds).
+Test Case '-[YoteikanUITests.YoteikanUITests test03DragResizeAndUnplace]' passed (16.222 seconds).
+Test Case '-[YoteikanUITests.YoteikanUITests test04InboxDropAndOverview]' passed (10.909 seconds).
+	 Executed 3 tests, with 0 failures (0 unexpected) in 37.710 (37.715) seconds
+	 Executed 3 tests, with 0 failures (0 unexpected) in 37.710 (37.716) seconds
+	 Executed 3 tests, with 0 failures (0 unexpected) in 37.710 (37.717) seconds
+** TEST SUCCEEDED **
