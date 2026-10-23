@@ -123,6 +123,20 @@ struct PlannerView: View {
                                 .frame(width: width - 3, height: max(overview ? 3 : 24, CGFloat(task.minutes) * scale - (overview ? 1 : 4) + (stretching == task.id ? stretch : 0)))
                                 .overlay { if collision { RoundedRectangle(cornerRadius: 9).stroke(.orange, lineWidth: 1.5).allowsHitTesting(false) } }
                                 .overlay(alignment: .bottom) { if !overview { resizeHandle(task) } }
+                                .contentShape(Rectangle())
+                                .overlay(alignment: .topTrailing) {
+                                    if selected == task.id && !overview { moveHandle(task).padding(3) }
+                                }
+                                .overlay(alignment: .top) {
+                                    if moving == task.id && !returningToInbox {
+                                        let start = task.start! + PlannerMath.snap(Double(shift / scale))
+                                        Text("\(clockText(start)) – \(clockText(start + task.minutes))")
+                                            .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                                            .padding(.horizontal, 10).padding(.vertical, 5)
+                                            .background(ink, in: Capsule()).foregroundStyle(.white)
+                                            .offset(y: -29).allowsHitTesting(false)
+                                    }
+                                }
                                 .offset(x: 58 + width * CGFloat(slot.column), y: CGFloat(task.start! - PlannerMath.first) * scale + 2 + (moving == task.id ? shift : 0))
                                 .zIndex(moving == task.id || stretching == task.id ? 5 : selected == task.id ? 3 : 1)
                                 .onTapGesture { if selected == task.id { editing = task } else { selected = task.id } }
@@ -167,7 +181,7 @@ struct PlannerView: View {
                 if duration >= 45 { Text(task.title).font(.system(size: 7, weight: .semibold)).lineLimit(1) }
             } else {
             if !compact { Text("\(clockText(start)) – \(clockText(start + duration))").font(.system(size: 10, weight: .medium)).foregroundStyle(ink.opacity(0.6)) }
-            HStack(spacing: 4) { Text(task.title).font(.system(size: compact ? 10 : 14, weight: .semibold)).lineLimit(1); Spacer(minLength: 0); if compact { Text("\(duration)分").font(.system(size: 9)) } }
+            HStack(spacing: 4) { Text(task.title).font(.system(size: compact ? 10 : 14, weight: .semibold)).lineLimit(1); Spacer(minLength: 0); if compact { Text("\(duration)分").font(.system(size: 9)) } }.padding(.trailing, selected == task.id ? 29 : 0)
             if !compact && duration >= 40 { Text(durationText(duration)).font(.system(size: 10)).foregroundStyle(ink.opacity(0.6)) }
             Spacer(minLength: 0)
             }
@@ -181,7 +195,7 @@ struct PlannerView: View {
     }
     private func resizeHandle(_ task: Sticky) -> some View {
         ZStack { Color.clear; Capsule().fill(ink.opacity(selected == task.id ? 0.6 : 0.25)).frame(width: 24, height: 3) }
-            .frame(height: 22).contentShape(Rectangle())
+            .frame(width: 44, height: 22).contentShape(Rectangle())
             .highPriorityGesture(DragGesture(minimumDistance: 0, coordinateSpace: .global).onChanged { value in
                 selected = task.id; stretching = task.id
                 let newDuration = PlannerMath.duration(task.minutes + PlannerMath.snap(Double(value.translation.height / scale)), start: task.start!)
@@ -191,23 +205,48 @@ struct PlannerView: View {
             })
             .accessibilityLabel("\(task.title)の長さを変更").accessibilityIdentifier("resize-\(task.title)")
     }
+    private func moveHandle(_ task: Sticky) -> some View {
+        Image(systemName: "arrow.up.and.down")
+            .font(.system(size: 12, weight: .semibold))
+            .frame(width: 36, height: 26)
+            .background(.white.opacity(0.75), in: Capsule())
+            .contentShape(Rectangle())
+            .highPriorityGesture(DragGesture(minimumDistance: 3, coordinateSpace: .global)
+                .onChanged { value in
+                    updateMove(task, delta: value.translation.height, location: value.location)
+                }
+                .onEnded { value in
+                    finishMove(task, delta: value.translation.height, location: value.location)
+                })
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("\(task.title)の開始時刻を変更")
+            .accessibilityHint("上下にドラッグして移動します")
+            .accessibilityIdentifier("move-\(task.title)")
+    }
+    private func updateMove(_ task: Sticky, delta: CGFloat, location: CGPoint) {
+        guard let start = task.start else { return }
+        selected = task.id; moving = task.id
+        returningToInbox = inboxFrame.contains(location)
+        let newStart = PlannerMath.start(start + PlannerMath.snap(Double(delta / scale)), duration: task.minutes)
+        shift = CGFloat(newStart - start) * scale
+    }
+    private func finishMove(_ task: Sticky, delta: CGFloat, location: CGPoint) {
+        defer { moving = nil; shift = 0; returningToInbox = false }
+        guard let start = task.start else { return }
+        if inboxFrame.contains(location) { plans.put(task.id, at: nil); selected = nil }
+        else { plans.move(task.id, start: start + PlannerMath.snap(Double(delta / scale))) }
+    }
     private func moveGesture(_ task: Sticky) -> some Gesture {
         LongPressGesture(minimumDuration: 0.25).sequenced(before: DragGesture(minimumDistance: 0, coordinateSpace: .global))
             .onChanged { value in
                 if case .second(true, let drag?) = value {
-                    selected = task.id; moving = task.id
-                    returningToInbox = inboxFrame.contains(drag.location)
                     let delta = drag.location.y - (touchTask == task.id ? touchStart.y : drag.startLocation.y)
-                    let newStart = PlannerMath.start(task.start! + PlannerMath.snap(Double(delta / scale)), duration: task.minutes)
-                    shift = CGFloat(newStart - task.start!) * scale
+                    updateMove(task, delta: delta, location: drag.location)
                 }
             }.onEnded { value in
                 if case .second(true, let drag?) = value {
-                    if inboxFrame.contains(drag.location) { plans.put(task.id, at: nil); selected = nil }
-                    else {
-                        let delta = drag.location.y - (touchTask == task.id ? touchStart.y : drag.startLocation.y)
-                        plans.move(task.id, start: task.start! + PlannerMath.snap(Double(delta / scale)))
-                    }
+                    let delta = drag.location.y - (touchTask == task.id ? touchStart.y : drag.startLocation.y)
+                    finishMove(task, delta: delta, location: drag.location)
                 }
                 moving = nil; shift = 0; returningToInbox = false
             }
@@ -229,7 +268,7 @@ struct PlannerView: View {
                     }.padding(.vertical, 2)
                 }
             }
-            Text("長押しで時間割へ。付箋の下端を引くと長さを変更できます。 ").font(.system(size: 9)).foregroundStyle(ink.opacity(0.45))
+            Text("付箋を選んで↕をドラッグすると移動、下端のつまみで長さを変更。").font(.system(size: 9)).foregroundStyle(ink.opacity(0.45))
         }.padding(.horizontal, 22).padding(.top, 15).padding(.bottom, 13)
             .background(returningToInbox ? tones[0] : paper)
             .background { GeometryReader { proxy in Color.clear.onAppear { inboxFrame = proxy.frame(in: .global) }.onChange(of: proxy.frame(in: .global)) { _, frame in inboxFrame = frame } } }

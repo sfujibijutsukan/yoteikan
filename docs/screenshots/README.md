@@ -34,4 +34,10 @@ iPhone 17eシミュレーター / iOS 27.0でXCTestを使って実際に操作�
 
 <img src="08-real-calendar-events.png" width="300" alt="EventKitで読み込んだ予定">
 
+## 移動つまみで開始時刻を変更
+
+新規作成した60分の付箋を配置し、右上の移動つまみで30分前へ移動した画面です。所要時間とカレンダーの会議は維持されます。
+
+<img src="09-start-time-drag.png" width="300" alt="右上の移動つまみで付箋の開始時刻を変更">
+
 [動作確認結果](../verification.md) / [READMEへ戻る](../../README.md)
