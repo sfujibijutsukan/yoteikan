@@ -1,27 +1,27 @@
-予定館 / Issue #1 改善後の検証結果
+予定館 / Issue #2 改善後の検証結果
 実行日: 2026-10-23
 環境: iPhone 17e Simulator / iOS 27.0
 ユニットテスト6件 + UIテスト9件 = 全15件成功
 
-Test Case '-[YoteikanTests.PlanTests testDateSeparationAndIndependentPresetCopies]' passed (0.003 seconds).
+Test Case '-[YoteikanTests.PlanTests testDateSeparationAndIndependentPresetCopies]' passed (0.004 seconds).
 Test Case '-[YoteikanTests.PlanTests testMovingOneStickyLeavesOthersAndPresetUnchanged]' passed (0.003 seconds).
-Test Case '-[YoteikanTests.PlanTests testOverlapColumnsCoverTransitiveGroupsAndReuseLanes]' passed (0.000 seconds).
-Test Case '-[YoteikanTests.PlanTests testSnappingBoundsAndOverlapUnion]' passed (0.000 seconds).
-Test Case '-[YoteikanTests.PlanTests testThreeSimultaneousEventsHaveSeparateColumns]' passed (0.000 seconds).
-Test Case '-[YoteikanTests.PlanTests testUndoAndPersistenceAndUnplace]' passed (0.003 seconds).
-	 Executed 6 tests, with 0 failures (0 unexpected) in 0.009 (0.011) seconds
-	 Executed 6 tests, with 0 failures (0 unexpected) in 0.009 (0.011) seconds
-	 Executed 6 tests, with 0 failures (0 unexpected) in 0.009 (0.012) seconds
-Test Case '-[YoteikanUITests.YoteikanUITests test01DemoAndPresets]' passed (7.945 seconds).
-Test Case '-[YoteikanUITests.YoteikanUITests test02CreatePersistEditAndUndo]' passed (20.216 seconds).
-Test Case '-[YoteikanUITests.YoteikanUITests test03DragResizeAndUnplace]' passed (16.138 seconds).
-Test Case '-[YoteikanUITests.YoteikanUITests test04InboxDropAndOverview]' passed (11.068 seconds).
-Test Case '-[YoteikanUITests.YoteikanUITests test05CalendarAccessAndRealEventKitRead]' passed (9.478 seconds).
-Test Case '-[YoteikanUITests.YoteikanUITests test06CreatePresetAndReuseItToday]' passed (13.410 seconds).
-Test Case '-[YoteikanUITests.YoteikanUITests test07CalendarSelectionChangesVisibleEvents]' passed (14.670 seconds).
-Test Case '-[YoteikanUITests.YoteikanUITests test08NewlyPlacedStickyMovesFromEmptyBodyArea]' passed (15.489 seconds).
-Test Case '-[YoteikanUITests.YoteikanUITests test09MoveHandleChangesStartAndPersistsWithUndo]' passed (25.040 seconds).
-	 Executed 9 tests, with 0 failures (0 unexpected) in 133.454 (133.466) seconds
-	 Executed 9 tests, with 0 failures (0 unexpected) in 133.454 (133.467) seconds
-	 Executed 9 tests, with 0 failures (0 unexpected) in 133.454 (133.468) seconds
+Test Case '-[YoteikanTests.PlanTests testOverlapColumnsCoverTransitiveGroupsAndReuseLanes]' passed (0.001 seconds).
+Test Case '-[YoteikanTests.PlanTests testSnappingBoundsAndOverlapUnion]' passed (0.001 seconds).
+Test Case '-[YoteikanTests.PlanTests testThreeSimultaneousEventsHaveSeparateColumns]' passed (0.001 seconds).
+Test Case '-[YoteikanTests.PlanTests testUndoAndPersistenceAndUnplace]' passed (0.004 seconds).
+	 Executed 6 tests, with 0 failures (0 unexpected) in 0.013 (0.015) seconds
+	 Executed 6 tests, with 0 failures (0 unexpected) in 0.013 (0.015) seconds
+	 Executed 6 tests, with 0 failures (0 unexpected) in 0.013 (0.016) seconds
+Test Case '-[YoteikanUITests.YoteikanUITests test01DemoAndPresets]' passed (8.286 seconds).
+Test Case '-[YoteikanUITests.YoteikanUITests test02CreatePersistEditAndUndo]' passed (19.904 seconds).
+Test Case '-[YoteikanUITests.YoteikanUITests test03DragResizeAndUnplace]' passed (13.803 seconds).
+Test Case '-[YoteikanUITests.YoteikanUITests test04InboxDropAndOverview]' passed (10.978 seconds).
+Test Case '-[YoteikanUITests.YoteikanUITests test05CalendarAccessAndRealEventKitRead]' passed (9.826 seconds).
+Test Case '-[YoteikanUITests.YoteikanUITests test06CreatePresetAndReuseItToday]' passed (13.291 seconds).
+Test Case '-[YoteikanUITests.YoteikanUITests test07CalendarSelectionChangesVisibleEvents]' passed (14.919 seconds).
+Test Case '-[YoteikanUITests.YoteikanUITests test08NewlyPlacedStickyMovesFromEmptyBodyArea]' passed (15.469 seconds).
+Test Case '-[YoteikanUITests.YoteikanUITests test09MoveHandleChangesStartAndPersistsWithUndo]' passed (24.895 seconds).
+	 Executed 9 tests, with 0 failures (0 unexpected) in 131.372 (131.383) seconds
+	 Executed 9 tests, with 0 failures (0 unexpected) in 131.372 (131.383) seconds
+	 Executed 9 tests, with 0 failures (0 unexpected) in 131.372 (131.384) seconds
 ** TEST SUCCEEDED **

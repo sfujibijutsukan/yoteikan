@@ -44,7 +44,7 @@ macOSと、iOS 17以降をビルドできるXcodeが必要です。
 | [開発・検証手順](docs/development.md) | 技術構成、ビルド・テスト、Goによるスクショ出力、テスト用の起動引数 |
 | [動作確認](docs/verification.md) | 確認した操作、検証環境、実機で未確認の項目 |
 | [スクリーンショット9枚](docs/screenshots/README.md) | 実際に操作して取得した画面 |
-| [テスト結果の抜粋](docs/test-results.txt) | Issue #1改善後の全15件成功の記録 |
+| [テスト結果の抜粋](docs/test-results.txt) | Issue #2改善後の全15件成功の記録 |
 
 ## 技術構成
 
