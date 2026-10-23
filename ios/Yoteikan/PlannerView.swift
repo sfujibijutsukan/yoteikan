@@ -55,7 +55,7 @@ struct PlannerView: View {
         .safeAreaInset(edge: .bottom, spacing: 0) { bottomBar }
         .sheet(isPresented: $showPresets) { PresetsView() }
         .sheet(isPresented: $showCalendar) { CalendarSettingsView() }
-        .sheet(isPresented: $showColors) { ColorNamesEditor(names: plans.plan.colorNames) }
+        .sheet(isPresented: $showColors) { ColorNamesEditor(colors: plans.plan.colors) }
         .sheet(isPresented: $showNew) { StickyEditor(task: Sticky(title: "", minutes: 30, day: dayKey(plans.date)), isNew: true) }
         .sheet(item: $editing) { StickyEditor(task: $0, isNew: false) }
         .onChange(of: plans.date) { _, value in calendar.refresh(date: value); selected = nil }
@@ -180,18 +180,20 @@ struct PlannerView: View {
         }.padding(overview ? 2 : 10).frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading).background(Color(red: 0.89, green: 0.91, blue: 0.89), in: RoundedRectangle(cornerRadius: 9)).overlay(alignment: .leading) { RoundedRectangle(cornerRadius: 2).fill(ink.opacity(0.25)).frame(width: 3).padding(.vertical, 9) }.clipped().accessibilityElement(children: .ignore).accessibilityLabel("\(event.title)、\(clockText(event.start))から\(clockText(event.end))、カレンダーの固定予定").accessibilityIdentifier("fixed-\(event.title)")
     }
     private func taskCard(_ task: Sticky, compact: Bool) -> some View {
+        let textColor = plans.paletteColor(for: task.tone).textColor
         let start = (task.start ?? 0) + (moving == task.id ? PlannerMath.snap(Double(shift / scale)) : 0)
         let duration = task.minutes + (stretching == task.id ? PlannerMath.snap(Double(stretch / scale)) : 0)
         return VStack(alignment: .leading, spacing: 4) {
             if overview {
                 if duration >= 45 { Text(task.title).font(.system(size: 7, weight: .semibold)).lineLimit(1) }
             } else {
-            if !compact { Text("\(clockText(start)) – \(clockText(start + duration))").font(.system(size: 10, weight: .medium)).foregroundStyle(ink.opacity(0.6)) }
+            if !compact { Text("\(clockText(start)) – \(clockText(start + duration))").font(.system(size: 10, weight: .medium)).foregroundStyle(textColor.opacity(0.8)) }
             HStack(spacing: 4) { Text(task.title).font(.system(size: compact ? 10 : 14, weight: .semibold)).lineLimit(1); Spacer(minLength: 0); if compact { Text("\(duration)分").font(.system(size: 9)) } }.padding(.trailing, selected == task.id ? 29 : 0)
             Spacer(minLength: 0)
             }
         }.padding(.horizontal, overview ? 3 : 12).padding(.top, overview ? 1 : (compact ? 5 : 9)).frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-            .background(tones[task.tone % tones.count], in: RoundedRectangle(cornerRadius: 9))
+            .foregroundStyle(textColor)
+            .background(plans.paletteColor(for: task.tone).color, in: RoundedRectangle(cornerRadius: 9))
             .overlay(alignment: .leading) { RoundedRectangle(cornerRadius: 2).fill(ink.opacity(0.22)).frame(width: 3).padding(.vertical, 9) }
             .overlay { RoundedRectangle(cornerRadius: 9).stroke(selected == task.id ? accent : .clear, lineWidth: 2).allowsHitTesting(false) }
             .shadow(color: ink.opacity(moving == task.id ? 0.18 : 0.04), radius: moving == task.id ? 8 : 2, y: 2)
@@ -199,7 +201,7 @@ struct PlannerView: View {
             .accessibilityLabel("\(task.title)、\(clockText(start))から\(duration)分")
     }
     private func resizeHandle(_ task: Sticky) -> some View {
-        ZStack { Color.clear; Capsule().fill(ink.opacity(selected == task.id ? 0.6 : 0.25)).frame(width: 24, height: 3) }
+        ZStack { Color.clear; Capsule().fill(plans.paletteColor(for: task.tone).textColor.opacity(selected == task.id ? 0.6 : 0.35)).frame(width: 24, height: 3) }
             .frame(width: 44, height: 22).contentShape(Rectangle())
             .highPriorityGesture(DragGesture(minimumDistance: 0, coordinateSpace: .global).onChanged { value in
                 selected = task.id; stretching = task.id
@@ -268,7 +270,8 @@ struct PlannerView: View {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 10) {
                         ForEach(inbox) { task in
-                            VStack(alignment: .leading, spacing: 10) { Text(task.title).font(.system(size: 13, weight: .semibold)).lineLimit(1); HStack { Text(durationText(task.minutes)).font(.system(size: 11)); Spacer(); Image(systemName: "arrow.up.left").font(.system(size: 10)) } }.padding(12).frame(width: 123, height: 73).background(tones[task.tone % tones.count], in: RoundedRectangle(cornerRadius: 7))
+                            VStack(alignment: .leading, spacing: 10) { Text(task.title).font(.system(size: 13, weight: .semibold)).lineLimit(1); HStack { Text(durationText(task.minutes)).font(.system(size: 11)); Spacer(); Image(systemName: "arrow.up.left").font(.system(size: 10)) } }.padding(12).frame(width: 123, height: 73).background(plans.paletteColor(for: task.tone).color, in: RoundedRectangle(cornerRadius: 7))
+                                .foregroundStyle(plans.paletteColor(for: task.tone).textColor)
                                 .onTapGesture { editing = task }.draggable(task.id.uuidString)
                                 .accessibilityElement(children: .ignore).accessibilityLabel("\(task.title)、\(task.minutes)分、未配置")
                                 .accessibilityIdentifier("inbox-\(task.title)")

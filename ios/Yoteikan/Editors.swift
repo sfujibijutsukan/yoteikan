@@ -38,6 +38,7 @@ struct StickyEditor: View {
                 ToolbarItem(placement: .confirmationAction) { Button("保存") { save() }.fontWeight(.semibold).disabled(task.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty).accessibilityIdentifier("saveSticky") }
             }
             .onAppear {
+                if !plans.plan.colors.contains(where: { $0.id == task.tone }) { task.tone = plans.plan.colors[0].id }
                 placed = task.start != nil
                 let start = task.start ?? 9 * 60
                 startTime = Calendar.current.date(bySettingHour: start / 60, minute: start % 60, second: 0, of: plans.date)!
@@ -70,7 +71,7 @@ struct PresetsView: View {
                 Section {
                     ForEach(plans.plan.presets) { preset in
                         HStack(spacing: 12) {
-                            RoundedRectangle(cornerRadius: 4).fill(tones[preset.tone % tones.count]).frame(width: 7, height: 42)
+                            RoundedRectangle(cornerRadius: 4).fill(plans.paletteColor(for: preset.tone).color).frame(width: 7, height: 42)
                             Button { plans.add(preset); added[preset.id, default: 0] += 1 } label: { HStack { VStack(alignment: .leading, spacing: 5) { Text(preset.title).font(.system(size: 16, weight: .medium)).foregroundStyle(ink); Text(durationText(preset.minutes)).font(.caption).foregroundStyle(.secondary) }; Spacer(); if let count = added[preset.id] { Text("\(count)").font(.system(size: 12, weight: .semibold, design: .rounded)).foregroundStyle(accent).accessibilityHidden(true) }; Image(systemName: "plus.circle.fill").font(.title3).foregroundStyle(accent) }.contentShape(Rectangle()) }.buttonStyle(.plain).accessibilityIdentifier("preset-\(preset.title)").accessibilityValue(added[preset.id].map { "\($0)枚追加済み" } ?? "")
                             Button { editing = preset } label: { Image(systemName: "ellipsis").frame(width: 34, height: 44).foregroundStyle(.secondary) }.buttonStyle(.plain).accessibilityLabel("\(preset.title)のプリセットを編集")
                         }.listRowBackground(Color.white)
@@ -99,6 +100,7 @@ struct PresetEditor: View {
                 Section("メモ") { TextField("任意", text: $preset.memo, axis: .vertical) }
                 if !isNew { Section { Button("プリセットを削除", role: .destructive) { plans.change { $0.presets.removeAll { $0.id == preset.id } }; dismiss() } } }
             }.scrollContentBackground(.hidden).background(paper).navigationTitle(isNew ? "プリセットをつくる" : "プリセットを編集").navigationBarTitleDisplayMode(.inline)
+                .onAppear { if !plans.plan.colors.contains(where: { $0.id == preset.tone }) { preset.tone = plans.plan.colors[0].id } }
                 .toolbar {
                     ToolbarItem(placement: .cancellationAction) { Button("キャンセル") { dismiss() } }
                     ToolbarItem(placement: .confirmationAction) { Button("保存") { preset.title = preset.title.trimmingCharacters(in: .whitespacesAndNewlines); plans.change { value in if isNew { value.presets.append(preset) } else if let i = value.presets.firstIndex(where: { $0.id == preset.id }) { value.presets[i] = preset } }; dismiss() }.disabled(preset.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty).accessibilityIdentifier("savePreset") }
@@ -111,18 +113,18 @@ struct NamedColorPicker: View {
     @EnvironmentObject private var plans: PlanStore
     @Binding var selection: Int
     var body: some View {
-        HStack(spacing: 8) {
-            ForEach(tones.indices, id: \.self) { index in
-                Button { selection = index } label: {
+        LazyVGrid(columns: [GridItem(.adaptive(minimum: 64))], spacing: 12) {
+            ForEach(plans.plan.colors) { color in
+                Button { selection = color.id } label: {
                     VStack(spacing: 7) {
-                        Circle().fill(tones[index]).frame(width: 36, height: 36)
-                            .overlay { if selection == index { Image(systemName: "checkmark").foregroundStyle(ink) } }
-                        Text(plans.colorName(for: index)).font(.system(size: 12))
+                        Circle().fill(color.color).frame(width: 36, height: 36)
+                            .overlay { if selection == color.id { Image(systemName: "checkmark").foregroundStyle(ink).padding(3).background(.white.opacity(0.8), in: Circle()) } }
+                        Text(color.name).font(.system(size: 12))
                             .lineLimit(1).minimumScaleFactor(0.7).foregroundStyle(ink)
                     }.frame(maxWidth: .infinity).padding(.vertical, 4).contentShape(Rectangle())
-                }.buttonStyle(.plain).accessibilityIdentifier("color-\(index)")
-                    .accessibilityLabel(plans.colorName(for: index))
-                    .accessibilityValue(selection == index ? "選択中" : "")
+                }.buttonStyle(.plain).accessibilityIdentifier("color-\(color.id)")
+                    .accessibilityLabel(color.name)
+                    .accessibilityValue(selection == color.id ? "選択中" : "")
             }
         }
     }
@@ -131,28 +133,67 @@ struct NamedColorPicker: View {
 struct ColorNamesEditor: View {
     @EnvironmentObject private var plans: PlanStore
     @Environment(\.dismiss) private var dismiss
-    @State var names: [String]
+    @State var colors: [StickyColor]
+    @State private var replacements: [Int: Int] = [:]
+    @State private var deleting: StickyColor?
+    @State private var nextID = 0
     var body: some View {
         NavigationStack {
             Form {
                 Section {
-                    ForEach(tones.indices, id: \.self) { index in
-                        HStack(spacing: 14) {
-                            Circle().fill(tones[index]).frame(width: 28, height: 28)
-                            TextField(SavedPlan.defaultColorNames[index], text: $names[index])
-                                .accessibilityLabel("色\(index + 1)の名前").accessibilityIdentifier("color-name-\(index)")
+                    ForEach($colors) { $color in
+                        VStack(spacing: 10) {
+                            HStack(spacing: 14) {
+                                ColorPicker("色", selection: Binding(get: { color.color }, set: { value in
+                                    var red: CGFloat = 0, green: CGFloat = 0, blue: CGFloat = 0, alpha: CGFloat = 0
+                                    UIColor(value).getRed(&red, green: &green, blue: &blue, alpha: &alpha)
+                                    color.hex = String(format: "%02X%02X%02X", Int((red * 255).rounded()), Int((green * 255).rounded()), Int((blue * 255).rounded()))
+                                }), supportsOpacity: false).labelsHidden().accessibilityLabel("\(color.name)の色")
+                                TextField("名前", text: $color.name)
+                                    .accessibilityLabel("色\(color.id + 1)の名前").accessibilityIdentifier("color-name-\(color.id)")
+                                Button(role: .destructive) { deleting = color } label: { Image(systemName: "trash").frame(width: 36, height: 36) }
+                                    .buttonStyle(.borderless).disabled(colors.count == 1)
+                                    .accessibilityLabel("\(color.name)を削除").accessibilityIdentifier("delete-color-\(color.id)")
+                            }
+                            HStack {
+                                Text("#").foregroundStyle(.secondary)
+                                TextField("RGB", text: $color.hex).font(.system(.caption, design: .monospaced))
+                                    .textInputAutocapitalization(.characters).autocorrectionDisabled()
+                                    .accessibilityLabel("\(color.name)のカラーコード").accessibilityIdentifier("color-hex-\(color.id)")
+                            }
                         }
                     }
+                }
+                Section {
+                    Button { colors.append(StickyColor(id: nextID, name: "新しい色", hex: "E8DDF5")); nextID += 1 } label: {
+                        Label("色を追加", systemImage: "plus")
+                    }.accessibilityIdentifier("addColor")
                 }
             }.scrollContentBackground(.hidden).background(paper)
                 .navigationTitle("付箋の色").navigationBarTitleDisplayMode(.inline)
                 .toolbar {
                     ToolbarItem(placement: .cancellationAction) { Button("キャンセル") { dismiss() } }
                     ToolbarItem(placement: .confirmationAction) {
-                        Button("保存") { plans.setColorNames(names); dismiss() }
-                            .disabled(names.contains { $0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty })
+                        Button("保存") { plans.setColors(colors, replacements: replacements); dismiss() }
+                            .disabled(colors.contains { $0.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || !StickyColor.validHex($0.hex) })
                             .accessibilityIdentifier("saveColorNames")
                     }
+                }
+                .onAppear { nextID = max(nextID, (colors.map(\.id).max() ?? -1) + 1) }
+                .confirmationDialog("削除後に使う色", isPresented: Binding(get: { deleting != nil }, set: { if !$0 { deleting = nil } }), titleVisibility: .visible) {
+                    if let source = deleting {
+                        ForEach(colors.filter { $0.id != source.id }) { target in
+                            Button("\(target.name)に付け替える") {
+                                for key in Array(replacements.keys) where replacements[key] == source.id { replacements[key] = target.id }
+                                replacements[source.id] = target.id
+                                colors.removeAll { $0.id == source.id }
+                                deleting = nil
+                            }
+                        }
+                    }
+                    Button("キャンセル", role: .cancel) { deleting = nil }
+                } message: {
+                    Text("この色の付箋とプリセットを、選んだ色に付け替えます。")
                 }
         }
     }
