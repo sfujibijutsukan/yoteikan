@@ -1,5 +1,9 @@
 // !$*UTF8*$!
 {archiveVersion = 1; classes = {}; objectVersion = 56; objects = {
+A10000000000000000000001 = {isa = PBXBuildFile; fileRef = A10000000000000000000002; };
+A10000000000000000000002 = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+A10000000000000000000003 = {isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = (A10000000000000000000001,); runOnlyForDeploymentPostprocessing = 0; };
+
 C226FA3F560BD68A29E98F08 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CalendarStore.swift; sourceTree = "<group>"; };
 C7084A90DB794F07696E135B = {isa = PBXBuildFile; fileRef = C226FA3F560BD68A29E98F08; };
 6D96CF0DB3A0D913C5B67514 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Editors.swift; sourceTree = "<group>"; };
@@ -11,14 +15,14 @@ FFCE13D7F836B17E82B02040 = {isa = PBXFileReference; lastKnownFileType = sourceco
 6E53A73F3F3D52953B496920 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = YoteikanApp.swift; sourceTree = "<group>"; };
 D650888B1F0FC0BB5CA8E70F = {isa = PBXBuildFile; fileRef = 6E53A73F3F3D52953B496920; };
 707A1B8AA6F495C9BF6658C2 = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
-8BA5F8C27E675102A992DF52 = {isa = PBXGroup; children = (C226FA3F560BD68A29E98F08,6D96CF0DB3A0D913C5B67514,FFCE13D7F836B17E82B02040,0CA3F632304258B7453CB62B,6E53A73F3F3D52953B496920,707A1B8AA6F495C9BF6658C2,); path = Yoteikan; sourceTree = "<group>"; };
+8BA5F8C27E675102A992DF52 = {isa = PBXGroup; children = (A10000000000000000000002,C226FA3F560BD68A29E98F08,6D96CF0DB3A0D913C5B67514,FFCE13D7F836B17E82B02040,0CA3F632304258B7453CB62B,6E53A73F3F3D52953B496920,707A1B8AA6F495C9BF6658C2,); path = Yoteikan; sourceTree = "<group>"; };
 437468150567B8E4EFF2747E = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Yoteikan.app; sourceTree = BUILT_PRODUCTS_DIR; };
 34DBB777AE5E96FBCCBB9F13 = {isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (C7084A90DB794F07696E135B,476C8B46EAF851C79AFDBA81,0B185DDB69EE6947E9C95DE1,6C2E0B51975D041CE516E346,D650888B1F0FC0BB5CA8E70F,); runOnlyForDeploymentPostprocessing = 0; };
 6044F76B2EAFA62F093BDBD1 = {isa = PBXFrameworksBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
-F0A9A399E010542A7CC60EED = {isa = XCBuildConfiguration; buildSettings = {PRODUCT_NAME = "$(TARGET_NAME)"; PRODUCT_BUNDLE_IDENTIFIER = com.sota.yoteikan; SWIFT_VERSION = 5.0; IPHONEOS_DEPLOYMENT_TARGET = 17.0; TARGETED_DEVICE_FAMILY = 1; CODE_SIGN_STYLE = Automatic; GENERATE_INFOPLIST_FILE = YES; SWIFT_EMIT_LOC_STRINGS = YES; SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG; SWIFT_OPTIMIZATION_LEVEL = "-Onone"; INFOPLIST_FILE = Yoteikan/Info.plist; ENABLE_PREVIEWS = YES;}; name = Debug; };
-F30B7857FA9AEA27B1B478DB = {isa = XCBuildConfiguration; buildSettings = {PRODUCT_NAME = "$(TARGET_NAME)"; PRODUCT_BUNDLE_IDENTIFIER = com.sota.yoteikan; SWIFT_VERSION = 5.0; IPHONEOS_DEPLOYMENT_TARGET = 17.0; TARGETED_DEVICE_FAMILY = 1; CODE_SIGN_STYLE = Automatic; GENERATE_INFOPLIST_FILE = YES; SWIFT_EMIT_LOC_STRINGS = YES; INFOPLIST_FILE = Yoteikan/Info.plist; ENABLE_PREVIEWS = YES;}; name = Release; };
+F0A9A399E010542A7CC60EED = {isa = XCBuildConfiguration; buildSettings = {ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon; PRODUCT_NAME = "$(TARGET_NAME)"; PRODUCT_BUNDLE_IDENTIFIER = com.sota.yoteikan; SWIFT_VERSION = 5.0; IPHONEOS_DEPLOYMENT_TARGET = 17.0; TARGETED_DEVICE_FAMILY = 1; CODE_SIGN_STYLE = Automatic; GENERATE_INFOPLIST_FILE = YES; SWIFT_EMIT_LOC_STRINGS = YES; SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG; SWIFT_OPTIMIZATION_LEVEL = "-Onone"; INFOPLIST_FILE = Yoteikan/Info.plist; ENABLE_PREVIEWS = YES;}; name = Debug; };
+F30B7857FA9AEA27B1B478DB = {isa = XCBuildConfiguration; buildSettings = {ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon; PRODUCT_NAME = "$(TARGET_NAME)"; PRODUCT_BUNDLE_IDENTIFIER = com.sota.yoteikan; SWIFT_VERSION = 5.0; IPHONEOS_DEPLOYMENT_TARGET = 17.0; TARGETED_DEVICE_FAMILY = 1; CODE_SIGN_STYLE = Automatic; GENERATE_INFOPLIST_FILE = YES; SWIFT_EMIT_LOC_STRINGS = YES; INFOPLIST_FILE = Yoteikan/Info.plist; ENABLE_PREVIEWS = YES;}; name = Release; };
 1F12DCAF1F8F3D5670942511 = {isa = XCConfigurationList; buildConfigurations = (F0A9A399E010542A7CC60EED,F30B7857FA9AEA27B1B478DB,); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; };
-89F85EADA563223FE893A400 = {isa = PBXNativeTarget; buildConfigurationList = 1F12DCAF1F8F3D5670942511; buildPhases = (34DBB777AE5E96FBCCBB9F13,6044F76B2EAFA62F093BDBD1,); buildRules = (); dependencies = (); name = Yoteikan; productName = Yoteikan; productReference = 437468150567B8E4EFF2747E; productType = "com.apple.product-type.application"; };
+89F85EADA563223FE893A400 = {isa = PBXNativeTarget; buildConfigurationList = 1F12DCAF1F8F3D5670942511; buildPhases = (34DBB777AE5E96FBCCBB9F13,6044F76B2EAFA62F093BDBD1,A10000000000000000000003,); buildRules = (); dependencies = (); name = Yoteikan; productName = Yoteikan; productReference = 437468150567B8E4EFF2747E; productType = "com.apple.product-type.application"; };
 8787388595F87B181AF8DEB6 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlanTests.swift; sourceTree = "<group>"; };
 A29BD0A086F2927F3685491B = {isa = PBXBuildFile; fileRef = 8787388595F87B181AF8DEB6; };
 DEB82168416CEE6BB8A02AD9 = {isa = PBXGroup; children = (8787388595F87B181AF8DEB6,); path = YoteikanTests; sourceTree = "<group>"; };
