@@ -6,6 +6,37 @@ import XCTest
     var suite: String!
     override func setUp() { super.setUp(); suite = "test.\(UUID())"; defaults = UserDefaults(suiteName: suite)! }
     override func tearDown() { defaults.removePersistentDomain(forName: suite); super.tearDown() }
+    func testLegacyPlanKeepsStickiesAndPresetsWhenAddingColorNames() throws {
+        var old = SavedPlan()
+        old.stickies = [Sticky(title: "残す予定", minutes: 45, tone: 1, day: dayKey(Date()), start: 600)]
+        var json = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(old)) as? [String: Any])
+        json.removeValue(forKey: "colorNames")
+        defaults.set(try JSONSerialization.data(withJSONObject: json), forKey: "yoteikan.plan.v1")
+        let restored = PlanStore(defaults: defaults)
+        XCTAssertEqual(restored.plan.stickies, old.stickies)
+        XCTAssertEqual(restored.plan.presets, old.presets)
+        XCTAssertEqual(restored.plan.colorNames, SavedPlan.defaultColorNames)
+    }
+    func testColorNamesPersistAndUndoWithoutChangingTasks() {
+        let store = PlanStore(defaults: defaults)
+        store.add(store.plan.presets[1])
+        let before = store.plan
+        store.setColorNames(["朝の準備", "集中", "暮らし", "休む"])
+        XCTAssertEqual(store.plan.stickies, before.stickies)
+        XCTAssertEqual(store.plan.presets, before.presets)
+        XCTAssertEqual(PlanStore(defaults: defaults).plan.colorNames, ["朝の準備", "集中", "暮らし", "休む"])
+        XCTAssertEqual(store.colorName(for: 1), "集中")
+        store.restore()
+        XCTAssertEqual(store.plan, before)
+        XCTAssertEqual(PlanStore(defaults: defaults).plan, before)
+    }
+    func testColorNamesNormalizeMissingBlankAndExtraEntries() throws {
+        XCTAssertEqual(SavedPlan.normalizedColorNames(["", " 集中\n"]), ["準備", "集中", "生活", "休憩"])
+        var plan = SavedPlan()
+        plan.colorNames = ["朝", "昼", "夜", "休", "余分"]
+        let restored = try JSONDecoder().decode(SavedPlan.self, from: JSONEncoder().encode(plan))
+        XCTAssertEqual(restored.colorNames, ["朝", "昼", "夜", "休"])
+    }
     func testMovingOneStickyLeavesOthersAndPresetUnchanged() {
         let store = PlanStore(defaults: defaults)
         let preset = store.plan.presets[0]

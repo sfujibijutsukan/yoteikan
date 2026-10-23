@@ -25,6 +25,8 @@ struct FixedEvent: Identifiable {
     var allDay = false
 }
 struct SavedPlan: Codable, Equatable {
+    static let defaultColorNames = ["準備", "仕事", "生活", "休憩"]
+    var colorNames = defaultColorNames
     var stickies: [Sticky] = []
     var presets: [Preset] = [
         Preset(title: "読書", minutes: 30, tone: 0),
@@ -32,6 +34,22 @@ struct SavedPlan: Codable, Equatable {
         Preset(title: "運動", minutes: 20, tone: 2),
         Preset(title: "休憩", minutes: 15, tone: 3)
     ]
+    init() {}
+    private enum CodingKeys: String, CodingKey { case stickies, presets, colorNames }
+    init(from decoder: Decoder) throws {
+        self.init()
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        stickies = try values.decodeIfPresent([Sticky].self, forKey: .stickies) ?? []
+        presets = try values.decodeIfPresent([Preset].self, forKey: .presets) ?? presets
+        colorNames = Self.normalizedColorNames(try values.decodeIfPresent([String].self, forKey: .colorNames) ?? Self.defaultColorNames)
+    }
+    static func normalizedColorNames(_ names: [String]) -> [String] {
+        defaultColorNames.enumerated().map { index, fallback in
+            guard names.indices.contains(index) else { return fallback }
+            let name = names[index].trimmingCharacters(in: .whitespacesAndNewlines)
+            return name.isEmpty ? fallback : name
+        }
+    }
 }
 struct TimelineItem {
     let id: String
@@ -117,6 +135,14 @@ let tones: [Color] = [Color(red: 0.88, green: 0.93, blue: 0.80), Color(red: 0.97
     func save() { if !demo, let data = try? JSONEncoder().encode(plan) { defaults.set(data, forKey: key) } }
     func change(_ body: (inout SavedPlan) -> Void) { undo = plan; body(&plan); save() }
     func restore() { guard let old = undo else { return }; plan = old; undo = nil; save() }
+    func colorName(for tone: Int) -> String {
+        plan.colorNames.indices.contains(tone) ? plan.colorNames[tone] : SavedPlan.defaultColorNames[0]
+    }
+    func setColorNames(_ names: [String]) {
+        let normalized = SavedPlan.normalizedColorNames(names)
+        guard normalized != plan.colorNames else { return }
+        change { $0.colorNames = normalized }
+    }
     func add(_ preset: Preset) {
         change { $0.stickies.append(Sticky(title: preset.title, minutes: preset.minutes, tone: preset.tone, memo: preset.memo, day: dayKey(date))) }
     }
