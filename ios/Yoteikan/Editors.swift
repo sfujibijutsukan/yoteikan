@@ -21,7 +21,10 @@ struct StickyEditor: View {
                 Section {
                     Toggle("開始時刻を指定", isOn: $placed).accessibilityIdentifier("placeToggle")
                     if placed { DatePicker("開始", selection: $startTime, displayedComponents: .hourAndMinute).environment(\.locale, Locale(identifier: "ja_JP")) }
-                } footer: { Text("\(PlannerMath.first / 60):00〜\(PlannerMath.last / 60):00") }
+                } footer: { Text(plans.hours.label) }
+                if placed && task.minutes > plans.hours.totalMinutes {
+                    Section { Text("所要時間が計画の時間帯を超えています。").foregroundStyle(.orange) }
+                }
                 Section("メモ") { TextField("任意", text: $task.memo, axis: .vertical).lineLimit(3...5).accessibilityIdentifier("stickyMemo") }
                 if isNew { Section { Toggle("プリセットにも保存", isOn: $saveAsPreset) } }
                 if !isNew {
@@ -35,7 +38,7 @@ struct StickyEditor: View {
             .navigationTitle(isNew ? "付箋をつくる" : "付箋を編集").navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("キャンセル") { dismiss() } }
-                ToolbarItem(placement: .confirmationAction) { Button("保存") { save() }.fontWeight(.semibold).disabled(task.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty).accessibilityIdentifier("saveSticky") }
+                ToolbarItem(placement: .confirmationAction) { Button("保存") { save() }.fontWeight(.semibold).disabled(task.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || (placed && task.minutes > plans.hours.totalMinutes)).accessibilityIdentifier("saveSticky") }
             }
             .onAppear {
                 if !plans.plan.colors.contains(where: { $0.id == task.tone }) { task.tone = plans.plan.colors[0].id }
@@ -47,7 +50,7 @@ struct StickyEditor: View {
     }
     private func save() {
         task.title = task.title.trimmingCharacters(in: .whitespacesAndNewlines)
-        if placed { let parts = Calendar.current.dateComponents([.hour, .minute], from: startTime); task.start = PlannerMath.start(PlannerMath.snap(Double((parts.hour ?? 9) * 60 + (parts.minute ?? 0))), duration: task.minutes) }
+        if placed { let parts = Calendar.current.dateComponents([.hour, .minute], from: startTime); task.start = PlannerMath.start(PlannerMath.snap(Double((parts.hour ?? 9) * 60 + (parts.minute ?? 0))), duration: task.minutes, from: plans.hours.start, to: plans.hours.end) }
         else { task.start = nil }
         if isNew {
             plans.change {
@@ -56,6 +59,33 @@ struct StickyEditor: View {
             }
         } else { plans.update(task) }
         dismiss()
+    }
+}
+
+struct PlanningHoursEditor: View {
+    @EnvironmentObject private var plans: PlanStore
+    @Environment(\.dismiss) private var dismiss
+    @State var hours: PlanningHours
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section {
+                    Picker("開始時刻", selection: $hours.start) {
+                        ForEach(0..<(hours.end / 60), id: \.self) { hour in Text(clockText(hour * 60)).tag(hour * 60) }
+                    }.accessibilityIdentifier("planningStart")
+                    Picker("終了時刻", selection: $hours.end) {
+                        ForEach((hours.start / 60 + 1)...24, id: \.self) { hour in Text(clockText(hour * 60)).tag(hour * 60) }
+                    }.accessibilityIdentifier("planningEnd")
+                }
+            }.scrollContentBackground(.hidden).background(paper)
+                .navigationTitle("計画の時間帯").navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) { Button("キャンセル") { dismiss() }.accessibilityIdentifier("cancelHours") }
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button("保存") { plans.setHours(hours); dismiss() }.disabled(!hours.isValid).accessibilityIdentifier("saveHours")
+                    }
+                }
+        }
     }
 }
 

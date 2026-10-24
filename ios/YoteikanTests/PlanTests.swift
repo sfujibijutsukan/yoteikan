@@ -144,6 +144,64 @@ import XCTest
         XCTAssertEqual(PlannerMath.start(300, duration: 720), 300)
     }
 
+    func testCustomHoursPersistUndoAndPreserveAllPlans() {
+        let store = PlanStore(defaults: defaults)
+        store.add(store.plan.presets[0])
+        store.put(store.today[0].id, at: 300)
+        let before = store.plan
+        store.setHours(PlanningHours(start: 480, end: 1200))
+        XCTAssertEqual(store.plan.stickies, before.stickies)
+        XCTAssertEqual(store.plan.presets, before.presets)
+        XCTAssertEqual(store.hours.totalMinutes, 720)
+        XCTAssertEqual(PlanStore(defaults: defaults).hours, store.hours)
+        store.restore()
+        XCTAssertEqual(store.plan, before)
+        XCTAssertEqual(PlanStore(defaults: defaults).plan, before)
+    }
+
+    func testCustomHoursConstrainPlacementAndRejectTooLongSticky() {
+        let store = PlanStore(defaults: defaults)
+        store.setHours(PlanningHours(start: 1200, end: 1320))
+        store.add(Preset(title: "夜の読書", minutes: 30))
+        let id = store.today[0].id
+        store.put(id, at: 300)
+        XCTAssertEqual(store.today[0].start, 1200)
+        store.move(id, start: 1400)
+        XCTAssertEqual(store.today[0].start, 1290)
+        store.resize(id, minutes: 60)
+        XCTAssertEqual(store.today[0].minutes, 30)
+        store.add(Preset(title: "長い作業", minutes: 180))
+        store.put(store.today[1].id, at: 1200)
+        XCTAssertNil(store.today[1].start)
+        XCTAssertEqual(store.today[1].minutes, 180)
+        XCTAssertNotNil(store.notice)
+        XCTAssertEqual(PlannerMath.occupied([(1140, 1230), (1300, 1400)], from: 1200, to: 1320), 50)
+    }
+
+    func testHoursMigrationAndInvalidSettingsKeepExistingData() throws {
+        var old = SavedPlan()
+        old.stickies = [Sticky(title: "既存の予定", minutes: 30, day: dayKey(Date()), start: 540)]
+        var json = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(old)) as? [String: Any])
+        json.removeValue(forKey: "hours")
+        var restored = try JSONDecoder().decode(SavedPlan.self, from: JSONSerialization.data(withJSONObject: json))
+        XCTAssertEqual(restored.hours, PlanningHours())
+        XCTAssertEqual(restored.stickies, old.stickies)
+        json["hours"] = ["start": 1200, "end": 600]
+        restored = try JSONDecoder().decode(SavedPlan.self, from: JSONSerialization.data(withJSONObject: json))
+        XCTAssertEqual(restored.hours, PlanningHours())
+        XCTAssertEqual(restored.stickies, old.stickies)
+        let store = PlanStore(defaults: defaults)
+        for hours in [PlanningHours(start: 600, end: 600), PlanningHours(start: -60, end: 1440),
+                      PlanningHours(start: 0, end: 1500), PlanningHours(start: 301, end: 1440)] {
+            store.setHours(hours)
+            XCTAssertEqual(store.hours, PlanningHours())
+        }
+        store.setHours(PlanningHours(start: 0, end: 1440))
+        XCTAssertEqual(store.hours.totalMinutes, 1440)
+        store.setHours(PlanningHours(start: 1380, end: 1440))
+        XCTAssertEqual(store.hours.totalMinutes, 60)
+    }
+
     func testOverlapColumnsCoverTransitiveGroupsAndReuseLanes() {
         let items = [TimelineItem(id: "a", start: 600, end: 660), TimelineItem(id: "b", start: 630, end: 690), TimelineItem(id: "c", start: 660, end: 720), TimelineItem(id: "d", start: 720, end: 750)]
         let slots = PlannerMath.layout(items)
