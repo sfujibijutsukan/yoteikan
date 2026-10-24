@@ -16,7 +16,6 @@ struct PlannerView: View {
     @State private var shift: CGFloat = 0
     @State private var stretching: UUID?
     @State private var stretch: CGFloat = 0
-    @State private var toast: String?
     @State private var viewportHeight: CGFloat = 350
     @State private var touchStart = CGPoint.zero
     @State private var touchTask: UUID?
@@ -35,7 +34,6 @@ struct PlannerView: View {
     private var slots: [String: TimelineSlot] {
         PlannerMath.layout(placed.map { TimelineItem(id: $0.id.uuidString, start: $0.start!, end: $0.start! + $0.minutes) } + fixed.filter { !$0.allDay }.map { TimelineItem(id: "fixed-" + $0.id, start: $0.start, end: $0.end) })
     }
-    private var overlapCount: Int { placed.filter { conflicts($0) }.count }
     var body: some View {
         VStack(spacing: 0) {
             header
@@ -43,11 +41,8 @@ struct PlannerView: View {
             stats
             if !calendar.connected && !plans.demo {
                 Button { showCalendar = true } label: {
-                    HStack(spacing: 8) { Image(systemName: "calendar.badge.plus"); Text("カレンダーをつないで、空き時間を見つける").font(.system(size: 11, weight: .medium)); Spacer(); Image(systemName: "chevron.right") }.padding(.horizontal, 20).padding(.vertical, 10).foregroundStyle(accent)
+                    HStack(spacing: 8) { Image(systemName: "calendar.badge.plus"); Text("カレンダーを接続").font(.system(size: 12, weight: .medium)); Spacer(); Image(systemName: "chevron.right") }.padding(.horizontal, 20).padding(.vertical, 10).foregroundStyle(accent)
                 }.accessibilityIdentifier("calendarConnectBanner")
-            }
-            if overlapCount > 0 {
-                Label("\(overlapCount)枚の付箋に重なりがあります・1枚ずつ調整できます", systemImage: "exclamationmark.circle").font(.system(size: 10, weight: .medium)).foregroundStyle(.orange).padding(.vertical, 6).accessibilityIdentifier("overlapWarning")
             }
             if !fixed.filter(\.allDay).isEmpty {
                 ScrollView(.horizontal, showsIndicators: false) { HStack { ForEach(fixed.filter(\.allDay)) { event in Label(event.title, systemImage: "sun.max").font(.caption2).padding(7).background(.white.opacity(0.6), in: Capsule()) } }.padding(.horizontal, 20) }
@@ -57,9 +52,6 @@ struct PlannerView: View {
         }
         .background(paper).foregroundStyle(ink)
         .safeAreaInset(edge: .bottom, spacing: 0) { bottomBar }
-        .overlay(alignment: .bottom) {
-            if let toast { Text(toast).font(.caption).padding(12).background(ink, in: Capsule()).foregroundStyle(.white).padding(.bottom, 180).allowsHitTesting(false) }
-        }
         .sheet(isPresented: $showPresets) { PresetsView() }
         .sheet(isPresented: $showCalendar) { CalendarSettingsView() }
         .sheet(isPresented: $showNew) { StickyEditor(task: Sticky(title: "", minutes: 30, day: dayKey(plans.date)), isNew: true) }
@@ -68,14 +60,18 @@ struct PlannerView: View {
         .onChange(of: phase) { _, value in if value == .active { calendar.refresh(date: plans.date) } }
     }
     private var header: some View {
-        HStack(alignment: .center) {
-            VStack(alignment: .leading, spacing: 5) {
-                HStack(spacing: 6) { Text("YOTEIKAN").tracking(2.8).font(.system(size: 10, weight: .bold)); Text("/ 予定館").font(.system(size: 10)); if plans.demo { Text("デモ").font(.system(size: 9)).padding(.horizontal, 6).padding(.vertical, 2).background(tones[1], in: Capsule()) } }.foregroundStyle(accent)
-                Text("今日を、組み立てる。").font(.system(size: 23, weight: .semibold, design: .serif))
+        HStack {
+            Text("予定館").font(.system(size: 22, weight: .semibold, design: .serif))
+            if plans.demo {
+                Text("デモ").font(.system(size: 9)).padding(.horizontal, 6).padding(.vertical, 2)
+                    .background(tones[1], in: Capsule())
             }
             Spacer()
-            Button { showCalendar = true } label: { Image(systemName: "calendar.badge.clock").font(.system(size: 19)).frame(width: 44, height: 44).background(.white.opacity(0.8), in: Circle()) }.accessibilityLabel("カレンダー設定").accessibilityIdentifier("calendarSettings")
-        }.padding(.horizontal, 22).padding(.top, 12).padding(.bottom, 18)
+            Button { showCalendar = true } label: {
+                Image(systemName: "calendar.badge.clock").font(.system(size: 19))
+                    .frame(width: 44, height: 44).background(.white.opacity(0.8), in: Circle())
+            }.accessibilityLabel("カレンダー設定").accessibilityIdentifier("calendarSettings")
+        }.padding(.horizontal, 22).padding(.top, 8).padding(.bottom, 8)
     }
     private var dateBar: some View {
         HStack(spacing: 9) {
@@ -88,15 +84,15 @@ struct PlannerView: View {
     }
     private var stats: some View {
         HStack(spacing: 0) {
-            stat("空き時間", durationText(1080 - occupied), "6:00–24:00")
+            stat("空き時間", durationText(1080 - occupied))
             Rectangle().fill(ink.opacity(0.10)).frame(width: 1, height: 31)
-            stat("未配置", durationText(inbox.reduce(0) { $0 + $1.minutes }), "\(inbox.count)枚の付箋")
+            stat("未配置", durationText(inbox.reduce(0) { $0 + $1.minutes }))
             Spacer(minLength: 0)
             Button { overview.toggle() } label: { VStack(spacing: 5) { Image(systemName: overview ? "plus.magnifyingglass" : "rectangle.expand.vertical").font(.system(size: 17)); Text(overview ? "拡大する" : "1日を見る").font(.system(size: 10)) }.frame(width: 70, height: 55) }.accessibilityIdentifier("zoomToggle")
         }.padding(.horizontal, 22).padding(.vertical, 12)
     }
-    private func stat(_ title: String, _ value: String, _ caption: String) -> some View {
-        VStack(alignment: .leading, spacing: 4) { Text(title).font(.system(size: 10)).foregroundStyle(ink.opacity(0.55)); Text(value).font(.system(size: 18, weight: .semibold, design: .rounded)); Text(caption).font(.system(size: 9)).foregroundStyle(ink.opacity(0.5)) }.frame(maxWidth: .infinity, alignment: .leading).padding(.leading, title == "未配置" ? 18 : 0)
+    private func stat(_ title: String, _ value: String) -> some View {
+        VStack(alignment: .leading, spacing: 4) { Text(title).font(.system(size: 10)).foregroundStyle(ink.opacity(0.55)); Text(value).font(.system(size: 18, weight: .semibold, design: .rounded)) }.frame(maxWidth: .infinity, alignment: .leading).padding(.leading, title == "未配置" ? 18 : 0)
     }
     private var timeline: some View {
         ScrollViewReader { reader in
@@ -145,6 +141,7 @@ struct PlannerView: View {
                                 .accessibilityElement(children: .contain)
                                 .accessibilityIdentifier("task-\(task.title)")
                                 .accessibilityValue("\(clockText(task.start!))|\(task.minutes)")
+                                .accessibilityHint(collision ? "ほかの予定と重なっています" : "")
                         }
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
@@ -168,7 +165,7 @@ struct PlannerView: View {
         VStack(alignment: .leading, spacing: overview ? 0 : 5) {
             if overview { Text(event.title).font(.system(size: 7, weight: .medium)).lineLimit(1) }
             else { HStack { Image(systemName: "lock.fill").font(.system(size: 9)); Text("\(clockText(event.start)) – \(clockText(event.end))").font(.system(size: 10, weight: .medium)); Spacer(minLength: 0) }.foregroundStyle(ink.opacity(0.55))
-            if !overview { Text(event.title).font(.system(size: 13, weight: .medium)).lineLimit(2); Text("カレンダーの予定").font(.system(size: 9)).foregroundStyle(ink.opacity(0.45)) }
+            if !overview { Text(event.title).font(.system(size: 13, weight: .medium)).lineLimit(2) }
             Spacer(minLength: 0)
             }
         }.padding(overview ? 2 : 10).frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading).background(Color(red: 0.89, green: 0.91, blue: 0.89), in: RoundedRectangle(cornerRadius: 9)).overlay(alignment: .leading) { RoundedRectangle(cornerRadius: 2).fill(ink.opacity(0.25)).frame(width: 3).padding(.vertical, 9) }.clipped().accessibilityElement(children: .ignore).accessibilityLabel("\(event.title)、\(clockText(event.start))から\(clockText(event.end))、カレンダーの固定予定").accessibilityIdentifier("fixed-\(event.title)")
@@ -182,7 +179,6 @@ struct PlannerView: View {
             } else {
             if !compact { Text("\(clockText(start)) – \(clockText(start + duration))").font(.system(size: 10, weight: .medium)).foregroundStyle(ink.opacity(0.6)) }
             HStack(spacing: 4) { Text(task.title).font(.system(size: compact ? 10 : 14, weight: .semibold)).lineLimit(1); Spacer(minLength: 0); if compact { Text("\(duration)分").font(.system(size: 9)) } }.padding(.trailing, selected == task.id ? 29 : 0)
-            if !compact && duration >= 40 { Text(durationText(duration)).font(.system(size: 10)).foregroundStyle(ink.opacity(0.6)) }
             Spacer(minLength: 0)
             }
         }.padding(.horizontal, overview ? 3 : 12).padding(.top, overview ? 1 : (compact ? 5 : 9)).frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
@@ -253,9 +249,12 @@ struct PlannerView: View {
     }
     private var inboxView: some View {
         VStack(alignment: .leading, spacing: 11) {
-            HStack { Text("今日の付箋").font(.system(size: 14, weight: .semibold)); Text("\(inbox.count)").font(.system(size: 10, weight: .bold)).padding(5).background(ink.opacity(0.06), in: Circle()); Spacer(); Button { showPresets = true } label: { Label("プリセット", systemImage: "square.stack").font(.system(size: 11, weight: .medium)) }.accessibilityIdentifier("presetsButton") }
+            HStack { Text("未配置").font(.system(size: 14, weight: .semibold)); Text("\(inbox.count)").font(.system(size: 10, weight: .bold)).padding(5).background(ink.opacity(0.06), in: Circle()); Spacer(); Button { showPresets = true } label: { Label("プリセット", systemImage: "square.stack").font(.system(size: 11, weight: .medium)) }.accessibilityIdentifier("presetsButton") }
             if inbox.isEmpty {
-                HStack { Image(systemName: "square.and.pencil"); Text("付箋を追加して、今日を組み立てましょう").font(.system(size: 11)); Spacer() }.foregroundStyle(ink.opacity(0.4)).frame(height: 64)
+                RoundedRectangle(cornerRadius: 8)
+                    .strokeBorder(ink.opacity(0.12), style: StrokeStyle(lineWidth: 1, dash: [4, 4]))
+                    .frame(height: 64)
+                    .accessibilityLabel("未配置の付箋はありません")
             } else {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 10) {
@@ -268,7 +267,6 @@ struct PlannerView: View {
                     }.padding(.vertical, 2)
                 }
             }
-            Text("付箋を選んで↕をドラッグすると移動、下端のつまみで長さを変更。").font(.system(size: 9)).foregroundStyle(ink.opacity(0.45))
         }.padding(.horizontal, 22).padding(.top, 15).padding(.bottom, 13)
             .background(returningToInbox ? tones[0] : paper)
             .background { GeometryReader { proxy in Color.clear.onAppear { inboxFrame = proxy.frame(in: .global) }.onChange(of: proxy.frame(in: .global)) { _, frame in inboxFrame = frame } } }

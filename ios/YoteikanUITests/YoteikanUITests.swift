@@ -9,7 +9,7 @@ final class YoteikanUITests: XCTestCase {
         launch(); shot("01-day-planner")
         app.buttons["presetsButton"].tap()
         XCTAssertTrue(app.buttons["preset-読書"].waitForExistence(timeout: 3)); app.buttons["preset-読書"].tap()
-        XCTAssertTrue(app.staticTexts["presetAdded"].exists); shot("02-presets")
+        XCTAssertEqual(app.buttons["preset-読書"].value as? String, "1枚追加済み"); shot("02-presets")
         app.buttons["closePresets"].tap()
         XCTAssertEqual(app.otherElements.matching(identifier: "inbox-読書").count, 2)
     }
@@ -32,7 +32,6 @@ final class YoteikanUITests: XCTestCase {
         XCTAssertTrue(task.waitForExistence(timeout: 3))
         let from = task.coordinate(withNormalizedOffset: CGVector(dx: 0.45, dy: 0.30))
         from.press(forDuration: 0.5, thenDragTo: from.withOffset(CGVector(dx: 0, dy: 46.5)))
-        XCTAssertTrue(app.staticTexts["overlapWarning"].waitForExistence(timeout: 3))
         XCTAssertEqual(task.value as? String, "09:30|60")
         XCTAssertEqual(app.otherElements["task-朝の読書"].value as? String, "08:00|30")
         shot("04-overlap-after-drag")
@@ -41,7 +40,6 @@ final class YoteikanUITests: XCTestCase {
         XCTAssertTrue(handle.exists)
         let point = handle.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
         point.press(forDuration: 0.15, thenDragTo: point.withOffset(CGVector(dx: 0, dy: 46.5)))
-        XCTAssertTrue(app.staticTexts["overlapWarning"].waitForExistence(timeout: 3))
         XCTAssertEqual(task.value as? String, "09:00|90")
         shot("05-resize-overlap")
         app.buttons["unplaceButton"].tap()
@@ -73,7 +71,7 @@ final class YoteikanUITests: XCTestCase {
             let allow = springboard.buttons.matching(NSPredicate(format: "label CONTAINS[c] 'Full Access' OR label CONTAINS 'フルアクセス' OR label == 'Allow'")).firstMatch
             if allow.waitForExistence(timeout: 5) { allow.tap() }
         }
-        XCTAssertTrue(app.staticTexts["calendarConnected"].waitForExistence(timeout: 8))
+        XCTAssertTrue(app.switches["calendar-予定館・動作確認用"].firstMatch.waitForExistence(timeout: 8))
         shot("07-calendar-settings")
         app.buttons["closeCalendar"].tap()
         XCTAssertTrue(app.descendants(matching: .any).matching(identifier: "fixed-チームミーティング").firstMatch.waitForExistence(timeout: 5))
