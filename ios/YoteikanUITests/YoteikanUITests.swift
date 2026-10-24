@@ -288,6 +288,37 @@ final class YoteikanUITests: XCTestCase {
         XCTAssertFalse(app.buttons["color-4"].exists)
         XCTAssertEqual(app.buttons["color-1"].value as? String, "選択中")
     }
+    func test14PlanAtFiveAMAndKeepMidnightBoundary() {
+        launch(["--reset-test-data"])
+        app.buttons["newStickyButton"].tap()
+        app.textFields["stickyTitle"].tap()
+        app.textFields["stickyTitle"].typeText("早朝の読書")
+        app.buttons["saveSticky"].tap()
+        let timeline = app.scrollViews["timeline"]
+        let upper = timeline.coordinate(withNormalizedOffset: CGVector(dx: 0.08, dy: 0.2))
+        let lower = timeline.coordinate(withNormalizedOffset: CGVector(dx: 0.08, dy: 0.9))
+        upper.press(forDuration: 0.01, thenDragTo: lower)
+        let firstHour = app.staticTexts["05:00"]
+        XCTAssertTrue(firstHour.waitForExistence(timeout: 3))
+        XCTAssertTrue(firstHour.isHittable)
+        let target = timeline.coordinate(withNormalizedOffset: CGVector(dx: 0.6, dy: 0))
+            .withOffset(CGVector(dx: 0, dy: firstHour.frame.minY - timeline.frame.minY + 1))
+        let inbox = app.descendants(matching: .any).matching(identifier: "inbox-早朝の読書").firstMatch
+        inbox.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).press(forDuration: 0.7, thenDragTo: target)
+        let task = app.otherElements["task-早朝の読書"]
+        XCTAssertTrue(task.waitForExistence(timeout: 3))
+        XCTAssertEqual(task.value as? String, "05:00|30")
+        app.buttons["zoomToggle"].tap()
+        XCTAssertTrue(app.staticTexts["05:00"].isHittable)
+        XCTAssertTrue(app.staticTexts["24:00"].isHittable)
+        shot("15-five-am-plan")
+        app.terminate(); launch([])
+        app.buttons["zoomToggle"].tap()
+        XCTAssertEqual(app.otherElements["task-早朝の読書"].value as? String, "05:00|30")
+        app.otherElements["task-早朝の読書"].tap()
+        app.buttons["editButton"].tap()
+        XCTAssertTrue(app.staticTexts["5:00〜24:00"].exists)
+    }
     func test11VerticalScrollAndInboxSwipeKeepDate() {
         launch()
         let date = app.staticTexts["selectedDate"].label

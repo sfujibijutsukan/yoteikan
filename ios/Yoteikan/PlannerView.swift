@@ -22,7 +22,7 @@ struct PlannerView: View {
     @State private var touchTask: UUID?
     @State private var inboxFrame = CGRect.zero
     @State private var returningToInbox = false
-    private var scale: CGFloat { overview ? max(0.15, (viewportHeight - 32) / 1080) : 1.55 }
+    private var scale: CGFloat { overview ? max(0.15, (viewportHeight - 32) / CGFloat(PlannerMath.totalMinutes)) : 1.55 }
     private var fixed: [FixedEvent] {
         if plans.demo, dayKey(plans.date) == dayKey(Date()) {
             return [FixedEvent(id: "demo1", title: "チームミーティング", start: 600, end: 660), FixedEvent(id: "demo2", title: "打ち合わせ", start: 840, end: 900)]
@@ -93,7 +93,7 @@ struct PlannerView: View {
     }
     private var stats: some View {
         HStack(spacing: 0) {
-            stat("空き時間", durationText(1080 - occupied))
+            stat("空き時間", durationText(PlannerMath.totalMinutes - occupied))
             Rectangle().fill(ink.opacity(0.10)).frame(width: 1, height: 31)
             stat("未配置", durationText(inbox.reduce(0) { $0 + $1.minutes }))
             Spacer(minLength: 0)
@@ -109,7 +109,7 @@ struct PlannerView: View {
                 GeometryReader { geometry in
                     ZStack(alignment: .topLeading) {
                         VStack(spacing: 0) {
-                        ForEach(6...24, id: \.self) { hour in
+                        ForEach((PlannerMath.first / 60)...(PlannerMath.last / 60), id: \.self) { hour in
                             HStack(alignment: .center, spacing: 10) { Text(String(format: "%02d:00", hour)).font(.system(size: 10, weight: .medium, design: .monospaced)).foregroundStyle(ink.opacity(0.4)).frame(width: 43, alignment: .trailing); Rectangle().fill(ink.opacity(0.09)).frame(height: 1) }.frame(height: 60 * scale, alignment: .top).id(hour)
                         }
                         }.contentShape(Rectangle()).simultaneousGesture(daySwipeGesture)
@@ -163,7 +163,7 @@ struct PlannerView: View {
                 }.frame(height: CGFloat(PlannerMath.last - PlannerMath.first) * scale + 18).padding(.top, 12).padding(.horizontal, 10)
             }.accessibilityIdentifier("timeline")
                 .task { await Task.yield(); reader.scrollTo(8, anchor: .top) }
-                .onChange(of: overview) { _, value in reader.scrollTo(value ? 6 : 8, anchor: .top) }
+                .onChange(of: overview) { _, value in reader.scrollTo(value ? PlannerMath.first / 60 : 8, anchor: .top) }
                 .onChange(of: plans.date) { _, _ in reader.scrollTo(8, anchor: .top) }
         }
         .background(.white.opacity(0.62))

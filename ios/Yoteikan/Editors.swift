@@ -21,7 +21,7 @@ struct StickyEditor: View {
                 Section {
                     Toggle("開始時刻を指定", isOn: $placed).accessibilityIdentifier("placeToggle")
                     if placed { DatePicker("開始", selection: $startTime, displayedComponents: .hourAndMinute).environment(\.locale, Locale(identifier: "ja_JP")) }
-                } footer: { Text("6:00〜24:00") }
+                } footer: { Text("\(PlannerMath.first / 60):00〜\(PlannerMath.last / 60):00") }
                 Section("メモ") { TextField("任意", text: $task.memo, axis: .vertical).lineLimit(3...5).accessibilityIdentifier("stickyMemo") }
                 if isNew { Section { Toggle("プリセットにも保存", isOn: $saveAsPreset) } }
                 if !isNew {

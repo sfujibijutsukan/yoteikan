@@ -108,13 +108,40 @@ import XCTest
     func testSnappingBoundsAndOverlapUnion() {
         XCTAssertEqual(PlannerMath.snap(608), 610)
         XCTAssertEqual(PlannerMath.start(1430, duration: 30), 1410)
-        XCTAssertEqual(PlannerMath.start(100, duration: 30), 360)
+        XCTAssertEqual(PlannerMath.start(100, duration: 30), 300)
         XCTAssertEqual(PlannerMath.duration(60, start: 1420), 20)
         XCTAssertEqual(PlannerMath.duration(-10, start: 600), 5)
         XCTAssertFalse(PlannerMath.overlaps(600, 630, 630, 660))
         XCTAssertTrue(PlannerMath.overlaps(600, 640, 630, 660))
         XCTAssertEqual(PlannerMath.occupied([(600, 660), (630, 700), (700, 720)]), 120)
-        XCTAssertEqual(PlannerMath.occupied([(0, 500), (1400, 1600)]), 180)
+        XCTAssertEqual(PlannerMath.occupied([(0, 500), (1400, 1600)]), 240)
+    }
+
+    func testFiveAMPlacementBoundsPersistenceAndUndo() {
+        let store = PlanStore(defaults: defaults)
+        store.add(Preset(title: "早朝の読書", minutes: 30))
+        let id = store.today[0].id
+        store.put(id, at: 300)
+        XCTAssertEqual(store.today[0].start, 300)
+        store.move(id, start: 240)
+        XCTAssertEqual(store.today[0].start, 300)
+        store.move(id, start: 1435)
+        XCTAssertEqual(store.today[0].start, 1410)
+        store.restore()
+        XCTAssertEqual(store.today[0].start, 300)
+        XCTAssertEqual(PlanStore(defaults: defaults).today[0].start, 300)
+        store.resize(id, minutes: 60)
+        XCTAssertEqual(store.today[0].start, 300)
+        XCTAssertEqual(store.today[0].minutes, 60)
+    }
+
+    func testPlanningRangeIncludesEarlyCalendarTimeAndEndsAtMidnight() {
+        XCTAssertEqual(PlannerMath.totalMinutes, 19 * 60)
+        XCTAssertEqual(PlannerMath.occupied([]), 0)
+        XCTAssertEqual(PlannerMath.occupied([(270, 330), (315, 360), (1430, 1500)]), 70)
+        XCTAssertEqual(PlannerMath.totalMinutes - PlannerMath.occupied([(300, 330)]), 1110)
+        XCTAssertEqual(PlannerMath.duration(60, start: 1420), 20)
+        XCTAssertEqual(PlannerMath.start(300, duration: 720), 300)
     }
 
     func testOverlapColumnsCoverTransitiveGroupsAndReuseLanes() {

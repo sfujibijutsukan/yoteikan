@@ -105,8 +105,9 @@ struct TimelineSlot {
     let columns: Int
 }
 enum PlannerMath {
-    static let first = 6 * 60
+    static let first = 5 * 60
     static let last = 24 * 60
+    static let totalMinutes = last - first
     // Partition each connected overlap group into independent, consistent columns.
     static func layout(_ items: [TimelineItem]) -> [String: TimelineSlot] {
         let sorted = items.sorted { $0.start == $1.start ? $0.id < $1.id : $0.start < $1.start }
