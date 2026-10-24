@@ -42,4 +42,8 @@ Issue #2で説明文と重複ラベルを整理した画面に更新していま
 
 <img src="09-start-time-drag.png" width="300" alt="右上の移動つまみで付箋の開始時刻を変更">
 
+## スワイプで翌日へ移動
+
+<img src="10-swipe-next-day.png" width="300" alt="左右スワイプで翌日の計画を表示">
+
 [動作確認結果](../verification.md) / [READMEへ戻る](../../README.md)

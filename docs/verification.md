@@ -2,7 +2,20 @@
 
 2026年10月23日。iPhone 17eシミュレーター / iOS 27.0で確認しました。
 
-初期版をSwiftUIで実装し、Issue #2の改善後、ユニットテスト6件・UI操作テスト9件の計15件がすべて成功しました。スクリーンショット抽出・一覧作成ツールはGoで実装しています。Pythonへの依存はありません。
+初期版をSwiftUIで実装し、Issue #3の改善後、ユニットテスト6件・UI操作テスト11件の計17件がすべて成功しました。スクリーンショット抽出・一覧作成ツールはGoで実装しています。Pythonへの依存はありません。
+
+## Issue #3：左右スワイプで日付を移動
+
+[Issue #3](https://github.com/sfujibijutsukan/yoteikan/issues/3)は、Issue #1・#2を引き継いだ fix/issue-3-swipe-day-navigation ブランチで対応しました。
+
+- 日付欄とタイムラインの余白で、左スワイプは翌日、右スワイプは前日へ移動。
+- 付箋の移動・伸縮と未配置エリアの横スクロールは、日付スワイプとは別の領域で操作。
+- 日付欄・余白の両方から移動し、戻った日の付箋の時刻と所要時間が保たれることを確認。
+- 縦スクロールと未配置エリアの横スクロールで、日付が変わらないことを確認。
+
+既存の15件と日付スワイプのUIテスト2件、計17件が成功しました。
+
+検証用の終日予定が2日間で作成されていたため、当日1日分に修正しました。カレンダー接続・選択・日付スワイプの3件を再実行し、翌日に前日の付箋・会議・当日限定の終日予定が表示されないことも確認しました。通常のカレンダー読み込み処理は変更していません。
 
 ## Issue #2：説明文と補足ラベルの整理
 
@@ -62,10 +75,12 @@
 7. [カレンダーの選択](screenshots/07-calendar-settings.png)
 8. [EventKitで読み込んだ予定](screenshots/08-real-calendar-events.png)
 9. [移動つまみで開始時刻を変更](screenshots/09-start-time-drag.png)
+10. [スワイプで翌日へ移動](screenshots/10-swipe-next-day.png)
 
 ## 検証結果の記録
 
-- [テスト結果の抜粋](test-results.txt)：ユニットテスト6件・UI操作テスト9件の計15件が成功。最新の結果は artifacts/Issue2Verified.xcresult と artifacts/issue-2-verified.log に保存。
+- [テスト結果の抜粋](test-results.txt)：ユニットテスト6件・UI操作テスト11件の計17件が成功。最新の結果は artifacts/Issue3Validation.xcresult と artifacts/issue-3-validation.log に保存。
+- 日付境界の追加確認：artifacts/Issue3CalendarVerified.xcresult と artifacts/issue-3-calendar-verified.log。カレンダー関連の3件が成功。
 - 元のログとXcode結果バンドルはローカルの artifacts/ に保存。生成物のためGit管理対象外。
 - [開発・検証手順](development.md)に、テスト実行とスクリーンショット生成の再現手順を記載。
 
