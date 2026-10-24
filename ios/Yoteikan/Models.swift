@@ -24,9 +24,35 @@ struct FixedEvent: Identifiable {
     var end: Int
     var allDay = false
 }
+struct StickyColor: Identifiable, Codable, Equatable {
+    var id: Int
+    var name: String
+    var hex: String
+    var color: Color {
+        let value = UInt(hex, radix: 16) ?? 0xE0EDCC
+        return Color(red: Double((value >> 16) & 255) / 255, green: Double((value >> 8) & 255) / 255, blue: Double(value & 255) / 255)
+    }
+    var usesLightText: Bool {
+        let value = UInt(hex, radix: 16) ?? 0xE0EDCC
+        func linear(_ channel: UInt) -> Double {
+            let value = Double(channel) / 255
+            return value <= 0.04045 ? value / 12.92 : pow((value + 0.055) / 1.055, 2.4)
+        }
+        let luminance = 0.2126 * linear((value >> 16) & 255) + 0.7152 * linear((value >> 8) & 255) + 0.0722 * linear(value & 255)
+        let inkLuminance = 0.2126 * linear(41) + 0.7152 * linear(59) + 0.0722 * linear(54)
+        return 1.05 / (luminance + 0.05) > (luminance + 0.05) / (inkLuminance + 0.05)
+    }
+    var textColor: Color { usesLightText ? .white : ink }
+    static func validHex(_ text: String) -> Bool {
+        text.count == 6 && text.unicodeScalars.allSatisfy { CharacterSet(charactersIn: "0123456789abcdefABCDEF").contains($0) }
+    }
+}
 struct SavedPlan: Codable, Equatable {
     static let defaultColorNames = ["準備", "仕事", "生活", "休憩"]
-    var colorNames = defaultColorNames
+    static let defaultColors = zip(defaultColorNames, ["E0EDCC", "F7E3B3", "DBE6F7", "F5D9CF"]).enumerated().map {
+        StickyColor(id: $0.offset, name: $0.element.0, hex: $0.element.1)
+    }
+    var colors = defaultColors
     var stickies: [Sticky] = []
     var presets: [Preset] = [
         Preset(title: "読書", minutes: 30, tone: 0),
@@ -35,13 +61,31 @@ struct SavedPlan: Codable, Equatable {
         Preset(title: "休憩", minutes: 15, tone: 3)
     ]
     init() {}
-    private enum CodingKeys: String, CodingKey { case stickies, presets, colorNames }
+    private enum CodingKeys: String, CodingKey { case stickies, presets, colorNames, colors }
     init(from decoder: Decoder) throws {
         self.init()
         let values = try decoder.container(keyedBy: CodingKeys.self)
         stickies = try values.decodeIfPresent([Sticky].self, forKey: .stickies) ?? []
         presets = try values.decodeIfPresent([Preset].self, forKey: .presets) ?? presets
-        colorNames = Self.normalizedColorNames(try values.decodeIfPresent([String].self, forKey: .colorNames) ?? Self.defaultColorNames)
+        if let saved = try values.decodeIfPresent([StickyColor].self, forKey: .colors),
+           !saved.isEmpty, Set(saved.map(\.id)).count == saved.count,
+           saved.allSatisfy({ StickyColor.validHex($0.hex) && !$0.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }) {
+            colors = saved
+        } else {
+            let names = Self.normalizedColorNames(try values.decodeIfPresent([String].self, forKey: .colorNames) ?? Self.defaultColorNames)
+            colors = Self.defaultColors.enumerated().map { index, color in
+                var color = color; color.name = names[index]; return color
+            }
+        }
+        let ids = Set(colors.map(\.id))
+        for i in stickies.indices where !ids.contains(stickies[i].tone) { stickies[i].tone = colors[0].id }
+        for i in presets.indices where !ids.contains(presets[i].tone) { presets[i].tone = colors[0].id }
+    }
+    func encode(to encoder: Encoder) throws {
+        var values = encoder.container(keyedBy: CodingKeys.self)
+        try values.encode(stickies, forKey: .stickies)
+        try values.encode(presets, forKey: .presets)
+        try values.encode(colors, forKey: .colors)
     }
     static func normalizedColorNames(_ names: [String]) -> [String] {
         defaultColorNames.enumerated().map { index, fallback in
@@ -136,12 +180,32 @@ let tones: [Color] = [Color(red: 0.88, green: 0.93, blue: 0.80), Color(red: 0.97
     func change(_ body: (inout SavedPlan) -> Void) { undo = plan; body(&plan); save() }
     func restore() { guard let old = undo else { return }; plan = old; undo = nil; save() }
     func colorName(for tone: Int) -> String {
-        plan.colorNames.indices.contains(tone) ? plan.colorNames[tone] : SavedPlan.defaultColorNames[0]
+        paletteColor(for: tone).name
     }
-    func setColorNames(_ names: [String]) {
-        let normalized = SavedPlan.normalizedColorNames(names)
-        guard normalized != plan.colorNames else { return }
-        change { $0.colorNames = normalized }
+    func paletteColor(for tone: Int) -> StickyColor {
+        plan.colors.first { $0.id == tone } ?? plan.colors[0]
+    }
+    func setColors(_ colors: [StickyColor], replacements: [Int: Int]) {
+        guard !colors.isEmpty, Set(colors.map(\.id)).count == colors.count else { return }
+        let normalized = colors.map { color in
+            var color = color
+            color.name = color.name.trimmingCharacters(in: .whitespacesAndNewlines)
+            color.hex = color.hex.uppercased()
+            return color
+        }
+        guard normalized.allSatisfy({ !$0.name.isEmpty && StickyColor.validHex($0.hex) }) else { return }
+        let ids = Set(normalized.map(\.id))
+        func replacement(_ tone: Int) -> Int {
+            if ids.contains(tone) { return tone }
+            if let target = replacements[tone], ids.contains(target) { return target }
+            return normalized[0].id
+        }
+        guard normalized != plan.colors else { return }
+        change {
+            $0.colors = normalized
+            for i in $0.stickies.indices { $0.stickies[i].tone = replacement($0.stickies[i].tone) }
+            for i in $0.presets.indices { $0.presets[i].tone = replacement($0.presets[i].tone) }
+        }
     }
     func add(_ preset: Preset) {
         change { $0.stickies.append(Sticky(title: preset.title, minutes: preset.minutes, tone: preset.tone, memo: preset.memo, day: dayKey(date))) }

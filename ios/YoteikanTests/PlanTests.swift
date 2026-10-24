@@ -11,20 +11,28 @@ import XCTest
         old.stickies = [Sticky(title: "残す予定", minutes: 45, tone: 1, day: dayKey(Date()), start: 600)]
         var json = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(old)) as? [String: Any])
         json.removeValue(forKey: "colorNames")
+        json.removeValue(forKey: "colors")
+        json["colorNames"] = ["朝", "集中", "生活", "休憩"]
         defaults.set(try JSONSerialization.data(withJSONObject: json), forKey: "yoteikan.plan.v1")
         let restored = PlanStore(defaults: defaults)
         XCTAssertEqual(restored.plan.stickies, old.stickies)
         XCTAssertEqual(restored.plan.presets, old.presets)
-        XCTAssertEqual(restored.plan.colorNames, SavedPlan.defaultColorNames)
+        XCTAssertEqual(restored.plan.colors.map(\.name), ["朝", "集中", "生活", "休憩"])
+        json.removeValue(forKey: "colorNames")
+        let original = try JSONDecoder().decode(SavedPlan.self, from: JSONSerialization.data(withJSONObject: json))
+        XCTAssertEqual(original.colors, SavedPlan.defaultColors)
     }
     func testColorNamesPersistAndUndoWithoutChangingTasks() {
         let store = PlanStore(defaults: defaults)
         store.add(store.plan.presets[1])
         let before = store.plan
-        store.setColorNames(["朝の準備", "集中", "暮らし", "休む"])
+        var colors = store.plan.colors
+        colors[1].name = "集中"; colors[1].hex = "ABCDEF"
+        colors.append(StickyColor(id: 4, name: "趣味", hex: "DDDDEE"))
+        store.setColors(colors, replacements: [:])
         XCTAssertEqual(store.plan.stickies, before.stickies)
         XCTAssertEqual(store.plan.presets, before.presets)
-        XCTAssertEqual(PlanStore(defaults: defaults).plan.colorNames, ["朝の準備", "集中", "暮らし", "休む"])
+        XCTAssertEqual(PlanStore(defaults: defaults).plan.colors, colors)
         XCTAssertEqual(store.colorName(for: 1), "集中")
         store.restore()
         XCTAssertEqual(store.plan, before)
@@ -32,10 +40,42 @@ import XCTest
     }
     func testColorNamesNormalizeMissingBlankAndExtraEntries() throws {
         XCTAssertEqual(SavedPlan.normalizedColorNames(["", " 集中\n"]), ["準備", "集中", "生活", "休憩"])
-        var plan = SavedPlan()
-        plan.colorNames = ["朝", "昼", "夜", "休", "余分"]
-        let restored = try JSONDecoder().decode(SavedPlan.self, from: JSONEncoder().encode(plan))
-        XCTAssertEqual(restored.colorNames, ["朝", "昼", "夜", "休"])
+        XCTAssertFalse(StickyColor.validHex("FFFF"))
+        XCTAssertFalse(StickyColor.validHex("GGGGGG"))
+        XCTAssertTrue(StickyColor.validHex("abcdef"))
+        XCTAssertTrue(StickyColor(id: 0, name: "黒", hex: "000000").usesLightText)
+        XCTAssertFalse(StickyColor(id: 0, name: "白", hex: "FFFFFF").usesLightText)
+    }
+    func testDeleteColorRemapsAllDaysAndPresetsAndUndoRestoresEverything() {
+        let store = PlanStore(defaults: defaults)
+        store.add(store.plan.presets[1])
+        store.date = Calendar.current.date(byAdding: .day, value: 1, to: store.date)!
+        store.add(store.plan.presets[1])
+        store.add(store.plan.presets[2])
+        let before = store.plan
+        let colors = before.colors.filter { $0.id != 1 }
+        store.setColors(colors, replacements: [1: 3])
+        XCTAssertEqual(store.plan.stickies.map(\.tone), [3, 3, 2])
+        XCTAssertEqual(store.plan.presets[1].tone, 3)
+        XCTAssertEqual(store.plan.stickies.map(\.start), before.stickies.map(\.start))
+        XCTAssertEqual(store.plan.stickies.map(\.minutes), before.stickies.map(\.minutes))
+        XCTAssertEqual(PlanStore(defaults: defaults).plan, store.plan)
+        store.restore()
+        XCTAssertEqual(store.plan, before)
+        XCTAssertEqual(PlanStore(defaults: defaults).plan, before)
+    }
+    func testPaletteRejectsEmptyInvalidOrDuplicateColorsAndSupportsOneColor() {
+        let store = PlanStore(defaults: defaults)
+        let before = store.plan
+        store.setColors([], replacements: [:])
+        store.setColors([StickyColor(id: 0, name: " ", hex: "FFFFFF")], replacements: [:])
+        store.setColors([StickyColor(id: 0, name: "色", hex: "X")], replacements: [:])
+        store.setColors([before.colors[0], before.colors[0]], replacements: [:])
+        XCTAssertEqual(store.plan, before)
+        store.setColors([before.colors[3]], replacements: [0: 3, 1: 3, 2: 3])
+        XCTAssertEqual(store.plan.colors.count, 1)
+        XCTAssertTrue(store.plan.presets.allSatisfy { $0.tone == 3 })
+        XCTAssertEqual(PlanStore(defaults: defaults).plan, store.plan)
     }
     func testMovingOneStickyLeavesOthersAndPresetUnchanged() {
         let store = PlanStore(defaults: defaults)

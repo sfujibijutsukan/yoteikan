@@ -1,8 +1,18 @@
 # 動作確認
 
-2026年10月23日。iPhone 17eシミュレーター / iOS 27.0で確認しました。
+2026年10月24日。iPhone 17eシミュレーター / iOS 27.0で確認しました。
 
-初期版をSwiftUIで実装し、Issue #4の改善後、ユニットテスト9件・UI操作テスト12件の計21件がすべて成功しました。スクリーンショット抽出・一覧作成ツールはGoで実装しています。Pythonへの依存はありません。
+色の管理機能追加後、ユニットテスト11件・UI操作テスト13件の計24件がすべて成功しました。スクリーンショット抽出・一覧作成ツールはGoで実装しています。Pythonへの依存はありません。
+
+## 色と名前の追加・編集・削除
+
+2026年10月24日、codex/manage-sticky-colorsブランチで対応しました。
+
+- パレットから色と名前を追加・編集。標準カラーピッカーと6桁RGBコードに対応。
+- 削除時は付け替え先を選び、全日付の付箋とプリセットをまとめて更新。最後の1色は削除不可。
+- 編集は保存まで下書きとして扱い、保存後はUndoで色・付箋・プリセットを一緒に復元。
+- 色名だけの旧データと、色名設定前のデータからの引き継ぎを確認。
+- 「趣味」を5色目として追加し、色と名前を編集、付箋とプリセットで使用後「仕事」へ付け替えて削除。再起動後の反映を確認。
 
 ## Issue #4：付箋の色に名前を付ける
 
@@ -88,10 +98,13 @@
 10. [スワイプで翌日へ移動](screenshots/10-swipe-next-day.png)
 11. [付箋の色名を設定](screenshots/11-color-settings.png)
 12. [名前付きの色選択](screenshots/12-named-color-picker.png)
+13. [色を追加・編集](screenshots/13-custom-colors.png)
+14. [追加した色を選択](screenshots/14-expanded-color-picker.png)
 
 ## 検証結果の記録
 
-- [テスト結果の抜粋](test-results.txt)：ユニットテスト9件・UI操作テスト12件の計21件が成功。最新の結果は artifacts/Issue4Validation.xcresult と artifacts/issue-4-validation.log に保存。
+- [テスト結果の抜粋](test-results.txt)：ユニットテスト11件・UI操作テスト13件の計24件が成功。最新の結果は artifacts/PaletteFinal.xcresult と artifacts/palette-final.log に保存。
+- 色の追加・削除テストを再実行し、保存済みの付箋で5色目の選択を確認。キーボードを閉じた画面を撮影し直しました。結果は artifacts/PaletteScreenshots.xcresult と artifacts/palette-screenshots.log。
 - 日付境界の追加確認：artifacts/Issue3CalendarVerified.xcresult と artifacts/issue-3-calendar-verified.log。カレンダー関連の3件が成功。
 - 元のログとXcode結果バンドルはローカルの artifacts/ に保存。生成物のためGit管理対象外。
 - [開発・検証手順](development.md)に、テスト実行とスクリーンショット生成の再現手順を記載。

@@ -239,6 +239,55 @@ final class YoteikanUITests: XCTestCase {
         XCTAssertEqual(app.buttons["color-1"].label, "集中")
         XCTAssertEqual(app.buttons["color-1"].value as? String, "選択中")
     }
+    func test13AddEditAndDeleteColorWithReplacement() {
+        launch(["--reset-test-data"])
+        app.buttons["colorSettings"].tap()
+        app.buttons["addColor"].tap()
+        let name = app.textFields["color-name-4"]
+        if !name.isHittable { app.swipeUp() }
+        name.tap()
+        name.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: 4) + "趣味")
+        let hex = app.textFields["color-hex-4"]
+        hex.tap()
+        hex.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: 6) + "C3D5F2")
+        app.buttons["saveColorNames"].tap()
+        app.buttons["colorSettings"].tap()
+        XCTAssertEqual(app.textFields["color-name-4"].value as? String, "趣味")
+        XCTAssertEqual(app.textFields["color-hex-4"].value as? String, "C3D5F2")
+        shot("13-custom-colors")
+        app.buttons["キャンセル"].tap()
+        app.buttons["newStickyButton"].tap()
+        app.textFields["stickyTitle"].tap()
+        app.textFields["stickyTitle"].typeText("趣味の時間")
+        app.buttons["color-4"].tap()
+        app.buttons["saveSticky"].tap()
+        app.descendants(matching: .any).matching(identifier: "inbox-趣味の時間").firstMatch.tap()
+        XCTAssertEqual(app.buttons["color-4"].value as? String, "選択中")
+        shot("14-expanded-color-picker")
+        app.buttons["キャンセル"].tap()
+        app.buttons["presetsButton"].tap()
+        app.buttons["newPreset"].tap()
+        app.textFields["presetTitle"].tap()
+        app.textFields["presetTitle"].typeText("趣味プリセット")
+        app.buttons["color-4"].tap()
+        app.buttons["savePreset"].tap()
+        app.buttons["closePresets"].tap()
+        app.buttons["colorSettings"].tap()
+        let remove = app.buttons["delete-color-4"]
+        if !remove.isHittable { app.swipeUp() }
+        remove.tap()
+        app.buttons["仕事に付け替える"].tap()
+        app.buttons["saveColorNames"].tap()
+        app.terminate(); launch([])
+        app.descendants(matching: .any).matching(identifier: "inbox-趣味の時間").firstMatch.tap()
+        XCTAssertFalse(app.buttons["color-4"].exists)
+        XCTAssertEqual(app.buttons["color-1"].value as? String, "選択中")
+        app.buttons["キャンセル"].tap()
+        app.buttons["presetsButton"].tap()
+        app.buttons["趣味プリセットのプリセットを編集"].tap()
+        XCTAssertFalse(app.buttons["color-4"].exists)
+        XCTAssertEqual(app.buttons["color-1"].value as? String, "選択中")
+    }
     func test11VerticalScrollAndInboxSwipeKeepDate() {
         launch()
         let date = app.staticTexts["selectedDate"].label
