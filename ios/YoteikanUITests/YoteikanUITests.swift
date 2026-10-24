@@ -107,4 +107,63 @@ final class YoteikanUITests: XCTestCase {
         app.buttons["calendarSettings"].tap(); toggle.coordinate(withNormalizedOffset: CGVector(dx: 0.9, dy: 0.5)).tap(); app.buttons["closeCalendar"].tap()
         XCTAssertTrue(app.descendants(matching: .any).matching(identifier: "fixed-チームミーティング").firstMatch.waitForExistence(timeout: 3))
     }
+
+    private func createAndPlaceSticky() -> XCUIElement {
+        app.buttons["newStickyButton"].tap()
+        app.textFields["stickyTitle"].tap()
+        app.textFields["stickyTitle"].typeText("移動の確認")
+        app.buttons["duration-60"].tap()
+        app.buttons["saveSticky"].tap()
+        let inbox = app.descendants(matching: .any).matching(identifier: "inbox-移動の確認").firstMatch
+        XCTAssertTrue(inbox.waitForExistence(timeout: 3))
+        let target = app.scrollViews["timeline"].coordinate(withNormalizedOffset: CGVector(dx: 0.6, dy: 0.4))
+        inbox.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).press(forDuration: 0.7, thenDragTo: target)
+        let task = app.otherElements["task-移動の確認"]
+        XCTAssertTrue(task.waitForExistence(timeout: 3))
+        return task
+    }
+    private func placement(of task: XCUIElement) -> (start: Int, duration: Int) {
+        let fields = (task.value as? String ?? "").split(separator: "|")
+        XCTAssertEqual(fields.count, 2)
+        guard fields.count == 2 else { return (-1, -1) }
+        let clock = fields[0].split(separator: ":").compactMap { Int($0) }
+        guard clock.count == 2, let duration = Int(fields[1]) else { XCTFail("Missing placement value"); return (-1, -1) }
+        return (clock[0] * 60 + clock[1], duration)
+    }
+    func test08NewlyPlacedStickyMovesFromEmptyBodyArea() {
+        launch(["--reset-test-data"])
+        let task = createAndPlaceSticky()
+        let before = placement(of: task)
+        let point = task.coordinate(withNormalizedOffset: CGVector(dx: 0.8, dy: 0.6))
+        point.press(forDuration: 0.5, thenDragTo: point.withOffset(CGVector(dx: 0, dy: -46.5)))
+        let after = placement(of: task)
+        XCTAssertEqual(after.start, before.start - 30)
+        XCTAssertEqual(after.duration, 60)
+        XCTAssertFalse(app.descendants(matching: .any).matching(identifier: "inbox-移動の確認").firstMatch.exists)
+    }
+    func test09MoveHandleChangesStartAndPersistsWithUndo() {
+        launch(["--reset-test-data"])
+        let task = createAndPlaceSticky()
+        let before = placement(of: task)
+        let handle = app.otherElements["move-移動の確認"]
+        XCTAssertTrue(handle.waitForExistence(timeout: 3))
+        let point = handle.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+        point.press(forDuration: 0.05, thenDragTo: point.withOffset(CGVector(dx: 0, dy: -46.5)))
+        XCTAssertEqual(placement(of: task).start, before.start - 30)
+        XCTAssertEqual(placement(of: task).duration, 60)
+        shot("09-start-time-drag")
+        app.buttons["undoButton"].tap()
+        XCTAssertEqual(placement(of: task).start, before.start)
+        XCTAssertEqual(placement(of: task).duration, 60)
+        let handleAgain = app.otherElements["move-移動の確認"]
+        XCTAssertTrue(handleAgain.waitForExistence(timeout: 3))
+        let again = handleAgain.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+        again.press(forDuration: 0.05, thenDragTo: again.withOffset(CGVector(dx: 0, dy: -46.5)))
+        XCTAssertEqual(placement(of: task).start, before.start - 30)
+        app.terminate(); launch([])
+        let restored = app.otherElements["task-移動の確認"]
+        XCTAssertTrue(restored.waitForExistence(timeout: 3))
+        XCTAssertEqual(placement(of: restored).start, before.start - 30)
+        XCTAssertEqual(placement(of: restored).duration, 60)
+    }
 }

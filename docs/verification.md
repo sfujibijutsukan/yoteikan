@@ -2,7 +2,17 @@
 
 2026年10月23日。iPhone 17eシミュレーター / iOS 27.0で確認しました。
 
-初期版をSwiftUIで実装し、ユニットテスト6件・UI操作テスト7件の計13件がすべて成功しました。スクリーンショット抽出・一覧作成ツールはGoで実装しています。Pythonへの依存はありません。
+初期版をSwiftUIで実装し、Issue #1の改善後、ユニットテスト6件・UI操作テスト9件の計15件がすべて成功しました。スクリーンショット抽出・一覧作成ツールはGoで実装しています。Pythonへの依存はありません。
+
+## Issue #1：配置後の開始時刻変更
+
+[Issue #1](https://github.com/sfujibijutsukan/yoteikan/issues/1)では、追加した付箋の開始時刻をドラッグで変更する操作を改善しました。
+
+- 旧版で、追加直後の付箋の余白を長押ししても開始時刻が変わらないケースをUIテストで再現。
+- 付箋全体に操作領域を設定し、文字のない部分からも長押しで移動できるよう修正。
+- 選択した付箋の右上に移動つまみを表示。長押しを待たずに上下ドラッグで移動できる。
+- 移動中は開始・終了時刻を表示し、下端の伸縮つまみと操作領域を分離。
+- 新規作成→配置→30分移動の操作、60分の所要時間保持、Undo、再起動後の保存を確認。
 
 ## 確認した動作
 
@@ -37,10 +47,11 @@
 6. [1日全体の表示](screenshots/06-day-overview.png)
 7. [カレンダーの選択](screenshots/07-calendar-settings.png)
 8. [EventKitで読み込んだ予定](screenshots/08-real-calendar-events.png)
+9. [移動つまみで開始時刻を変更](screenshots/09-start-time-drag.png)
 
 ## 検証結果の記録
 
-- [テスト結果の抜粋](test-results.txt)：ユニットテスト6件・UI操作テスト7件の成功と、表示調整後のUIテスト3件の成功。
+- [テスト結果の抜粋](test-results.txt)：ユニットテスト6件・UI操作テスト9件の計15件が成功。最新の結果は artifacts/Issue1Validation.xcresult と artifacts/issue-1-validation.log に保存。
 - 元のログとXcode結果バンドルはローカルの artifacts/ に保存。生成物のためGit管理対象外。
 - [開発・検証手順](development.md)に、テスト実行とスクリーンショット生成の再現手順を記載。
 
