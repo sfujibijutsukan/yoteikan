@@ -7,6 +7,7 @@ struct PlannerView: View {
     @Environment(\.scenePhase) private var phase
     @State private var showPresets = false
     @State private var showCalendar = false
+    @State private var showColors = false
     @State private var showNew = false
     @State private var editing: Sticky?
     @State private var selected: UUID?
@@ -54,6 +55,7 @@ struct PlannerView: View {
         .safeAreaInset(edge: .bottom, spacing: 0) { bottomBar }
         .sheet(isPresented: $showPresets) { PresetsView() }
         .sheet(isPresented: $showCalendar) { CalendarSettingsView() }
+        .sheet(isPresented: $showColors) { ColorNamesEditor(names: plans.plan.colorNames) }
         .sheet(isPresented: $showNew) { StickyEditor(task: Sticky(title: "", minutes: 30, day: dayKey(plans.date)), isNew: true) }
         .sheet(item: $editing) { StickyEditor(task: $0, isNew: false) }
         .onChange(of: plans.date) { _, value in calendar.refresh(date: value); selected = nil }
@@ -67,6 +69,10 @@ struct PlannerView: View {
                     .background(tones[1], in: Capsule())
             }
             Spacer()
+            Button { showColors = true } label: {
+                Image(systemName: "paintpalette").font(.system(size: 19))
+                    .frame(width: 44, height: 44).background(.white.opacity(0.8), in: Circle())
+            }.accessibilityLabel("付箋の色を設定").accessibilityIdentifier("colorSettings")
             Button { showCalendar = true } label: {
                 Image(systemName: "calendar.badge.clock").font(.system(size: 19))
                     .frame(width: 44, height: 44).background(.white.opacity(0.8), in: Circle())

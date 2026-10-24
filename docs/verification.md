@@ -2,7 +2,17 @@
 
 2026年10月23日。iPhone 17eシミュレーター / iOS 27.0で確認しました。
 
-初期版をSwiftUIで実装し、Issue #3の改善後、ユニットテスト6件・UI操作テスト11件の計17件がすべて成功しました。スクリーンショット抽出・一覧作成ツールはGoで実装しています。Pythonへの依存はありません。
+初期版をSwiftUIで実装し、Issue #4の改善後、ユニットテスト9件・UI操作テスト12件の計21件がすべて成功しました。スクリーンショット抽出・一覧作成ツールはGoで実装しています。Pythonへの依存はありません。
+
+## Issue #4：付箋の色に名前を付ける
+
+[Issue #4](https://github.com/sfujibijutsukan/yoteikan/issues/4)は、Issue #3までを引き継いだ feat/issue-4-named-sticky-colors ブランチで対応しました。
+
+- 4色の初期名を「準備・仕事・生活・休憩」とし、右上のパレットから編集。
+- 付箋とプリセットの色選択に共通の名前を表示し、選択中の色をチェックで表示。
+- 色名を変更しても、既存の付箋・プリセットの内容・時間・色番号を保持。
+- 再起動後の保存とUndo、色名のない旧データからの引き継ぎを確認。
+- 「仕事」を「集中」へ変更し、既存付箋・新規プリセット・追加した付箋への反映を操作で確認。
 
 ## Issue #3：左右スワイプで日付を移動
 
@@ -76,10 +86,12 @@
 8. [EventKitで読み込んだ予定](screenshots/08-real-calendar-events.png)
 9. [移動つまみで開始時刻を変更](screenshots/09-start-time-drag.png)
 10. [スワイプで翌日へ移動](screenshots/10-swipe-next-day.png)
+11. [付箋の色名を設定](screenshots/11-color-settings.png)
+12. [名前付きの色選択](screenshots/12-named-color-picker.png)
 
 ## 検証結果の記録
 
-- [テスト結果の抜粋](test-results.txt)：ユニットテスト6件・UI操作テスト11件の計17件が成功。最新の結果は artifacts/Issue3Validation.xcresult と artifacts/issue-3-validation.log に保存。
+- [テスト結果の抜粋](test-results.txt)：ユニットテスト9件・UI操作テスト12件の計21件が成功。最新の結果は artifacts/Issue4Validation.xcresult と artifacts/issue-4-validation.log に保存。
 - 日付境界の追加確認：artifacts/Issue3CalendarVerified.xcresult と artifacts/issue-3-calendar-verified.log。カレンダー関連の3件が成功。
 - 元のログとXcode結果バンドルはローカルの artifacts/ に保存。生成物のためGit管理対象外。
 - [開発・検証手順](development.md)に、テスト実行とスクリーンショット生成の再現手順を記載。
