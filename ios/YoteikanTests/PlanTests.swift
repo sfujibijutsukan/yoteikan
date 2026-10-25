@@ -108,13 +108,98 @@ import XCTest
     func testSnappingBoundsAndOverlapUnion() {
         XCTAssertEqual(PlannerMath.snap(608), 610)
         XCTAssertEqual(PlannerMath.start(1430, duration: 30), 1410)
-        XCTAssertEqual(PlannerMath.start(100, duration: 30), 360)
+        XCTAssertEqual(PlannerMath.start(100, duration: 30), 300)
         XCTAssertEqual(PlannerMath.duration(60, start: 1420), 20)
         XCTAssertEqual(PlannerMath.duration(-10, start: 600), 5)
         XCTAssertFalse(PlannerMath.overlaps(600, 630, 630, 660))
         XCTAssertTrue(PlannerMath.overlaps(600, 640, 630, 660))
         XCTAssertEqual(PlannerMath.occupied([(600, 660), (630, 700), (700, 720)]), 120)
-        XCTAssertEqual(PlannerMath.occupied([(0, 500), (1400, 1600)]), 180)
+        XCTAssertEqual(PlannerMath.occupied([(0, 500), (1400, 1600)]), 240)
+    }
+
+    func testFiveAMPlacementBoundsPersistenceAndUndo() {
+        let store = PlanStore(defaults: defaults)
+        store.add(Preset(title: "早朝の読書", minutes: 30))
+        let id = store.today[0].id
+        store.put(id, at: 300)
+        XCTAssertEqual(store.today[0].start, 300)
+        store.move(id, start: 240)
+        XCTAssertEqual(store.today[0].start, 300)
+        store.move(id, start: 1435)
+        XCTAssertEqual(store.today[0].start, 1410)
+        store.restore()
+        XCTAssertEqual(store.today[0].start, 300)
+        XCTAssertEqual(PlanStore(defaults: defaults).today[0].start, 300)
+        store.resize(id, minutes: 60)
+        XCTAssertEqual(store.today[0].start, 300)
+        XCTAssertEqual(store.today[0].minutes, 60)
+    }
+
+    func testPlanningRangeIncludesEarlyCalendarTimeAndEndsAtMidnight() {
+        XCTAssertEqual(PlannerMath.totalMinutes, 19 * 60)
+        XCTAssertEqual(PlannerMath.occupied([]), 0)
+        XCTAssertEqual(PlannerMath.occupied([(270, 330), (315, 360), (1430, 1500)]), 70)
+        XCTAssertEqual(PlannerMath.totalMinutes - PlannerMath.occupied([(300, 330)]), 1110)
+        XCTAssertEqual(PlannerMath.duration(60, start: 1420), 20)
+        XCTAssertEqual(PlannerMath.start(300, duration: 720), 300)
+    }
+
+    func testCustomHoursPersistUndoAndPreserveAllPlans() {
+        let store = PlanStore(defaults: defaults)
+        store.add(store.plan.presets[0])
+        store.put(store.today[0].id, at: 300)
+        let before = store.plan
+        store.setHours(PlanningHours(start: 480, end: 1200))
+        XCTAssertEqual(store.plan.stickies, before.stickies)
+        XCTAssertEqual(store.plan.presets, before.presets)
+        XCTAssertEqual(store.hours.totalMinutes, 720)
+        XCTAssertEqual(PlanStore(defaults: defaults).hours, store.hours)
+        store.restore()
+        XCTAssertEqual(store.plan, before)
+        XCTAssertEqual(PlanStore(defaults: defaults).plan, before)
+    }
+
+    func testCustomHoursConstrainPlacementAndRejectTooLongSticky() {
+        let store = PlanStore(defaults: defaults)
+        store.setHours(PlanningHours(start: 1200, end: 1320))
+        store.add(Preset(title: "夜の読書", minutes: 30))
+        let id = store.today[0].id
+        store.put(id, at: 300)
+        XCTAssertEqual(store.today[0].start, 1200)
+        store.move(id, start: 1400)
+        XCTAssertEqual(store.today[0].start, 1290)
+        store.resize(id, minutes: 60)
+        XCTAssertEqual(store.today[0].minutes, 30)
+        store.add(Preset(title: "長い作業", minutes: 180))
+        store.put(store.today[1].id, at: 1200)
+        XCTAssertNil(store.today[1].start)
+        XCTAssertEqual(store.today[1].minutes, 180)
+        XCTAssertNotNil(store.notice)
+        XCTAssertEqual(PlannerMath.occupied([(1140, 1230), (1300, 1400)], from: 1200, to: 1320), 50)
+    }
+
+    func testHoursMigrationAndInvalidSettingsKeepExistingData() throws {
+        var old = SavedPlan()
+        old.stickies = [Sticky(title: "既存の予定", minutes: 30, day: dayKey(Date()), start: 540)]
+        var json = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(old)) as? [String: Any])
+        json.removeValue(forKey: "hours")
+        var restored = try JSONDecoder().decode(SavedPlan.self, from: JSONSerialization.data(withJSONObject: json))
+        XCTAssertEqual(restored.hours, PlanningHours())
+        XCTAssertEqual(restored.stickies, old.stickies)
+        json["hours"] = ["start": 1200, "end": 600]
+        restored = try JSONDecoder().decode(SavedPlan.self, from: JSONSerialization.data(withJSONObject: json))
+        XCTAssertEqual(restored.hours, PlanningHours())
+        XCTAssertEqual(restored.stickies, old.stickies)
+        let store = PlanStore(defaults: defaults)
+        for hours in [PlanningHours(start: 600, end: 600), PlanningHours(start: -60, end: 1440),
+                      PlanningHours(start: 0, end: 1500), PlanningHours(start: 301, end: 1440)] {
+            store.setHours(hours)
+            XCTAssertEqual(store.hours, PlanningHours())
+        }
+        store.setHours(PlanningHours(start: 0, end: 1440))
+        XCTAssertEqual(store.hours.totalMinutes, 1440)
+        store.setHours(PlanningHours(start: 1380, end: 1440))
+        XCTAssertEqual(store.hours.totalMinutes, 60)
     }
 
     func testOverlapColumnsCoverTransitiveGroupsAndReuseLanes() {

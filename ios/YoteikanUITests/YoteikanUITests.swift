@@ -288,6 +288,89 @@ final class YoteikanUITests: XCTestCase {
         XCTAssertFalse(app.buttons["color-4"].exists)
         XCTAssertEqual(app.buttons["color-1"].value as? String, "選択中")
     }
+    func test14PlanAtFiveAMAndKeepMidnightBoundary() {
+        launch(["--reset-test-data"])
+        app.buttons["newStickyButton"].tap()
+        app.textFields["stickyTitle"].tap()
+        app.textFields["stickyTitle"].typeText("早朝の読書")
+        app.buttons["saveSticky"].tap()
+        let timeline = app.scrollViews["timeline"]
+        let upper = timeline.coordinate(withNormalizedOffset: CGVector(dx: 0.08, dy: 0.2))
+        let lower = timeline.coordinate(withNormalizedOffset: CGVector(dx: 0.08, dy: 0.9))
+        upper.press(forDuration: 0.01, thenDragTo: lower)
+        let firstHour = app.staticTexts["05:00"]
+        XCTAssertTrue(firstHour.waitForExistence(timeout: 3))
+        XCTAssertTrue(firstHour.isHittable)
+        let target = timeline.coordinate(withNormalizedOffset: CGVector(dx: 0.6, dy: 0))
+            .withOffset(CGVector(dx: 0, dy: firstHour.frame.minY - timeline.frame.minY + 1))
+        let inbox = app.descendants(matching: .any).matching(identifier: "inbox-早朝の読書").firstMatch
+        inbox.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).press(forDuration: 0.7, thenDragTo: target)
+        let task = app.otherElements["task-早朝の読書"]
+        XCTAssertTrue(task.waitForExistence(timeout: 3))
+        XCTAssertEqual(task.value as? String, "05:00|30")
+        app.buttons["zoomToggle"].tap()
+        XCTAssertTrue(app.staticTexts["05:00"].isHittable)
+        XCTAssertTrue(app.staticTexts["24:00"].isHittable)
+        shot("15-five-am-plan")
+        app.terminate(); launch([])
+        app.buttons["zoomToggle"].tap()
+        XCTAssertEqual(app.otherElements["task-早朝の読書"].value as? String, "05:00|30")
+        app.otherElements["task-早朝の読書"].tap()
+        app.buttons["editButton"].tap()
+        XCTAssertTrue(app.staticTexts["5:00〜24:00"].exists)
+    }
+    func test15CustomizeHoursPersistAndRecoverOutsideSticky() {
+        launch(["--reset-test-data"])
+        app.buttons["newStickyButton"].tap()
+        app.textFields["stickyTitle"].tap()
+        app.textFields["stickyTitle"].typeText("夜の計画")
+        app.buttons["saveSticky"].tap()
+        app.buttons["hoursSettings"].tap()
+        chooseHour("20:00", picker: "planningStart")
+        chooseHour("22:00", picker: "planningEnd")
+        shot("16-planning-hours-settings")
+        app.buttons["saveHours"].tap()
+        app.buttons["zoomToggle"].tap()
+        XCTAssertTrue(app.staticTexts["20:00"].isHittable)
+        XCTAssertTrue(app.staticTexts["22:00"].isHittable)
+        XCTAssertFalse(app.staticTexts["05:00"].exists)
+        XCTAssertTrue(app.staticTexts["2時間"].exists)
+        app.terminate(); launch([])
+        app.buttons["hoursSettings"].tap()
+        XCTAssertTrue(app.buttons["planningStart"].label.contains("20:00"))
+        XCTAssertTrue(app.buttons["planningEnd"].label.contains("22:00"))
+        chooseHour("19:00", picker: "planningStart")
+        app.buttons["cancelHours"].tap()
+        app.buttons["hoursSettings"].tap()
+        XCTAssertTrue(app.buttons["planningStart"].label.contains("20:00"))
+        app.buttons["cancelHours"].tap()
+        let timeline = app.scrollViews["timeline"]
+        let marker = app.staticTexts["20:00"]
+        let target = timeline.coordinate(withNormalizedOffset: CGVector(dx: 0.6, dy: 0))
+            .withOffset(CGVector(dx: 0, dy: marker.frame.minY - timeline.frame.minY + 1))
+        app.descendants(matching: .any).matching(identifier: "inbox-夜の計画").firstMatch
+            .coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).press(forDuration: 0.7, thenDragTo: target)
+        XCTAssertEqual(app.otherElements["task-夜の計画"].value as? String, "20:00|30")
+        app.buttons["hoursSettings"].tap()
+        chooseHour("21:00", picker: "planningStart")
+        app.buttons["saveHours"].tap()
+        XCTAssertFalse(app.otherElements["task-夜の計画"].exists)
+        let outside = app.descendants(matching: .any).matching(identifier: "inbox-夜の計画").firstMatch
+        XCTAssertTrue(outside.exists)
+        XCTAssertTrue(outside.label.contains("時間外 20:00"))
+        shot("17-custom-hours-and-outside-sticky")
+        app.buttons["undoButton"].tap()
+        XCTAssertEqual(app.otherElements["task-夜の計画"].value as? String, "20:00|30")
+    }
+    private func chooseHour(_ hour: String, picker: String) {
+        app.buttons[picker].tap()
+        let option = app.buttons[hour]
+        for _ in 0..<4 {
+            if option.exists && option.isHittable { break }
+            app.swipeUp()
+        }
+        option.tap()
+    }
     func test11VerticalScrollAndInboxSwipeKeepDate() {
         launch()
         let date = app.staticTexts["selectedDate"].label

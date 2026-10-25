@@ -47,7 +47,16 @@ struct StickyColor: Identifiable, Codable, Equatable {
         text.count == 6 && text.unicodeScalars.allSatisfy { CharacterSet(charactersIn: "0123456789abcdefABCDEF").contains($0) }
     }
 }
+struct PlanningHours: Codable, Equatable {
+    var start = 5 * 60
+    var end = 24 * 60
+    var isValid: Bool { start >= 0 && end <= 1440 && start < end && start % 60 == 0 && end % 60 == 0 }
+    var totalMinutes: Int { end - start }
+    var label: String { "\(start / 60):00〜\(end / 60):00" }
+    func overlaps(start: Int, end: Int) -> Bool { start < self.end && end > self.start }
+}
 struct SavedPlan: Codable, Equatable {
+    var hours = PlanningHours()
     static let defaultColorNames = ["準備", "仕事", "生活", "休憩"]
     static let defaultColors = zip(defaultColorNames, ["E0EDCC", "F7E3B3", "DBE6F7", "F5D9CF"]).enumerated().map {
         StickyColor(id: $0.offset, name: $0.element.0, hex: $0.element.1)
@@ -61,10 +70,11 @@ struct SavedPlan: Codable, Equatable {
         Preset(title: "休憩", minutes: 15, tone: 3)
     ]
     init() {}
-    private enum CodingKeys: String, CodingKey { case stickies, presets, colorNames, colors }
+    private enum CodingKeys: String, CodingKey { case stickies, presets, colorNames, colors, hours }
     init(from decoder: Decoder) throws {
         self.init()
         let values = try decoder.container(keyedBy: CodingKeys.self)
+        if let saved = try values.decodeIfPresent(PlanningHours.self, forKey: .hours), saved.isValid { hours = saved }
         stickies = try values.decodeIfPresent([Sticky].self, forKey: .stickies) ?? []
         presets = try values.decodeIfPresent([Preset].self, forKey: .presets) ?? presets
         if let saved = try values.decodeIfPresent([StickyColor].self, forKey: .colors),
@@ -86,6 +96,7 @@ struct SavedPlan: Codable, Equatable {
         try values.encode(stickies, forKey: .stickies)
         try values.encode(presets, forKey: .presets)
         try values.encode(colors, forKey: .colors)
+        try values.encode(hours, forKey: .hours)
     }
     static func normalizedColorNames(_ names: [String]) -> [String] {
         defaultColorNames.enumerated().map { index, fallback in
@@ -105,8 +116,9 @@ struct TimelineSlot {
     let columns: Int
 }
 enum PlannerMath {
-    static let first = 6 * 60
+    static let first = 5 * 60
     static let last = 24 * 60
+    static let totalMinutes = last - first
     // Partition each connected overlap group into independent, consistent columns.
     static func layout(_ items: [TimelineItem]) -> [String: TimelineSlot] {
         let sorted = items.sorted { $0.start == $1.start ? $0.id < $1.id : $0.start < $1.start }
@@ -127,8 +139,8 @@ enum PlannerMath {
         return result
     }
     static func snap(_ value: Double) -> Int { Int((value / 5).rounded()) * 5 }
-    static func start(_ value: Int, duration: Int) -> Int { max(first, min(last - duration, value)) }
-    static func duration(_ value: Int, start: Int) -> Int { max(5, min(720, last - start, value)) }
+    static func start(_ value: Int, duration: Int, from: Int = first, to: Int = last) -> Int { max(from, min(to - duration, value)) }
+    static func duration(_ value: Int, start: Int, to: Int = last) -> Int { max(5, min(720, to - start, value)) }
     static func overlaps(_ a: Int, _ b: Int, _ c: Int, _ d: Int) -> Bool { a < d && c < b }
     static func occupied(_ intervals: [(Int, Int)], from: Int = first, to: Int = last) -> Int {
         let sorted = intervals.map { (max(from, $0.0), min(to, $0.1)) }.filter { $0.0 < $0.1 }.sorted { $0.0 < $1.0 }
@@ -176,6 +188,11 @@ let tones: [Color] = [Color(red: 0.88, green: 0.93, blue: 0.80), Color(red: 0.97
         }
     }
     var today: [Sticky] { plan.stickies.filter { $0.day == dayKey(date) } }
+    var hours: PlanningHours { plan.hours }
+    func setHours(_ hours: PlanningHours) {
+        guard hours.isValid, hours != plan.hours else { return }
+        change { $0.hours = hours }
+    }
     func save() { if !demo, let data = try? JSONEncoder().encode(plan) { defaults.set(data, forKey: key) } }
     func change(_ body: (inout SavedPlan) -> Void) { undo = plan; body(&plan); save() }
     func restore() { guard let old = undo else { return }; plan = old; undo = nil; save() }
@@ -213,17 +230,21 @@ let tones: [Color] = [Color(red: 0.88, green: 0.93, blue: 0.80), Color(red: 0.97
     func put(_ id: UUID, at start: Int?) {
         guard let i = plan.stickies.firstIndex(where: { $0.id == id }) else { return }
         let duration = plan.stickies[i].minutes
-        change { $0.stickies[i].start = start.map { PlannerMath.start($0, duration: duration) } }
+        guard start == nil || duration <= hours.totalMinutes else {
+            notice = "この付箋を配置するには、所要時間を短くするか、計画の時間帯を広げてください。"
+            return
+        }
+        change { $0.stickies[i].start = start.map { PlannerMath.start($0, duration: duration, from: hours.start, to: hours.end) } }
     }
     func move(_ id: UUID, start: Int) { put(id, at: start) }
     func resize(_ id: UUID, minutes: Int) {
         guard let i = plan.stickies.firstIndex(where: { $0.id == id }), let start = plan.stickies[i].start else { return }
-        change { $0.stickies[i].minutes = PlannerMath.duration(minutes, start: start) }
+        change { $0.stickies[i].minutes = PlannerMath.duration(minutes, start: start, to: hours.end) }
     }
     func update(_ task: Sticky) {
         guard let i = plan.stickies.firstIndex(where: { $0.id == task.id }) else { return }
         var task = task
-        if let start = task.start { task.minutes = PlannerMath.duration(task.minutes, start: start) }
+        if let start = task.start { task.minutes = PlannerMath.duration(task.minutes, start: start, to: hours.end) }
         change { $0.stickies[i] = task }
     }
     func remove(_ id: UUID) { change { $0.stickies.removeAll { $0.id == id } } }
