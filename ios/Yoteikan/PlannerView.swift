@@ -187,7 +187,6 @@ struct PlannerView: View {
     }
     private var header: some View {
         HStack {
-            Text("予定館").font(.system(size: 22, weight: .semibold, design: .serif))
             if plans.demo {
                 Text("デモ").font(.system(size: 9)).padding(.horizontal, 6).padding(.vertical, 2)
                     .background(tones[1], in: Capsule())
@@ -220,16 +219,26 @@ struct PlannerView: View {
             .accessibilityElement(children: .contain).accessibilityIdentifier("dayNavigation")
     }
     private func stats(compact: Bool) -> some View {
-        HStack(spacing: 0) {
-            stat("空き時間", durationText(plans.hours.totalMinutes - occupied), compact: compact)
-            Rectangle().fill(ink.opacity(0.10)).frame(width: 1, height: 31)
-            stat("未配置", durationText(inbox.reduce(0) { $0 + $1.minutes }), compact: compact)
-            Spacer(minLength: 0)
-            Button { overview.toggle() } label: { VStack(spacing: compact ? 2 : 5) { Image(systemName: overview ? "plus.magnifyingglass" : "rectangle.expand.vertical").font(.system(size: 17)); Text(overview ? "拡大する" : "1日を見る").font(.system(size: 10)) }.frame(width: 70, height: compact ? 34 : 55) }.accessibilityIdentifier("zoomToggle")
-        }.padding(.horizontal, 22).padding(.vertical, compact ? 4 : 12)
+        HStack(spacing: 14) {
+            VStack(spacing: compact ? 5 : 8) {
+                timeBar("空き時間", minutes: plans.hours.totalMinutes - occupied, color: accent, identifier: "freeTimeBar")
+                timeBar("未配置", minutes: inbox.reduce(0) { $0 + $1.minutes }, color: Color(red: 0.73, green: 0.55, blue: 0.24), identifier: "unplacedTimeBar")
+            }
+            Button { overview.toggle() } label: { VStack(spacing: 2) { Image(systemName: overview ? "plus.magnifyingglass" : "rectangle.expand.vertical").font(.system(size: 17)); Text(overview ? "拡大する" : "1日を見る").font(.system(size: 10)) }.frame(width: 60, height: 44) }.accessibilityIdentifier("zoomToggle")
+        }.padding(.horizontal, 18).padding(.vertical, compact ? 2 : 6)
     }
-    private func stat(_ title: String, _ value: String, compact: Bool) -> some View {
-        VStack(alignment: .leading, spacing: compact ? 2 : 4) { Text(title).font(.system(size: compact ? 9 : 10)).foregroundStyle(ink.opacity(0.55)); Text(value).font(.system(size: compact ? 15 : 18, weight: .semibold, design: .rounded)) }.frame(maxWidth: .infinity, alignment: .leading).padding(.leading, title == "未配置" ? 18 : 0)
+    private func timeBar(_ title: String, minutes: Int, color: Color, identifier: String) -> some View {
+        HStack(spacing: 8) {
+            Text(title).frame(width: 44, alignment: .leading)
+            GeometryReader { proxy in
+                Capsule().fill(ink.opacity(0.07))
+                    .overlay(alignment: .leading) {
+                        Capsule().fill(color).frame(width: proxy.size.width * min(1, max(0, CGFloat(minutes) / CGFloat(plans.hours.totalMinutes))))
+                    }
+            }.frame(height: 5).accessibilityHidden(true)
+            Text(durationText(minutes)).monospacedDigit().frame(width: 78, alignment: .trailing)
+        }.font(.system(size: 10, weight: .medium)).foregroundStyle(ink.opacity(0.7))
+            .accessibilityElement(children: .contain).accessibilityIdentifier(identifier).accessibilityValue(durationText(minutes))
     }
     private var zoomControls: some View {
         HStack(spacing: 0) {
