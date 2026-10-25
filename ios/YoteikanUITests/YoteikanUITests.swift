@@ -10,6 +10,8 @@ final class YoteikanUITests: XCTestCase {
         XCTAssertFalse(app.staticTexts["予定館"].exists)
         XCTAssertEqual(app.descendants(matching: .any).matching(identifier: "freeTimeBar").firstMatch.value as? String, "15時間30分")
         XCTAssertEqual(app.descendants(matching: .any).matching(identifier: "unplacedTimeBar").firstMatch.value as? String, "1時間5分")
+        XCTAssertLessThan(app.scrollViews["timeline"].frame.minY, app.frame.height * 0.25)
+        XCTAssertGreaterThan(app.scrollViews["timeline"].frame.height, app.frame.height * 0.65)
         shot("01-day-planner")
         app.buttons["showStickyPool"].tap(); app.buttons["presetsButton"].tap()
         XCTAssertTrue(app.buttons["preset-読書"].waitForExistence(timeout: 3)); app.buttons["preset-読書"].tap()
