@@ -248,4 +248,8 @@ let tones: [Color] = [Color(red: 0.88, green: 0.93, blue: 0.80), Color(red: 0.97
         change { $0.stickies[i] = task }
     }
     func remove(_ id: UUID) { change { $0.stickies.removeAll { $0.id == id } } }
+    func setMemo(_ id: UUID, memo: String) {
+        guard let index = plan.stickies.firstIndex(where: { $0.id == id }), plan.stickies[index].memo != memo else { return }
+        change { $0.stickies[index].memo = memo }
+    }
 }

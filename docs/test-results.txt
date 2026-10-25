@@ -1,43 +1,47 @@
-予定館 / Issue #5 開始・終了時刻の設定 検証結果
+予定館 / 時間割・詳細メモ・付箋ゾーン 検証結果
 実行日: 2026-10-25
 環境: iPhone 17e Simulator / iOS 27.0
-ユニットテスト16件 + UIテスト15件 = 全31件成功（再実行を含む）
+ユニットテスト17件 + UIテスト17件 = 全34件成功
 
-全体実行で30件成功。新しいUIテストでは時刻一覧のスクロール操作を追加して再実行し、成功しました。
-全体実行ログ: artifacts/custom-hours-validation.log
-全体実行の結果バンドルは書き出しで停止したため利用できません。
-設定操作の結果: artifacts/CustomHoursSelection.xcresult / artifacts/custom-hours-selection.log
+結果: artifacts/ZonesValidation.xcresult / artifacts/zones-validation.log
 
 Test Case '-[YoteikanTests.PlanTests testColorNamesNormalizeMissingBlankAndExtraEntries]' passed (0.003 seconds).
 Test Case '-[YoteikanTests.PlanTests testColorNamesPersistAndUndoWithoutChangingTasks]' passed (0.004 seconds).
-Test Case '-[YoteikanTests.PlanTests testCustomHoursConstrainPlacementAndRejectTooLongSticky]' passed (0.003 seconds).
-Test Case '-[YoteikanTests.PlanTests testCustomHoursPersistUndoAndPreserveAllPlans]' passed (0.003 seconds).
+Test Case '-[YoteikanTests.PlanTests testCustomHoursConstrainPlacementAndRejectTooLongSticky]' passed (0.004 seconds).
+Test Case '-[YoteikanTests.PlanTests testCustomHoursPersistUndoAndPreserveAllPlans]' passed (0.004 seconds).
 Test Case '-[YoteikanTests.PlanTests testDateSeparationAndIndependentPresetCopies]' passed (0.003 seconds).
-Test Case '-[YoteikanTests.PlanTests testDeleteColorRemapsAllDaysAndPresetsAndUndoRestoresEverything]' passed (0.003 seconds).
-Test Case '-[YoteikanTests.PlanTests testFiveAMPlacementBoundsPersistenceAndUndo]' passed (0.003 seconds).
-Test Case '-[YoteikanTests.PlanTests testHoursMigrationAndInvalidSettingsKeepExistingData]' passed (0.002 seconds).
+Test Case '-[YoteikanTests.PlanTests testDeleteColorRemapsAllDaysAndPresetsAndUndoRestoresEverything]' passed (0.004 seconds).
+Test Case '-[YoteikanTests.PlanTests testFiveAMPlacementBoundsPersistenceAndUndo]' passed (0.004 seconds).
+Test Case '-[YoteikanTests.PlanTests testHoursMigrationAndInvalidSettingsKeepExistingData]' passed (0.003 seconds).
 Test Case '-[YoteikanTests.PlanTests testLegacyPlanKeepsStickiesAndPresetsWhenAddingColorNames]' passed (0.003 seconds).
-Test Case '-[YoteikanTests.PlanTests testMovingOneStickyLeavesOthersAndPresetUnchanged]' passed (0.004 seconds).
+Test Case '-[YoteikanTests.PlanTests testMemoEditPreservesTimingAndOtherNotesAndSupportsUndo]' passed (0.004 seconds).
+Test Case '-[YoteikanTests.PlanTests testMovingOneStickyLeavesOthersAndPresetUnchanged]' passed (0.003 seconds).
 Test Case '-[YoteikanTests.PlanTests testOverlapColumnsCoverTransitiveGroupsAndReuseLanes]' passed (0.001 seconds).
 Test Case '-[YoteikanTests.PlanTests testPaletteRejectsEmptyInvalidOrDuplicateColorsAndSupportsOneColor]' passed (0.002 seconds).
 Test Case '-[YoteikanTests.PlanTests testPlanningRangeIncludesEarlyCalendarTimeAndEndsAtMidnight]' passed (0.001 seconds).
 Test Case '-[YoteikanTests.PlanTests testSnappingBoundsAndOverlapUnion]' passed (0.001 seconds).
 Test Case '-[YoteikanTests.PlanTests testThreeSimultaneousEventsHaveSeparateColumns]' passed (0.001 seconds).
-Test Case '-[YoteikanTests.PlanTests testUndoAndPersistenceAndUnplace]' passed (0.003 seconds).
-Test Case '-[YoteikanUITests.YoteikanUITests test01DemoAndPresets]' passed (8.293 seconds).
-Test Case '-[YoteikanUITests.YoteikanUITests test02CreatePersistEditAndUndo]' passed (18.916 seconds).
-Test Case '-[YoteikanUITests.YoteikanUITests test03DragResizeAndUnplace]' passed (13.781 seconds).
-Test Case '-[YoteikanUITests.YoteikanUITests test04InboxDropAndOverview]' passed (10.882 seconds).
-Test Case '-[YoteikanUITests.YoteikanUITests test05CalendarAccessAndRealEventKitRead]' passed (9.736 seconds).
-Test Case '-[YoteikanUITests.YoteikanUITests test06CreatePresetAndReuseItToday]' passed (12.716 seconds).
-Test Case '-[YoteikanUITests.YoteikanUITests test07CalendarSelectionChangesVisibleEvents]' passed (14.394 seconds).
-Test Case '-[YoteikanUITests.YoteikanUITests test08NewlyPlacedStickyMovesFromEmptyBodyArea]' passed (14.735 seconds).
-Test Case '-[YoteikanUITests.YoteikanUITests test09MoveHandleChangesStartAndPersistsWithUndo]' passed (23.840 seconds).
-Test Case '-[YoteikanUITests.YoteikanUITests test10SwipeDaysAndKeepEachDaysPlan]' passed (19.019 seconds).
-Test Case '-[YoteikanUITests.YoteikanUITests test11VerticalScrollAndInboxSwipeKeepDate]' passed (9.317 seconds).
-Test Case '-[YoteikanUITests.YoteikanUITests test12NamedColorsPersistAndApplyToStickyAndPreset]' passed (26.568 seconds).
-Test Case '-[YoteikanUITests.YoteikanUITests test13AddEditAndDeleteColorWithReplacement]' passed (32.434 seconds).
-Test Case '-[YoteikanUITests.YoteikanUITests test14PlanAtFiveAMAndKeepMidnightBoundary]' passed (22.232 seconds).
-Test Case '-[YoteikanUITests.YoteikanUITests test15CustomizeHoursPersistAndRecoverOutsideSticky]' passed (39.257 seconds).
+Test Case '-[YoteikanTests.PlanTests testUndoAndPersistenceAndUnplace]' passed (0.004 seconds).
+Test Case '-[YoteikanUITests.YoteikanUITests test01DemoAndPresets]' passed (8.256 seconds).
+Test Case '-[YoteikanUITests.YoteikanUITests test02CreatePersistEditAndUndo]' passed (20.429 seconds).
+Test Case '-[YoteikanUITests.YoteikanUITests test03DragResizeAndUnplace]' passed (13.509 seconds).
+Test Case '-[YoteikanUITests.YoteikanUITests test04InboxDropAndOverview]' passed (10.493 seconds).
+Test Case '-[YoteikanUITests.YoteikanUITests test05CalendarAccessAndRealEventKitRead]' passed (9.963 seconds).
+Test Case '-[YoteikanUITests.YoteikanUITests test06CreatePresetAndReuseItToday]' passed (13.439 seconds).
+Test Case '-[YoteikanUITests.YoteikanUITests test07CalendarSelectionChangesVisibleEvents]' passed (14.948 seconds).
+Test Case '-[YoteikanUITests.YoteikanUITests test08NewlyPlacedStickyMovesFromEmptyBodyArea]' passed (15.554 seconds).
+Test Case '-[YoteikanUITests.YoteikanUITests test09MoveHandleChangesStartAndPersistsWithUndo]' passed (25.078 seconds).
+Test Case '-[YoteikanUITests.YoteikanUITests test10SwipeDaysAndKeepEachDaysPlan]' passed (19.795 seconds).
+Test Case '-[YoteikanUITests.YoteikanUITests test11VerticalScrollAndInboxSwipeKeepDate]' passed (9.544 seconds).
+Test Case '-[YoteikanUITests.YoteikanUITests test12NamedColorsPersistAndApplyToStickyAndPreset]' passed (30.007 seconds).
+Test Case '-[YoteikanUITests.YoteikanUITests test13AddEditAndDeleteColorWithReplacement]' passed (36.857 seconds).
+Test Case '-[YoteikanUITests.YoteikanUITests test14PlanAtFiveAMAndKeepMidnightBoundary]' passed (22.625 seconds).
+Test Case '-[YoteikanUITests.YoteikanUITests test15CustomizeHoursPersistAndRecoverOutsideSticky]' passed (40.141 seconds).
+Test Case '-[YoteikanUITests.YoteikanUITests test16TwoZonesDragAndMemoPersist]' passed (30.247 seconds).
+Test Case '-[YoteikanUITests.YoteikanUITests test17LandscapeShowsThreeZonesAndKeepsSelection]' passed (9.849 seconds).
 
-全31件の成功を確認（設定操作テストの再実行を含む）。
+** TEST SUCCEEDED **
+
+横画面の撮影方式をXCUIScreenへ変更した追加確認:
+Test Case '-[YoteikanUITests.YoteikanUITests test17LandscapeShowsThreeZonesAndKeepsSelection]' passed (9.370 seconds).
+artifacts/ZonesLandscapeCapture.xcresult / artifacts/zones-landscape-capture.log
