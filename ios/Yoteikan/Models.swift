@@ -182,6 +182,15 @@ let tones: [Color] = [Color(red: 0.88, green: 0.93, blue: 0.80), Color(red: 0.97
                 Sticky(title: "読書", minutes: 30, tone: 0, day: day),
                 Sticky(title: "ひと休み", minutes: 15, tone: 3, day: day)
             ]
+            #if DEBUG && targetEnvironment(simulator)
+            if ProcessInfo.processInfo.arguments.contains("--short-events-test") {
+                sample.stickies = [
+                    Sticky(title: "読書5分", minutes: 5, tone: 0, day: day, start: 480),
+                    Sticky(title: "休憩5分", minutes: 5, tone: 1, day: day, start: 485),
+                    Sticky(title: "確認5分", minutes: 5, tone: 2, day: day, start: 490)
+                ]
+            }
+            #endif
             plan = sample
         } else {
             plan = defaults.data(forKey: key).flatMap { try? JSONDecoder().decode(SavedPlan.self, from: $0) } ?? SavedPlan()

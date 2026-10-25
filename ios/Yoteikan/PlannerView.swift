@@ -1,6 +1,11 @@
 import SwiftUI
 import UniformTypeIdentifiers
 
+private struct HourPositions: PreferenceKey {
+    static var defaultValue: [Int: CGFloat] = [:]
+    static func reduce(value: inout [Int: CGFloat], nextValue: () -> [Int: CGFloat]) { value.merge(nextValue(), uniquingKeysWith: { _, new in new }) }
+}
+
 struct PlannerView: View {
     @EnvironmentObject private var plans: PlanStore
     @EnvironmentObject private var calendar: CalendarStore
@@ -13,6 +18,11 @@ struct PlannerView: View {
     @State private var editing: Sticky?
     @State private var selected: UUID?
     @State private var overview = false
+    @State private var zoomLevel = 0
+    @State private var visibleHour: Int?
+    @State private var zoomAnchor = 8
+    @State private var viewportTop: CGFloat = 0
+    private let zoomSteps: [CGFloat] = [1, 2, 4, 8]
     @State private var dropActive = false
     @State private var moving: UUID?
     @State private var shift: CGFloat = 0
@@ -28,9 +38,14 @@ struct PlannerView: View {
     @State private var memoDrafts: [UUID: String] = [:]
     @FocusState private var memoFocused: Bool
     private var selectedTask: Sticky? { plans.today.first { $0.id == selected } }
-    private var scale: CGFloat { overview ? max(0.15, (viewportHeight - 32) / CGFloat(plans.hours.totalMinutes)) : 1.55 }
+    private var scale: CGFloat { overview ? max(0.15, (viewportHeight - 32) / CGFloat(plans.hours.totalMinutes)) : 1.55 * zoomSteps[zoomLevel] }
     private var fixed: [FixedEvent] {
         if plans.demo, dayKey(plans.date) == dayKey(Date()) {
+            #if DEBUG && targetEnvironment(simulator)
+            if ProcessInfo.processInfo.arguments.contains("--short-events-test") {
+                return [FixedEvent(id: "short1", title: "会議5分", start: 495, end: 500), FixedEvent(id: "short2", title: "連絡5分", start: 500, end: 505)]
+            }
+            #endif
             return [FixedEvent(id: "demo1", title: "チームミーティング", start: 600, end: 660), FixedEvent(id: "demo2", title: "打ち合わせ", start: 840, end: 900)]
         }
         return calendar.events
@@ -65,7 +80,7 @@ struct PlannerView: View {
                 ScrollView(.horizontal, showsIndicators: false) { HStack { ForEach(fixed.filter(\.allDay)) { event in Label(event.title, systemImage: "sun.max").font(.caption2).padding(7).background(.white.opacity(0.6), in: Capsule()) } }.padding(.horizontal, 20) }
             }
             HStack(spacing: 0) {
-                VStack(spacing: 0) { zoneTitle("時間割"); timeline }
+                VStack(spacing: 0) { zoomControls; timeline }
                     .accessibilityElement(children: .contain).accessibilityIdentifier("scheduleZone")
                 if wide && !sideShowsDetails {
                     Divider()
@@ -216,6 +231,25 @@ struct PlannerView: View {
     private func stat(_ title: String, _ value: String, compact: Bool) -> some View {
         VStack(alignment: .leading, spacing: compact ? 2 : 4) { Text(title).font(.system(size: compact ? 9 : 10)).foregroundStyle(ink.opacity(0.55)); Text(value).font(.system(size: compact ? 15 : 18, weight: .semibold, design: .rounded)) }.frame(maxWidth: .infinity, alignment: .leading).padding(.leading, title == "未配置" ? 18 : 0)
     }
+    private var zoomControls: some View {
+        HStack(spacing: 0) {
+            Text("時間割").font(.system(size: 11, weight: .semibold))
+            Spacer(minLength: 0)
+            Button { zoomAnchor = selectedTask?.start.map { $0 / 60 } ?? visibleHour ?? initialHour; zoomLevel -= 1 } label: {
+                Image(systemName: "minus.magnifyingglass").frame(width: 44, height: 44)
+            }.disabled(overview || zoomLevel == 0).accessibilityLabel("時間割を縮小").accessibilityIdentifier("zoomOut")
+            Text(overview ? "全日" : "\(Int(zoomSteps[zoomLevel]))倍")
+                .font(.system(size: 11, weight: .medium)).frame(width: 28)
+                .accessibilityIdentifier("zoomLevel")
+            Button { if overview { overview = false } else { zoomAnchor = selectedTask?.start.map { $0 / 60 } ?? visibleHour ?? initialHour; zoomLevel += 1 } } label: {
+                Image(systemName: "plus.magnifyingglass").frame(width: 44, height: 44)
+            }.disabled(!overview && zoomLevel == zoomSteps.count - 1).accessibilityLabel("時間割を拡大").accessibilityIdentifier("zoomIn")
+        }.padding(.horizontal, 8)
+    }
+    private func cardHeight(_ minutes: Int) -> CGFloat {
+        let slot = CGFloat(minutes) * scale
+        return max(0, slot - min(overview ? 1 : 4, slot * 0.25))
+    }
     private var timeline: some View {
         ScrollViewReader { reader in
             ScrollView(.vertical) {
@@ -223,14 +257,30 @@ struct PlannerView: View {
                     ZStack(alignment: .topLeading) {
                         VStack(spacing: 0) {
                         ForEach((plans.hours.start / 60)...(plans.hours.end / 60), id: \.self) { hour in
-                            HStack(alignment: .center, spacing: 6) { Text(String(format: "%02d:00", hour)).font(.system(size: 9, weight: .medium, design: .monospaced)).foregroundStyle(ink.opacity(0.55)).frame(width: 34, alignment: .trailing); Rectangle().fill(ink.opacity(0.09)).frame(height: 1) }.frame(height: 60 * scale, alignment: .top).id(hour)
+                            ZStack(alignment: .topLeading) {
+                                HStack(spacing: 6) { Text(String(format: "%02d:00", hour)).font(.system(size: 9, weight: .medium, design: .monospaced)).foregroundStyle(ink.opacity(0.55)).frame(width: 34, alignment: .trailing); Rectangle().fill(ink.opacity(0.09)).frame(height: 1) }
+                                if !overview && zoomLevel >= 2 && hour < plans.hours.end / 60 {
+                                    ForEach(1..<12) { step in
+                                        HStack(spacing: 6) {
+                                            Text(String(format: ":%02d", step * 5)).font(.system(size: 8, design: .monospaced)).frame(width: 34, alignment: .trailing)
+                                            Rectangle().frame(height: 0.5)
+                                        }.foregroundStyle(ink.opacity(0.22)).offset(y: CGFloat(step * 5) * scale)
+                                    }
+                                }
+                            }.frame(height: 60 * scale, alignment: .top).id("hour-\(hour)")
+                                .background { GeometryReader { proxy in Color.clear.preference(key: HourPositions.self, value: [hour: proxy.frame(in: .global).minY]) } }
                         }
                         }.contentShape(Rectangle()).simultaneousGesture(daySwipeGesture)
                         ForEach(visibleFixed) { event in
                             let start = max(plans.hours.start, event.start)
                             let slot = slots["fixed-" + event.id] ?? TimelineSlot(column: 0, columns: 1)
                             let width = (geometry.size.width - 42) / CGFloat(slot.columns)
-                            fixedCard(event).frame(width: width - 3, height: max(overview ? 3 : 20, CGFloat(min(event.end, plans.hours.end) - start) * scale - (overview ? 1 : 4))).offset(x: 40 + width * CGFloat(slot.column), y: CGFloat(start - plans.hours.start) * scale + 2)
+                            let height = cardHeight(min(event.end, plans.hours.end) - start)
+                            fixedCard(event, height: height).frame(width: width - 3, height: height).clipped()
+                                .accessibilityElement(children: .ignore)
+                                .accessibilityLabel("\(event.title)、\(clockText(event.start))から\(clockText(event.end))、カレンダーの固定予定")
+                                .accessibilityIdentifier("fixed-\(event.title)")
+                                .offset(x: 40 + width * CGFloat(slot.column), y: CGFloat(start - plans.hours.start) * scale + 2)
                         }
                         ForEach(placed) { task in
                             let visibleStart = max(task.start!, plans.hours.start)
@@ -239,14 +289,16 @@ struct PlannerView: View {
                             let slot = slots[task.id.uuidString] ?? TimelineSlot(column: 0, columns: 1)
                             let slotCount = slot.columns
                             let width = (geometry.size.width - 42) / CGFloat(slotCount)
-                            taskCard(task, compact: overview || slotCount > 1)
-                                .frame(width: width - 3, height: max(overview ? 3 : 24, CGFloat(visibleEnd - visibleStart) * scale - (overview ? 1 : 4) + (stretching == task.id ? stretch : 0)))
+                            let height = max(0, cardHeight(visibleEnd - visibleStart) + (stretching == task.id ? stretch : 0))
+                            taskCard(task, compact: overview || slotCount > 1, height: height)
+                                .frame(width: width - 3, height: height)
                                 .overlay { if collision { RoundedRectangle(cornerRadius: 9).stroke(.orange, lineWidth: 1.5).allowsHitTesting(false) } }
-                                .overlay(alignment: .bottom) { if !overview { resizeHandle(task) } }
+                                .overlay(alignment: .bottom) { if !overview && (height >= 54 || stretching == task.id) { resizeHandle(task) } }
                                 .contentShape(Rectangle())
                                 .overlay(alignment: .topTrailing) {
-                                    if selected == task.id && !overview { moveHandle(task).padding(3) }
+                                    if selected == task.id && !overview && height >= 32 { moveHandle(task).padding(3) }
                                 }
+                                .clipped()
                                 .overlay(alignment: .top) {
                                     if moving == task.id && !returningToInbox {
                                         let start = task.start! + PlannerMath.snap(Double(shift / scale))
@@ -276,41 +328,54 @@ struct PlannerView: View {
                     } isTargeted: { dropActive = $0 }
                     .background(dropActive ? accent.opacity(0.05) : Color.clear)
                 }.frame(height: CGFloat(plans.hours.end - plans.hours.start) * scale + 18).padding(.top, 12).padding(.horizontal, 5)
-            }.accessibilityIdentifier("timeline")
-                .task { await Task.yield(); reader.scrollTo(initialHour, anchor: .top) }
-                .onChange(of: overview) { _, value in reader.scrollTo(value ? plans.hours.start / 60 : initialHour, anchor: .top) }
-                .onChange(of: plans.date) { _, _ in reader.scrollTo(overview ? plans.hours.start / 60 : initialHour, anchor: .top) }
+            }.coordinateSpace(name: "timelineViewport").accessibilityIdentifier("timeline")
+                .onPreferenceChange(HourPositions.self) { positions in
+                    visibleHour = positions.filter { $0.value <= viewportTop + 16 }.max(by: { $0.value < $1.value })?.key ?? initialHour
+                }
+                .task { await Task.yield(); reader.scrollTo("hour-\(initialHour)", anchor: .top) }
+                .onChange(of: zoomLevel) { _, _ in
+                    Task { @MainActor in
+                        await Task.yield()
+                        reader.scrollTo("hour-\(zoomAnchor)", anchor: .top)
+                    }
+                }
+                .onChange(of: overview) { _, value in reader.scrollTo("hour-\(value ? plans.hours.start / 60 : initialHour)", anchor: .top) }
+                .onChange(of: plans.date) { _, _ in reader.scrollTo("hour-\(overview ? plans.hours.start / 60 : initialHour)", anchor: .top) }
                 .onChange(of: plans.hours) { _, _ in
                     selected = nil; moving = nil; stretching = nil; shift = 0; stretch = 0
-                    reader.scrollTo(overview ? plans.hours.start / 60 : initialHour, anchor: .top)
+                    reader.scrollTo("hour-\(overview ? plans.hours.start / 60 : initialHour)", anchor: .top)
                 }
         }
         .background(.white.opacity(0.62))
-        .background { GeometryReader { proxy in Color.clear.onAppear { viewportHeight = proxy.size.height }.onChange(of: proxy.size.height) { _, height in viewportHeight = height } } }
+        .background { GeometryReader { proxy in Color.clear.onAppear { viewportHeight = proxy.size.height; viewportTop = proxy.frame(in: .global).minY }.onChange(of: proxy.size) { _, size in viewportHeight = size.height; viewportTop = proxy.frame(in: .global).minY } } }
         .overlay(alignment: .top) { Rectangle().fill(ink.opacity(0.06)).frame(height: 1) }
     }
-    private func fixedCard(_ event: FixedEvent) -> some View {
+    private func fixedCard(_ event: FixedEvent, height: CGFloat) -> some View {
         VStack(alignment: .leading, spacing: overview ? 0 : 5) {
-            if overview { Text(event.title).font(.system(size: 7, weight: .medium)).lineLimit(1) }
+            if height < 44 {
+                if height >= 14 { Text(event.title).font(.system(size: 10, weight: .medium)).lineLimit(1) }
+            } else if overview { Text(event.title).font(.system(size: 7, weight: .medium)).lineLimit(1) }
             else { HStack { Image(systemName: "lock.fill").font(.system(size: 9)); Text("\(clockText(event.start)) – \(clockText(event.end))").font(.system(size: 10, weight: .medium)); Spacer(minLength: 0) }.foregroundStyle(ink.opacity(0.55))
             if !overview { Text(event.title).font(.system(size: 13, weight: .medium)).lineLimit(2) }
             Spacer(minLength: 0)
             }
-        }.padding(overview ? 2 : 10).frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading).background(Color(red: 0.89, green: 0.91, blue: 0.89), in: RoundedRectangle(cornerRadius: 9)).overlay(alignment: .leading) { RoundedRectangle(cornerRadius: 2).fill(ink.opacity(0.25)).frame(width: 3).padding(.vertical, 9) }.clipped().accessibilityElement(children: .ignore).accessibilityLabel("\(event.title)、\(clockText(event.start))から\(clockText(event.end))、カレンダーの固定予定").accessibilityIdentifier("fixed-\(event.title)")
+        }.padding(height < 44 ? min(height / 2, 2) : 10).frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading).background(Color(red: 0.89, green: 0.91, blue: 0.89), in: RoundedRectangle(cornerRadius: 9)).overlay(alignment: .leading) { RoundedRectangle(cornerRadius: 2).fill(ink.opacity(0.25)).frame(width: 3).padding(.vertical, 9) }.clipped()
     }
-    private func taskCard(_ task: Sticky, compact: Bool) -> some View {
+    private func taskCard(_ task: Sticky, compact: Bool, height: CGFloat) -> some View {
         let textColor = plans.paletteColor(for: task.tone).textColor
         let start = (task.start ?? 0) + (moving == task.id ? PlannerMath.snap(Double(shift / scale)) : 0)
         let duration = task.minutes + (stretching == task.id ? PlannerMath.snap(Double(stretch / scale)) : 0)
         return VStack(alignment: .leading, spacing: 4) {
-            if overview {
+            if height < 44 {
+                if height >= 14 { Text(task.title).font(.system(size: 10, weight: .semibold)).lineLimit(1) }
+            } else if overview {
                 if duration >= 45 { Text(task.title).font(.system(size: 7, weight: .semibold)).lineLimit(1) }
             } else {
             if !compact { Text("\(clockText(start)) – \(clockText(start + duration))").font(.system(size: 10, weight: .medium)).foregroundStyle(textColor.opacity(0.8)) }
             HStack(spacing: 4) { Text(task.title).font(.system(size: compact ? 10 : 12, weight: .semibold)).lineLimit(2); Spacer(minLength: 0); if compact { Text("\(duration)分").font(.system(size: 9)) } }.padding(.trailing, selected == task.id ? 29 : 0)
             Spacer(minLength: 0)
             }
-        }.padding(.horizontal, overview ? 3 : 7).padding(.top, overview ? 1 : (compact ? 5 : 7)).frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        }.padding(.horizontal, overview ? 3 : 7).padding(.top, height < 44 ? 1 : (compact ? 5 : 7)).frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             .foregroundStyle(textColor)
             .background(plans.paletteColor(for: task.tone).color, in: RoundedRectangle(cornerRadius: 9))
             .overlay(alignment: .leading) { RoundedRectangle(cornerRadius: 2).fill(ink.opacity(0.22)).frame(width: 3).padding(.vertical, 9) }

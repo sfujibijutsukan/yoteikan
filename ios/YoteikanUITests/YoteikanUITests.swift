@@ -487,4 +487,86 @@ final class YoteikanUITests: XCTestCase {
         XCTAssertEqual(app.staticTexts["selectedDate"].label, date)
         XCTAssertFalse(app.staticTexts["08:00"].isHittable)
     }
+    func test20ZoomShortEventsWithoutVisualOverlap() {
+        launch(["--demo", "--short-events-test"])
+        let first = app.otherElements["task-読書5分"]
+        let second = app.otherElements["task-休憩5分"]
+        let third = app.otherElements["task-確認5分"]
+        let meeting = app.otherElements["fixed-会議5分"]
+        let call = app.otherElements["fixed-連絡5分"]
+        func checkFrames() {
+            for (a, b) in [(first, second), (second, third), (third, meeting), (meeting, call)] {
+                XCTAssertLessThan(a.frame.maxY, b.frame.minY, "\(a.identifier) overlaps \(b.identifier)")
+            }
+            XCTAssertEqual(first.value as? String, "08:00|5")
+            XCTAssertEqual(second.value as? String, "08:05|5")
+            XCTAssertEqual(third.value as? String, "08:10|5")
+        }
+        XCTAssertTrue(first.waitForExistence(timeout: 3))
+        checkFrames()
+        XCTAssertFalse(app.otherElements["resize-読書5分"].exists)
+        let baseHeight = first.frame.height
+        for label in ["2倍", "4倍", "8倍"] {
+            app.buttons["zoomIn"].tap()
+            XCTAssertEqual(app.staticTexts["zoomLevel"].label, label)
+            checkFrames()
+        }
+        XCTAssertGreaterThan(first.frame.height, baseHeight * 7)
+        XCTAssertGreaterThan(first.frame.height, 54)
+        XCTAssertFalse(app.buttons["zoomIn"].isEnabled)
+        XCTAssertTrue(first.isHittable)
+        XCTAssertTrue(call.isHittable)
+        shot("22-five-minute-zoom")
+        first.tap()
+        XCTAssertTrue(app.otherElements["move-読書5分"].exists)
+        let handle = app.otherElements["resize-読書5分"]
+        XCTAssertTrue(handle.exists)
+        let point = handle.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+        // Two adjacent five-minute slots provide the actual screen distance.
+        let fiveMinutes = second.frame.minY - first.frame.minY
+        point.press(forDuration: 0.15, thenDragTo: point.withOffset(CGVector(dx: 0, dy: fiveMinutes)))
+        XCTAssertEqual(first.value as? String, "08:00|10")
+        app.buttons["undoButton"].tap()
+        XCTAssertEqual(first.value as? String, "08:00|5")
+        let move = app.otherElements["move-読書5分"].coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+        move.press(forDuration: 0.05, thenDragTo: move.withOffset(CGVector(dx: 0, dy: fiveMinutes)))
+        XCTAssertEqual(first.value as? String, "08:05|5")
+        XCTAssertEqual(second.value as? String, "08:05|5")
+        app.buttons["undoButton"].tap()
+        XCTAssertEqual(first.value as? String, "08:00|5")
+        app.buttons["zoomToggle"].tap()
+        XCTAssertEqual(app.staticTexts["zoomLevel"].label, "全日")
+        checkFrames()
+        app.buttons["zoomToggle"].tap()
+        XCTAssertEqual(app.staticTexts["zoomLevel"].label, "8倍")
+        checkFrames()
+        for label in ["4倍", "2倍", "1倍"] {
+            app.buttons["zoomOut"].tap()
+            XCTAssertEqual(app.staticTexts["zoomLevel"].label, label)
+            checkFrames()
+        }
+        XCTAssertFalse(app.buttons["zoomOut"].isEnabled)
+        shot("23-five-minute-standard")
+    }
+    func test21ZoomKeepsVisibleHourAndZoneLayout() {
+        launch()
+        let timeline = app.scrollViews["timeline"]
+        let axis = timeline.coordinate(withNormalizedOffset: CGVector(dx: 0.08, dy: 0.8))
+        axis.press(forDuration: 0.01, thenDragTo: axis.withOffset(CGVector(dx: 0, dy: -210)))
+        let visible = (8...23).map { app.staticTexts[String(format: "%02d:00", $0)] }
+            .first { $0.isHittable && $0.frame.minY >= timeline.frame.minY && $0.frame.minY < timeline.frame.maxY }
+        XCTAssertNotNil(visible)
+        let hour = visible!.label
+        app.buttons["zoomIn"].tap()
+        XCTAssertTrue(app.staticTexts[hour].isHittable)
+        XCTAssertEqual(app.staticTexts["zoomLevel"].label, "2倍")
+        XCUIDevice.shared.orientation = .landscapeLeft
+        Thread.sleep(forTimeInterval: 1)
+        XCTAssertTrue(app.otherElements["memoZone"].exists)
+        XCTAssertEqual(app.staticTexts["zoomLevel"].label, "2倍")
+        let schedule = app.otherElements["scheduleZone"]
+        let memo = app.otherElements["memoZone"]
+        XCTAssertLessThanOrEqual(schedule.frame.maxX, memo.frame.minX + 1)
+        XCUIDevice.shared.orientation = .portrait
+    }
 }
