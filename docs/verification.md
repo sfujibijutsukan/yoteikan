@@ -2,7 +2,17 @@
 
 2026年10月25日。iPhone 17eシミュレーター / iOS 27.0で確認しました。
 
-ゾーン構成を変更し、ユニットテスト17件・UI操作テスト17件の計34件を検証しました。スクリーンショット抽出・一覧作成ツールはGoで実装しています。Pythonへの依存はありません。
+付箋・詳細の切り替えに対応し、ユニットテスト17件・UI操作テスト19件の計36件を検証しました。スクリーンショット抽出・一覧作成ツールはGoで実装しています。Pythonへの依存はありません。
+
+## 付箋領域を予定の詳細に切り替え
+
+- 右側の「付箋／詳細」をワンタップで切り替え。
+- 付箋をタップすると、その場で選択した予定の時刻・所要時間・メモを表示。
+- メモを書いて一覧へ戻り、再度詳細を開いても下書きを保持。保存しても時刻・所要時間は変わらない。
+- 詳細の編集ボタンから予定を編集し、再配置・右への戻しも確認。
+- 詳細の表示中に右へドロップすると、未配置へ戻して付箋一覧を再表示。
+
+全体実行で35件成功。右へ戻す新規テストが伸縮つまみに当たっていたため、移動つまみを使う操作へ修正しました。見出し整理後の切り替え・メモ・縦横表示・右への戻しを4件の再実行で確認しました。
 
 ## 時間割・詳細メモ・付箋のゾーン構成
 
@@ -126,11 +136,11 @@
 18. [縦画面の2ゾーン](screenshots/18-two-zone-planner.png)
 19. [詳細メモの編集](screenshots/19-detail-memo.png)
 20. [横画面の3ゾーン](screenshots/20-three-zone-planner.png)
+21. [付箋領域を予定の詳細へ切り替え](screenshots/21-switch-to-schedule-details.png)
 
 ## 検証結果の記録
 
-- [テスト結果の抜粋](test-results.txt)：ユニット17件・UI操作17件の全34件が成功。artifacts/ZonesValidation.xcresult / artifacts/zones-validation.log に保存。
-- 横画面の撮影を画面全体の方式へ変更して追加確認。artifacts/ZonesLandscapeCapture.xcresult / artifacts/zones-landscape-capture.log に保存。
+- [テスト結果の抜粋](test-results.txt)：ユニット17件・UI操作19件の成功を確認（4件の再実行を含む）。全体実行は artifacts/SideDetailsValidation.xcresult / artifacts/side-details-validation.log、最終操作確認は artifacts/SideDetailsInteraction.xcresult / artifacts/side-details-interaction.log に保存。
 - 色の追加・削除テストを再実行し、保存済みの付箋で5色目の選択を確認。キーボードを閉じた画面を撮影し直しました。結果は artifacts/PaletteScreenshots.xcresult と artifacts/palette-screenshots.log。
 - 日付境界の追加確認：artifacts/Issue3CalendarVerified.xcresult と artifacts/issue-3-calendar-verified.log。カレンダー関連の3件が成功。
 - 元のログとXcode結果バンドルはローカルの artifacts/ に保存。生成物のためGit管理対象外。

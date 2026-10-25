@@ -24,6 +24,7 @@ struct PlannerView: View {
     @State private var inboxFrame = CGRect.zero
     @State private var returningToInbox = false
     @State private var showDetails = false
+    @State private var sideShowsDetails = false
     @State private var memoDrafts: [UUID: String] = [:]
     @FocusState private var memoFocused: Bool
     private var selectedTask: Sticky? { plans.today.first { $0.id == selected } }
@@ -66,14 +67,14 @@ struct PlannerView: View {
             HStack(spacing: 0) {
                 VStack(spacing: 0) { zoneTitle("時間割"); timeline }
                     .accessibilityElement(children: .contain).accessibilityIdentifier("scheduleZone")
-                if wide {
+                if wide && !sideShowsDetails {
                     Divider()
                     VStack(spacing: 0) { zoneTitle("詳細メモ"); memoPane }
                         .frame(width: geometry.size.width * 0.28)
                         .accessibilityElement(children: .contain).accessibilityIdentifier("memoZone")
                 }
                 Divider()
-                inboxView.frame(width: wide ? geometry.size.width * 0.25 : max(124, geometry.size.width * 0.34))
+                sideZone.frame(width: wide ? geometry.size.width * 0.25 : max(124, geometry.size.width * 0.34))
             }
         }
         }
@@ -124,6 +125,50 @@ struct PlannerView: View {
                 Spacer()
             }
         }.padding(12).frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading).background(paper)
+    }
+    private var sideZone: some View {
+        VStack(spacing: 0) {
+            HStack(spacing: 2) {
+                sideTab("付箋 \(trayTasks.count)", details: false, identifier: "showStickyPool")
+                sideTab("詳細", details: true, identifier: "showScheduleDetails")
+            }.padding(5).background(paper)
+            if sideShowsDetails {
+                VStack(spacing: 0) {
+                    if let task = selectedTask {
+                        VStack(alignment: .leading, spacing: 7) {
+                            Text(task.start.map { "\(clockText($0))〜\(clockText($0 + task.minutes))" } ?? "未配置")
+                                .font(.system(size: 10, weight: .medium))
+                            Text(durationText(task.minutes)).font(.system(size: 11))
+                            Button("予定を編集") { editing = task }.font(.system(size: 11))
+                                .accessibilityIdentifier("editSideDetail")
+                        }.frame(maxWidth: .infinity, alignment: .leading).padding(.horizontal, 12).padding(.top, 10)
+                    }
+                    memoPane
+                }.accessibilityElement(children: .contain).accessibilityIdentifier("sideDetail")
+            } else {
+                inboxView
+            }
+        }
+        .background(returningToInbox ? tones[0] : paper)
+        .background { GeometryReader { proxy in Color.clear.onAppear { inboxFrame = proxy.frame(in: .global) }.onChange(of: proxy.frame(in: .global)) { _, frame in inboxFrame = frame } } }
+        .accessibilityElement(children: .contain).accessibilityIdentifier("sideZone")
+        .accessibilityValue(sideShowsDetails ? "詳細" : "付箋")
+        .dropDestination(for: String.self) { values, _ in
+            guard let raw = values.first, let id = UUID(uuidString: raw), plans.today.contains(where: { $0.id == id }) else { return false }
+            plans.put(id, at: nil); sideShowsDetails = false; return true
+        }
+    }
+    private func sideTab(_ title: String, details: Bool, identifier: String) -> some View {
+        Button {
+            memoFocused = false
+            if details && selectedTask == nil { selected = placed.first?.id ?? trayTasks.first?.id }
+            sideShowsDetails = details
+        } label: {
+            Text(title).font(.system(size: 11, weight: .semibold)).frame(maxWidth: .infinity, minHeight: 34)
+                .background(sideShowsDetails == details ? accent : .clear, in: RoundedRectangle(cornerRadius: 6))
+                .foregroundStyle(sideShowsDetails == details ? .white : ink)
+        }.buttonStyle(.plain).accessibilityIdentifier(identifier)
+            .accessibilityValue(sideShowsDetails == details ? "選択中" : "")
     }
     private var header: some View {
         HStack {
@@ -314,7 +359,7 @@ struct PlannerView: View {
     private func finishMove(_ task: Sticky, delta: CGFloat, location: CGPoint) {
         defer { moving = nil; shift = 0; returningToInbox = false }
         guard let start = task.start else { return }
-        if inboxFrame.contains(location) { plans.put(task.id, at: nil); selected = nil }
+        if inboxFrame.contains(location) { plans.put(task.id, at: nil); selected = nil; sideShowsDetails = false }
         else { plans.move(task.id, start: start + PlannerMath.snap(Double(delta / scale))) }
     }
     private func moveGesture(_ task: Sticky) -> some Gesture {
@@ -334,9 +379,6 @@ struct PlannerView: View {
     }
     private var inboxView: some View {
         VStack(spacing: 0) {
-            HStack { Text("付箋").font(.system(size: 12, weight: .semibold)); Spacer(); Text("\(trayTasks.count)").font(.caption) }
-                .padding(.horizontal, 10).frame(height: 35)
-                .overlay(alignment: .bottom) { Rectangle().fill(ink.opacity(0.1)).frame(height: 1) }
             ScrollView(.vertical, showsIndicators: false) {
                 VStack(spacing: 10) {
                     if trayTasks.isEmpty {
@@ -352,7 +394,7 @@ struct PlannerView: View {
                                 .background(plans.paletteColor(for: task.tone).color, in: RoundedRectangle(cornerRadius: 7))
                                 .overlay { RoundedRectangle(cornerRadius: 7).stroke(selected == task.id ? accent : .clear, lineWidth: 2) }
                                 .foregroundStyle(plans.paletteColor(for: task.tone).textColor)
-                                .onTapGesture { if selected == task.id { editing = task } else { selected = task.id } }.draggable(task.id.uuidString)
+                                .onTapGesture { selected = task.id; sideShowsDetails = true }.draggable(task.id.uuidString)
                                 .accessibilityElement(children: .ignore).accessibilityLabel("\(task.title)、\(task.minutes)分、\(task.start.map { "時間外 \(clockText($0))" } ?? "未配置")")
                                 .accessibilityIdentifier("inbox-\(task.title)")
                         }
@@ -364,9 +406,7 @@ struct PlannerView: View {
             }.padding(8)
         }
             .background(returningToInbox ? tones[0] : paper)
-            .background { GeometryReader { proxy in Color.clear.onAppear { inboxFrame = proxy.frame(in: .global) }.onChange(of: proxy.frame(in: .global)) { _, frame in inboxFrame = frame } } }
             .accessibilityElement(children: .contain).accessibilityIdentifier("inboxTray")
-            .dropDestination(for: String.self) { values, _ in guard let raw = values.first, let id = UUID(uuidString: raw) else { return false }; plans.put(id, at: nil); return true }
     }
     private var bottomBar: some View {
         HStack {

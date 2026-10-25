@@ -7,7 +7,7 @@ final class YoteikanUITests: XCTestCase {
     func shot(_ name: String) { let attachment = XCTAttachment(screenshot: app.screenshot()); attachment.name = name; attachment.lifetime = .keepAlways; add(attachment) }
     func test01DemoAndPresets() {
         launch(); shot("01-day-planner")
-        app.buttons["presetsButton"].tap()
+        app.buttons["showStickyPool"].tap(); app.buttons["presetsButton"].tap()
         XCTAssertTrue(app.buttons["preset-読書"].waitForExistence(timeout: 3)); app.buttons["preset-読書"].tap()
         XCTAssertEqual(app.buttons["preset-読書"].value as? String, "1枚追加済み"); shot("02-presets")
         app.buttons["closePresets"].tap()
@@ -81,7 +81,7 @@ final class YoteikanUITests: XCTestCase {
 
     func test06CreatePresetAndReuseItToday() {
         launch()
-        app.buttons["presetsButton"].tap(); app.buttons["newPreset"].tap()
+        app.buttons["showStickyPool"].tap(); app.buttons["presetsButton"].tap(); app.buttons["newPreset"].tap()
         app.textFields["presetTitle"].tap(); app.textFields["presetTitle"].typeText("散歩")
         app.buttons["savePreset"].tap()
         XCTAssertTrue(app.buttons["preset-散歩"].waitForExistence(timeout: 3))
@@ -226,7 +226,7 @@ final class YoteikanUITests: XCTestCase {
         shot("12-named-color-picker")
         app.buttons["キャンセル"].tap()
         app.terminate(); launch([])
-        app.buttons["presetsButton"].tap()
+        app.buttons["showStickyPool"].tap(); app.buttons["presetsButton"].tap()
         app.buttons["newPreset"].tap()
         app.textFields["presetTitle"].tap()
         app.textFields["presetTitle"].typeText("色のプリセット")
@@ -265,7 +265,7 @@ final class YoteikanUITests: XCTestCase {
         XCTAssertEqual(app.buttons["color-4"].value as? String, "選択中")
         shot("14-expanded-color-picker")
         app.buttons["キャンセル"].tap()
-        app.buttons["presetsButton"].tap()
+        app.buttons["showStickyPool"].tap(); app.buttons["presetsButton"].tap()
         app.buttons["newPreset"].tap()
         app.textFields["presetTitle"].tap()
         app.textFields["presetTitle"].typeText("趣味プリセット")
@@ -283,7 +283,7 @@ final class YoteikanUITests: XCTestCase {
         XCTAssertFalse(app.buttons["color-4"].exists)
         XCTAssertEqual(app.buttons["color-1"].value as? String, "選択中")
         app.buttons["キャンセル"].tap()
-        app.buttons["presetsButton"].tap()
+        app.buttons["showStickyPool"].tap(); app.buttons["presetsButton"].tap()
         app.buttons["趣味プリセットのプリセットを編集"].tap()
         XCTAssertFalse(app.buttons["color-4"].exists)
         XCTAssertEqual(app.buttons["color-1"].value as? String, "選択中")
@@ -372,6 +372,7 @@ final class YoteikanUITests: XCTestCase {
         option.tap()
     }
     private func editInbox(_ title: String) {
+        app.buttons["showStickyPool"].tap()
         let note = app.descendants(matching: .any).matching(identifier: "inbox-\(title)").firstMatch
         for _ in 0..<5 {
             if note.exists && note.isHittable { break }
@@ -425,6 +426,54 @@ final class YoteikanUITests: XCTestCase {
         XCTAssertFalse(memo.exists)
         app.buttons["notesButton"].tap()
         XCTAssertTrue(app.staticTexts["朝の読書"].exists)
+    }
+    func test18SwitchSideZoneInOneTapAndKeepMemoDraft() {
+        launch()
+        let task = app.otherElements["task-資料作成"]
+        task.tap()
+        let before = task.value as? String
+        app.buttons["showScheduleDetails"].tap()
+        XCTAssertTrue(app.otherElements["sideDetail"].exists)
+        XCTAssertFalse(app.otherElements["inboxTray"].exists)
+        XCTAssertFalse(app.buttons["closeNotes"].exists)
+        XCTAssertTrue(app.staticTexts["09:00〜10:00"].exists)
+        app.textViews["detailMemo"].tap()
+        app.textViews["detailMemo"].typeText("確認する資料")
+        app.buttons["showStickyPool"].tap()
+        XCTAssertTrue(app.otherElements["inboxTray"].exists)
+        app.buttons["showScheduleDetails"].tap()
+        XCTAssertEqual(app.textViews["detailMemo"].value as? String, "確認する資料")
+        app.buttons["saveDetailMemo"].tap()
+        XCTAssertEqual(task.value as? String, before)
+        shot("21-switch-to-schedule-details")
+        app.buttons["showStickyPool"].tap()
+        XCTAssertTrue(app.otherElements["inboxTray"].exists)
+    }
+    func test19TapStickyForDetailsAndDropBackWhileDetailsAreOpen() {
+        launch()
+        app.descendants(matching: .any).matching(identifier: "inbox-運動").firstMatch.tap()
+        XCTAssertTrue(app.otherElements["sideDetail"].exists)
+        XCTAssertTrue(app.buttons["editSideDetail"].exists)
+        app.buttons["editSideDetail"].tap()
+        app.buttons["duration-30"].tap()
+        app.buttons["saveSticky"].tap()
+        XCTAssertTrue(app.staticTexts["30分"].exists)
+        app.buttons["showStickyPool"].tap()
+        let timeline = app.scrollViews["timeline"]
+        app.descendants(matching: .any).matching(identifier: "inbox-運動").firstMatch
+            .coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+            .press(forDuration: 0.7, thenDragTo: timeline.coordinate(withNormalizedOffset: CGVector(dx: 0.65, dy: 0.3)))
+        let task = app.otherElements["task-運動"]
+        XCTAssertTrue(task.waitForExistence(timeout: 3))
+        XCTAssertEqual(placement(of: task).duration, 30)
+        app.buttons["showScheduleDetails"].tap()
+        let side = app.otherElements["sideZone"]
+        app.otherElements["move-運動"].coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+            .press(forDuration: 0.05, thenDragTo: side.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)))
+        XCTAssertTrue(app.otherElements["inboxTray"].exists)
+        XCTAssertTrue(app.descendants(matching: .any).matching(identifier: "inbox-運動").firstMatch.exists)
+        XCTAssertFalse(task.exists)
+        XCTAssertTrue(app.descendants(matching: .any).matching(identifier: "inbox-運動").firstMatch.label.contains("30分"))
     }
     func test11VerticalScrollAndInboxSwipeKeepDate() {
         launch()
