@@ -46,3 +46,12 @@ Test Case '-[YoteikanUITests.YoteikanUITests test18SwitchSideZoneInOneTapAndKeep
 Test Case '-[YoteikanUITests.YoteikanUITests test19TapStickyForDetailsAndDropBackWhileDetailsAreOpen]' passed (13.540 seconds).
 Test Case '-[YoteikanUITests.YoteikanUITests test20ZoomShortEventsWithoutVisualOverlap]' passed (24.124 seconds).
 Test Case '-[YoteikanUITests.YoteikanUITests test21ZoomKeepsVisibleHourAndZoneLayout]' passed (9.007 seconds).
+
+上部表示の簡素化 / 2026-10-25
+関連するUI操作4件を再実行し、すべて成功。
+結果: artifacts/SimpleBars.xcresult / artifacts/simple-bars.log
+見出しの削除、横棒の時間値、時間帯設定、横画面、5分予定の拡大・移動・伸縮を確認。
+Test Case '-[YoteikanUITests.YoteikanUITests test01DemoAndPresets]' passed (8.776 seconds).
+Test Case '-[YoteikanUITests.YoteikanUITests test15CustomizeHoursPersistAndRecoverOutsideSticky]' passed (39.968 seconds).
+Test Case '-[YoteikanUITests.YoteikanUITests test17LandscapeShowsThreeZonesAndKeepsSelection]' passed (9.981 seconds).
+Test Case '-[YoteikanUITests.YoteikanUITests test20ZoomShortEventsWithoutVisualOverlap]' passed (23.392 seconds).

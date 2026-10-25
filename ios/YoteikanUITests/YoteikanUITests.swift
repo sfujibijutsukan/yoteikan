@@ -6,7 +6,11 @@ final class YoteikanUITests: XCTestCase {
     func launch(_ args: [String] = ["--demo"]) { app = XCUIApplication(); app.launchArguments = args; app.launch(); XCTAssertTrue(app.buttons["presetsButton"].waitForExistence(timeout: 10)) }
     func shot(_ name: String) { let attachment = XCTAttachment(screenshot: app.screenshot()); attachment.name = name; attachment.lifetime = .keepAlways; add(attachment) }
     func test01DemoAndPresets() {
-        launch(); shot("01-day-planner")
+        launch()
+        XCTAssertFalse(app.staticTexts["予定館"].exists)
+        XCTAssertEqual(app.descendants(matching: .any).matching(identifier: "freeTimeBar").firstMatch.value as? String, "15時間30分")
+        XCTAssertEqual(app.descendants(matching: .any).matching(identifier: "unplacedTimeBar").firstMatch.value as? String, "1時間5分")
+        shot("01-day-planner")
         app.buttons["showStickyPool"].tap(); app.buttons["presetsButton"].tap()
         XCTAssertTrue(app.buttons["preset-読書"].waitForExistence(timeout: 3)); app.buttons["preset-読書"].tap()
         XCTAssertEqual(app.buttons["preset-読書"].value as? String, "1枚追加済み"); shot("02-presets")
