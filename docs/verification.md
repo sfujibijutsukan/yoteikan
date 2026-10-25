@@ -2,7 +2,26 @@
 
 2026年10月25日。iPhone 17eシミュレーター / iOS 27.0で確認しました。
 
-Issue #5の時間帯設定に対応し、ユニットテスト16件・UI操作テスト15件の計31件を検証しました（設定操作テストの再実行を含む）。スクリーンショット抽出・一覧作成ツールはGoで実装しています。Pythonへの依存はありません。
+付箋・詳細の切り替えに対応し、ユニットテスト17件・UI操作テスト19件の計36件を検証しました。スクリーンショット抽出・一覧作成ツールはGoで実装しています。Pythonへの依存はありません。
+
+## 付箋領域を予定の詳細に切り替え
+
+- 右側の「付箋／詳細」をワンタップで切り替え。
+- 付箋をタップすると、その場で選択した予定の時刻・所要時間・メモを表示。
+- メモを書いて一覧へ戻り、再度詳細を開いても下書きを保持。保存しても時刻・所要時間は変わらない。
+- 詳細の編集ボタンから予定を編集し、再配置・右への戻しも確認。
+- 詳細の表示中に右へドロップすると、未配置へ戻して付箋一覧を再表示。
+
+全体実行で35件成功。右へ戻す新規テストが伸縮つまみに当たっていたため、移動つまみを使う操作へ修正しました。見出し整理後の切り替え・メモ・縦横表示・右への戻しを4件の再実行で確認しました。
+
+## 時間割・詳細メモ・付箋のゾーン構成
+
+- 縦画面では左に時間割、右に付箋を表示。右の付箋は縦スクロールで貯める。
+- 右から左へ長押しドラッグで配置し、左から右へ戻すと未配置へ戻る。
+- 幅に余裕のある横画面では、中央に選択中の付箋の詳細メモを表示。
+- 縦画面では下部の「詳細メモ」から同じメモを別画面で編集・保存。
+- メモ保存後の再起動で復元され、予定時刻・所要時間・ほかの付箋は変わらないことを確認。
+- 時間帯設定・日付スワイプ・移動・伸縮・カレンダー連携の操作も再確認。
 
 ## Issue #5：計画の開始・終了時刻を選択
 
@@ -114,11 +133,14 @@ Issue #5の時間帯設定に対応し、ユニットテスト16件・UI操作�
 15. [5:00からの計画](screenshots/15-five-am-plan.png)
 16. [開始・終了時刻の設定](screenshots/16-planning-hours-settings.png)
 17. [時間外の付箋を保持](screenshots/17-custom-hours-and-outside-sticky.png)
+18. [縦画面の2ゾーン](screenshots/18-two-zone-planner.png)
+19. [詳細メモの編集](screenshots/19-detail-memo.png)
+20. [横画面の3ゾーン](screenshots/20-three-zone-planner.png)
+21. [付箋領域を予定の詳細へ切り替え](screenshots/21-switch-to-schedule-details.png)
 
 ## 検証結果の記録
 
-- [テスト結果の抜粋](test-results.txt)：全体実行の30件の成功は artifacts/custom-hours-validation.log に保存。新規の設定操作テストは一覧をスクロールする操作を追加して再実行し、artifacts/CustomHoursSelection.xcresult / artifacts/custom-hours-selection.log に保存。
-- 全体実行の結果バンドルは書き出しで停止したため利用不可。設定操作の結果バンドルは正常に出力し、画面16・17を抽出。画面1〜15は時間帯設定追加前の検証画像を保持。
+- [テスト結果の抜粋](test-results.txt)：ユニット17件・UI操作19件の成功を確認（4件の再実行を含む）。全体実行は artifacts/SideDetailsValidation.xcresult / artifacts/side-details-validation.log、最終操作確認は artifacts/SideDetailsInteraction.xcresult / artifacts/side-details-interaction.log に保存。
 - 色の追加・削除テストを再実行し、保存済みの付箋で5色目の選択を確認。キーボードを閉じた画面を撮影し直しました。結果は artifacts/PaletteScreenshots.xcresult と artifacts/palette-screenshots.log。
 - 日付境界の追加確認：artifacts/Issue3CalendarVerified.xcresult と artifacts/issue-3-calendar-verified.log。カレンダー関連の3件が成功。
 - 元のログとXcode結果バンドルはローカルの artifacts/ に保存。生成物のためGit管理対象外。

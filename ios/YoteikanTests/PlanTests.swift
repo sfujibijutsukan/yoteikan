@@ -6,6 +6,22 @@ import XCTest
     var suite: String!
     override func setUp() { super.setUp(); suite = "test.\(UUID())"; defaults = UserDefaults(suiteName: suite)! }
     override func tearDown() { defaults.removePersistentDomain(forName: suite); super.tearDown() }
+    func testMemoEditPreservesTimingAndOtherNotesAndSupportsUndo() {
+        let store = PlanStore(defaults: defaults)
+        store.add(store.plan.presets[0]); store.add(store.plan.presets[1])
+        let id = store.today[0].id
+        store.put(id, at: 600)
+        let before = store.plan
+        store.setMemo(id, memo: "次の章を読む")
+        XCTAssertEqual(store.today[0].memo, "次の章を読む")
+        XCTAssertEqual(store.today[0].start, 600)
+        XCTAssertEqual(store.today[0].minutes, before.stickies[0].minutes)
+        XCTAssertEqual(store.today[1], before.stickies[1])
+        XCTAssertEqual(store.plan.presets, before.presets)
+        XCTAssertEqual(PlanStore(defaults: defaults).plan, store.plan)
+        store.restore()
+        XCTAssertEqual(store.plan, before)
+    }
     func testLegacyPlanKeepsStickiesAndPresetsWhenAddingColorNames() throws {
         var old = SavedPlan()
         old.stickies = [Sticky(title: "残す予定", minutes: 45, tone: 1, day: dayKey(Date()), start: 600)]

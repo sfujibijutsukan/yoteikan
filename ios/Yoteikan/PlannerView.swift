@@ -23,6 +23,11 @@ struct PlannerView: View {
     @State private var touchTask: UUID?
     @State private var inboxFrame = CGRect.zero
     @State private var returningToInbox = false
+    @State private var showDetails = false
+    @State private var sideShowsDetails = false
+    @State private var memoDrafts: [UUID: String] = [:]
+    @FocusState private var memoFocused: Bool
+    private var selectedTask: Sticky? { plans.today.first { $0.id == selected } }
     private var scale: CGFloat { overview ? max(0.15, (viewportHeight - 32) / CGFloat(plans.hours.totalMinutes)) : 1.55 }
     private var fixed: [FixedEvent] {
         if plans.demo, dayKey(plans.date) == dayKey(Date()) {
@@ -41,10 +46,16 @@ struct PlannerView: View {
         PlannerMath.layout(placed.map { TimelineItem(id: $0.id.uuidString, start: max(plans.hours.start, $0.start!), end: min(plans.hours.end, $0.start! + $0.minutes)) } + visibleFixed.map { TimelineItem(id: "fixed-" + $0.id, start: max(plans.hours.start, $0.start), end: min(plans.hours.end, $0.end)) })
     }
     var body: some View {
+        GeometryReader { geometry in
+            let wide = geometry.size.width >= 700
         VStack(spacing: 0) {
+            if wide {
+                HStack(spacing: 0) { header.frame(width: 310); dateBar }
+            } else {
             header
             dateBar
-            stats
+            }
+            stats(compact: wide)
             if !calendar.connected && !plans.demo {
                 Button { showCalendar = true } label: {
                     HStack(spacing: 8) { Image(systemName: "calendar.badge.plus"); Text("カレンダーを接続").font(.system(size: 12, weight: .medium)); Spacer(); Image(systemName: "chevron.right") }.padding(.horizontal, 20).padding(.vertical, 10).foregroundStyle(accent)
@@ -53,8 +64,19 @@ struct PlannerView: View {
             if !fixed.filter(\.allDay).isEmpty {
                 ScrollView(.horizontal, showsIndicators: false) { HStack { ForEach(fixed.filter(\.allDay)) { event in Label(event.title, systemImage: "sun.max").font(.caption2).padding(7).background(.white.opacity(0.6), in: Capsule()) } }.padding(.horizontal, 20) }
             }
-            timeline
-            inboxView
+            HStack(spacing: 0) {
+                VStack(spacing: 0) { zoneTitle("時間割"); timeline }
+                    .accessibilityElement(children: .contain).accessibilityIdentifier("scheduleZone")
+                if wide && !sideShowsDetails {
+                    Divider()
+                    VStack(spacing: 0) { zoneTitle("詳細メモ"); memoPane }
+                        .frame(width: geometry.size.width * 0.28)
+                        .accessibilityElement(children: .contain).accessibilityIdentifier("memoZone")
+                }
+                Divider()
+                sideZone.frame(width: wide ? geometry.size.width * 0.25 : max(124, geometry.size.width * 0.34))
+            }
+        }
         }
         .background(paper).foregroundStyle(ink)
         .safeAreaInset(edge: .bottom, spacing: 0) { bottomBar }
@@ -62,6 +84,12 @@ struct PlannerView: View {
         .sheet(isPresented: $showCalendar) { CalendarSettingsView() }
         .sheet(isPresented: $showColors) { ColorNamesEditor(colors: plans.plan.colors) }
         .sheet(isPresented: $showHours) { PlanningHoursEditor(hours: plans.hours) }
+        .sheet(isPresented: $showDetails) {
+            NavigationStack {
+                memoPane.navigationTitle("詳細メモ").navigationBarTitleDisplayMode(.inline)
+                    .toolbar { ToolbarItem(placement: .confirmationAction) { Button("閉じる") { showDetails = false }.accessibilityIdentifier("closeNotes") } }
+            }
+        }
         .sheet(isPresented: $showNew) { StickyEditor(task: Sticky(title: "", minutes: 30, day: dayKey(plans.date)), isNew: true) }
         .sheet(item: $editing) { StickyEditor(task: $0, isNew: false) }
         .onChange(of: plans.date) { _, value in calendar.refresh(date: value); selected = nil }
@@ -69,6 +97,78 @@ struct PlannerView: View {
         .alert("付箋を配置できません", isPresented: Binding(get: { plans.notice != nil }, set: { if !$0 { plans.notice = nil } })) {
             Button("OK") { plans.notice = nil }
         } message: { Text(plans.notice ?? "") }
+    }
+    private func zoneTitle(_ title: String) -> some View {
+        Text(title).font(.system(size: 12, weight: .semibold)).frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 12).frame(height: 35).background(paper)
+            .overlay(alignment: .bottom) { Rectangle().fill(ink.opacity(0.1)).frame(height: 1) }
+    }
+    private var memoPane: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            if let task = selectedTask {
+                Text(task.title).font(.system(size: 15, weight: .semibold)).lineLimit(2)
+                TextEditor(text: Binding(get: { memoDrafts[task.id] ?? task.memo }, set: { memoDrafts[task.id] = $0 }))
+                    .font(.system(size: 14)).scrollContentBackground(.hidden)
+                    .focused($memoFocused)
+                    .background(.white, in: RoundedRectangle(cornerRadius: 8))
+                    .accessibilityIdentifier("detailMemo")
+                Button("メモを保存") {
+                    plans.setMemo(task.id, memo: memoDrafts[task.id] ?? task.memo)
+                    memoDrafts.removeValue(forKey: task.id)
+                    memoFocused = false
+                }.disabled((memoDrafts[task.id] ?? task.memo) == task.memo)
+                    .accessibilityIdentifier("saveDetailMemo")
+            } else {
+                Spacer()
+                Image(systemName: "note.text").font(.title2)
+                Text("付箋を選択").font(.subheadline)
+                Spacer()
+            }
+        }.padding(12).frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading).background(paper)
+    }
+    private var sideZone: some View {
+        VStack(spacing: 0) {
+            HStack(spacing: 2) {
+                sideTab("付箋 \(trayTasks.count)", details: false, identifier: "showStickyPool")
+                sideTab("詳細", details: true, identifier: "showScheduleDetails")
+            }.padding(5).background(paper)
+            if sideShowsDetails {
+                VStack(spacing: 0) {
+                    if let task = selectedTask {
+                        VStack(alignment: .leading, spacing: 7) {
+                            Text(task.start.map { "\(clockText($0))〜\(clockText($0 + task.minutes))" } ?? "未配置")
+                                .font(.system(size: 10, weight: .medium))
+                            Text(durationText(task.minutes)).font(.system(size: 11))
+                            Button("予定を編集") { editing = task }.font(.system(size: 11))
+                                .accessibilityIdentifier("editSideDetail")
+                        }.frame(maxWidth: .infinity, alignment: .leading).padding(.horizontal, 12).padding(.top, 10)
+                    }
+                    memoPane
+                }.accessibilityElement(children: .contain).accessibilityIdentifier("sideDetail")
+            } else {
+                inboxView
+            }
+        }
+        .background(returningToInbox ? tones[0] : paper)
+        .background { GeometryReader { proxy in Color.clear.onAppear { inboxFrame = proxy.frame(in: .global) }.onChange(of: proxy.frame(in: .global)) { _, frame in inboxFrame = frame } } }
+        .accessibilityElement(children: .contain).accessibilityIdentifier("sideZone")
+        .accessibilityValue(sideShowsDetails ? "詳細" : "付箋")
+        .dropDestination(for: String.self) { values, _ in
+            guard let raw = values.first, let id = UUID(uuidString: raw), plans.today.contains(where: { $0.id == id }) else { return false }
+            plans.put(id, at: nil); sideShowsDetails = false; return true
+        }
+    }
+    private func sideTab(_ title: String, details: Bool, identifier: String) -> some View {
+        Button {
+            memoFocused = false
+            if details && selectedTask == nil { selected = placed.first?.id ?? trayTasks.first?.id }
+            sideShowsDetails = details
+        } label: {
+            Text(title).font(.system(size: 11, weight: .semibold)).frame(maxWidth: .infinity, minHeight: 34)
+                .background(sideShowsDetails == details ? accent : .clear, in: RoundedRectangle(cornerRadius: 6))
+                .foregroundStyle(sideShowsDetails == details ? .white : ink)
+        }.buttonStyle(.plain).accessibilityIdentifier(identifier)
+            .accessibilityValue(sideShowsDetails == details ? "選択中" : "")
     }
     private var header: some View {
         HStack {
@@ -104,17 +204,17 @@ struct PlannerView: View {
             .simultaneousGesture(daySwipeGesture)
             .accessibilityElement(children: .contain).accessibilityIdentifier("dayNavigation")
     }
-    private var stats: some View {
+    private func stats(compact: Bool) -> some View {
         HStack(spacing: 0) {
-            stat("空き時間", durationText(plans.hours.totalMinutes - occupied))
+            stat("空き時間", durationText(plans.hours.totalMinutes - occupied), compact: compact)
             Rectangle().fill(ink.opacity(0.10)).frame(width: 1, height: 31)
-            stat("未配置", durationText(inbox.reduce(0) { $0 + $1.minutes }))
+            stat("未配置", durationText(inbox.reduce(0) { $0 + $1.minutes }), compact: compact)
             Spacer(minLength: 0)
-            Button { overview.toggle() } label: { VStack(spacing: 5) { Image(systemName: overview ? "plus.magnifyingglass" : "rectangle.expand.vertical").font(.system(size: 17)); Text(overview ? "拡大する" : "1日を見る").font(.system(size: 10)) }.frame(width: 70, height: 55) }.accessibilityIdentifier("zoomToggle")
-        }.padding(.horizontal, 22).padding(.vertical, 12)
+            Button { overview.toggle() } label: { VStack(spacing: compact ? 2 : 5) { Image(systemName: overview ? "plus.magnifyingglass" : "rectangle.expand.vertical").font(.system(size: 17)); Text(overview ? "拡大する" : "1日を見る").font(.system(size: 10)) }.frame(width: 70, height: compact ? 34 : 55) }.accessibilityIdentifier("zoomToggle")
+        }.padding(.horizontal, 22).padding(.vertical, compact ? 4 : 12)
     }
-    private func stat(_ title: String, _ value: String) -> some View {
-        VStack(alignment: .leading, spacing: 4) { Text(title).font(.system(size: 10)).foregroundStyle(ink.opacity(0.55)); Text(value).font(.system(size: 18, weight: .semibold, design: .rounded)) }.frame(maxWidth: .infinity, alignment: .leading).padding(.leading, title == "未配置" ? 18 : 0)
+    private func stat(_ title: String, _ value: String, compact: Bool) -> some View {
+        VStack(alignment: .leading, spacing: compact ? 2 : 4) { Text(title).font(.system(size: compact ? 9 : 10)).foregroundStyle(ink.opacity(0.55)); Text(value).font(.system(size: compact ? 15 : 18, weight: .semibold, design: .rounded)) }.frame(maxWidth: .infinity, alignment: .leading).padding(.leading, title == "未配置" ? 18 : 0)
     }
     private var timeline: some View {
         ScrollViewReader { reader in
@@ -123,14 +223,14 @@ struct PlannerView: View {
                     ZStack(alignment: .topLeading) {
                         VStack(spacing: 0) {
                         ForEach((plans.hours.start / 60)...(plans.hours.end / 60), id: \.self) { hour in
-                            HStack(alignment: .center, spacing: 10) { Text(String(format: "%02d:00", hour)).font(.system(size: 10, weight: .medium, design: .monospaced)).foregroundStyle(ink.opacity(0.4)).frame(width: 43, alignment: .trailing); Rectangle().fill(ink.opacity(0.09)).frame(height: 1) }.frame(height: 60 * scale, alignment: .top).id(hour)
+                            HStack(alignment: .center, spacing: 6) { Text(String(format: "%02d:00", hour)).font(.system(size: 9, weight: .medium, design: .monospaced)).foregroundStyle(ink.opacity(0.55)).frame(width: 34, alignment: .trailing); Rectangle().fill(ink.opacity(0.09)).frame(height: 1) }.frame(height: 60 * scale, alignment: .top).id(hour)
                         }
                         }.contentShape(Rectangle()).simultaneousGesture(daySwipeGesture)
                         ForEach(visibleFixed) { event in
                             let start = max(plans.hours.start, event.start)
                             let slot = slots["fixed-" + event.id] ?? TimelineSlot(column: 0, columns: 1)
-                            let width = (geometry.size.width - 68) / CGFloat(slot.columns)
-                            fixedCard(event).frame(width: width - 3, height: max(overview ? 3 : 20, CGFloat(min(event.end, plans.hours.end) - start) * scale - (overview ? 1 : 4))).offset(x: 58 + width * CGFloat(slot.column), y: CGFloat(start - plans.hours.start) * scale + 2)
+                            let width = (geometry.size.width - 42) / CGFloat(slot.columns)
+                            fixedCard(event).frame(width: width - 3, height: max(overview ? 3 : 20, CGFloat(min(event.end, plans.hours.end) - start) * scale - (overview ? 1 : 4))).offset(x: 40 + width * CGFloat(slot.column), y: CGFloat(start - plans.hours.start) * scale + 2)
                         }
                         ForEach(placed) { task in
                             let visibleStart = max(task.start!, plans.hours.start)
@@ -138,7 +238,7 @@ struct PlannerView: View {
                             let collision = conflicts(task)
                             let slot = slots[task.id.uuidString] ?? TimelineSlot(column: 0, columns: 1)
                             let slotCount = slot.columns
-                            let width = (geometry.size.width - 68) / CGFloat(slotCount)
+                            let width = (geometry.size.width - 42) / CGFloat(slotCount)
                             taskCard(task, compact: overview || slotCount > 1)
                                 .frame(width: width - 3, height: max(overview ? 3 : 24, CGFloat(visibleEnd - visibleStart) * scale - (overview ? 1 : 4) + (stretching == task.id ? stretch : 0)))
                                 .overlay { if collision { RoundedRectangle(cornerRadius: 9).stroke(.orange, lineWidth: 1.5).allowsHitTesting(false) } }
@@ -157,7 +257,7 @@ struct PlannerView: View {
                                             .offset(y: -29).allowsHitTesting(false)
                                     }
                                 }
-                                .offset(x: 58 + width * CGFloat(slot.column), y: CGFloat((moving == task.id ? task.start! : visibleStart) - plans.hours.start) * scale + 2 + (moving == task.id ? shift : 0))
+                                .offset(x: 40 + width * CGFloat(slot.column), y: CGFloat((moving == task.id ? task.start! : visibleStart) - plans.hours.start) * scale + 2 + (moving == task.id ? shift : 0))
                                 .zIndex(moving == task.id || stretching == task.id ? 5 : selected == task.id ? 3 : 1)
                                 .onTapGesture { if selected == task.id { editing = task } else { selected = task.id } }
                                 .gesture(moveGesture(task))
@@ -175,7 +275,7 @@ struct PlannerView: View {
                         plans.put(id, at: plans.hours.start + PlannerMath.snap(Double(location.y / scale))); selected = id; return true
                     } isTargeted: { dropActive = $0 }
                     .background(dropActive ? accent.opacity(0.05) : Color.clear)
-                }.frame(height: CGFloat(plans.hours.end - plans.hours.start) * scale + 18).padding(.top, 12).padding(.horizontal, 10)
+                }.frame(height: CGFloat(plans.hours.end - plans.hours.start) * scale + 18).padding(.top, 12).padding(.horizontal, 5)
             }.accessibilityIdentifier("timeline")
                 .task { await Task.yield(); reader.scrollTo(initialHour, anchor: .top) }
                 .onChange(of: overview) { _, value in reader.scrollTo(value ? plans.hours.start / 60 : initialHour, anchor: .top) }
@@ -207,10 +307,10 @@ struct PlannerView: View {
                 if duration >= 45 { Text(task.title).font(.system(size: 7, weight: .semibold)).lineLimit(1) }
             } else {
             if !compact { Text("\(clockText(start)) – \(clockText(start + duration))").font(.system(size: 10, weight: .medium)).foregroundStyle(textColor.opacity(0.8)) }
-            HStack(spacing: 4) { Text(task.title).font(.system(size: compact ? 10 : 14, weight: .semibold)).lineLimit(1); Spacer(minLength: 0); if compact { Text("\(duration)分").font(.system(size: 9)) } }.padding(.trailing, selected == task.id ? 29 : 0)
+            HStack(spacing: 4) { Text(task.title).font(.system(size: compact ? 10 : 12, weight: .semibold)).lineLimit(2); Spacer(minLength: 0); if compact { Text("\(duration)分").font(.system(size: 9)) } }.padding(.trailing, selected == task.id ? 29 : 0)
             Spacer(minLength: 0)
             }
-        }.padding(.horizontal, overview ? 3 : 12).padding(.top, overview ? 1 : (compact ? 5 : 9)).frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        }.padding(.horizontal, overview ? 3 : 7).padding(.top, overview ? 1 : (compact ? 5 : 7)).frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             .foregroundStyle(textColor)
             .background(plans.paletteColor(for: task.tone).color, in: RoundedRectangle(cornerRadius: 9))
             .overlay(alignment: .leading) { RoundedRectangle(cornerRadius: 2).fill(ink.opacity(0.22)).frame(width: 3).padding(.vertical, 9) }
@@ -259,7 +359,7 @@ struct PlannerView: View {
     private func finishMove(_ task: Sticky, delta: CGFloat, location: CGPoint) {
         defer { moving = nil; shift = 0; returningToInbox = false }
         guard let start = task.start else { return }
-        if inboxFrame.contains(location) { plans.put(task.id, at: nil); selected = nil }
+        if inboxFrame.contains(location) { plans.put(task.id, at: nil); selected = nil; sideShowsDetails = false }
         else { plans.move(task.id, start: start + PlannerMath.snap(Double(delta / scale))) }
     }
     private func moveGesture(_ task: Sticky) -> some Gesture {
@@ -278,41 +378,45 @@ struct PlannerView: View {
             }
     }
     private var inboxView: some View {
-        VStack(alignment: .leading, spacing: 11) {
-            HStack { Text(outside.isEmpty ? "未配置" : "未配置・時間外").font(.system(size: 14, weight: .semibold)); Text("\(trayTasks.count)").font(.system(size: 10, weight: .bold)).padding(5).background(ink.opacity(0.06), in: Circle()); Spacer(); Button { showPresets = true } label: { Label("プリセット", systemImage: "square.stack").font(.system(size: 11, weight: .medium)) }.accessibilityIdentifier("presetsButton") }
-            if trayTasks.isEmpty {
-                RoundedRectangle(cornerRadius: 8)
-                    .strokeBorder(ink.opacity(0.12), style: StrokeStyle(lineWidth: 1, dash: [4, 4]))
-                    .frame(height: 64)
-                    .accessibilityLabel("未配置の付箋はありません")
-            } else {
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 10) {
+        VStack(spacing: 0) {
+            ScrollView(.vertical, showsIndicators: false) {
+                VStack(spacing: 10) {
+                    if trayTasks.isEmpty {
+                        RoundedRectangle(cornerRadius: 8)
+                            .strokeBorder(ink.opacity(0.16), style: StrokeStyle(lineWidth: 1, dash: [4, 4]))
+                            .frame(height: 100).accessibilityLabel("未配置の付箋はありません")
+                    }
                         ForEach(trayTasks) { task in
-                            VStack(alignment: .leading, spacing: 10) { Text(task.title).font(.system(size: 13, weight: .semibold)).lineLimit(1); HStack { Text(task.start.map { "時間外 \(clockText($0))" } ?? durationText(task.minutes)).font(.system(size: 11)); Spacer(); Image(systemName: "arrow.up.left").font(.system(size: 10)) } }.padding(12).frame(width: 123, height: 73).background(plans.paletteColor(for: task.tone).color, in: RoundedRectangle(cornerRadius: 7))
+                            VStack(alignment: .leading, spacing: 8) {
+                                Text(task.title).font(.system(size: 12, weight: .semibold)).lineLimit(3)
+                                Text(task.start.map { "時間外 \(clockText($0))" } ?? durationText(task.minutes)).font(.system(size: 10))
+                            }.frame(maxWidth: .infinity, minHeight: 52, alignment: .topLeading).padding(10)
+                                .background(plans.paletteColor(for: task.tone).color, in: RoundedRectangle(cornerRadius: 7))
+                                .overlay { RoundedRectangle(cornerRadius: 7).stroke(selected == task.id ? accent : .clear, lineWidth: 2) }
                                 .foregroundStyle(plans.paletteColor(for: task.tone).textColor)
-                                .onTapGesture { editing = task }.draggable(task.id.uuidString)
+                                .onTapGesture { selected = task.id; sideShowsDetails = true }.draggable(task.id.uuidString)
                                 .accessibilityElement(children: .ignore).accessibilityLabel("\(task.title)、\(task.minutes)分、\(task.start.map { "時間外 \(clockText($0))" } ?? "未配置")")
                                 .accessibilityIdentifier("inbox-\(task.title)")
                         }
-                    }.padding(.vertical, 2)
-                }
+                }.padding(8).frame(maxWidth: .infinity, minHeight: 100, alignment: .top)
             }
-        }.padding(.horizontal, 22).padding(.top, 15).padding(.bottom, 13)
+            VStack(spacing: 4) {
+                Button { showPresets = true } label: { Label("プリセット", systemImage: "square.stack").font(.system(size: 11)).frame(maxWidth: .infinity, minHeight: 40) }.accessibilityIdentifier("presetsButton")
+                Button { showNew = true } label: { Label("つくる", systemImage: "plus").font(.system(size: 12, weight: .semibold)).frame(maxWidth: .infinity, minHeight: 40).background(accent, in: RoundedRectangle(cornerRadius: 8)).foregroundStyle(.white) }.accessibilityLabel("付箋をつくる").accessibilityIdentifier("newStickyButton")
+            }.padding(8)
+        }
             .background(returningToInbox ? tones[0] : paper)
-            .background { GeometryReader { proxy in Color.clear.onAppear { inboxFrame = proxy.frame(in: .global) }.onChange(of: proxy.frame(in: .global)) { _, frame in inboxFrame = frame } } }
             .accessibilityElement(children: .contain).accessibilityIdentifier("inboxTray")
-            .dropDestination(for: String.self) { values, _ in guard let raw = values.first, let id = UUID(uuidString: raw) else { return false }; plans.put(id, at: nil); return true }
     }
     private var bottomBar: some View {
         HStack {
             Button { plans.restore() } label: { Label("元に戻す", systemImage: "arrow.uturn.backward").font(.system(size: 11, weight: .medium)).frame(height: 42) }.disabled(plans.undo == nil).accessibilityIdentifier("undoButton")
             Spacer()
+            Button { showDetails = true } label: { Label("詳細メモ", systemImage: "note.text").font(.system(size: 11)).frame(height: 42) }.accessibilityIdentifier("notesButton")
             if let id = selected, let task = plans.today.first(where: { $0.id == id }) {
                 Button { plans.put(id, at: nil); selected = nil } label: { Image(systemName: "tray.and.arrow.down").frame(width: 38, height: 42) }.accessibilityLabel("未配置に戻す").accessibilityIdentifier("unplaceButton")
                 Button { editing = task } label: { Image(systemName: "slider.horizontal.3").frame(width: 38, height: 42) }.accessibilityLabel("付箋を編集").accessibilityIdentifier("editButton")
             }
-            Button { showNew = true } label: { Label("付箋をつくる", systemImage: "plus").font(.system(size: 12, weight: .semibold)).padding(.horizontal, 17).frame(height: 42).background(accent, in: Capsule()).foregroundStyle(.white) }.accessibilityIdentifier("newStickyButton")
         }.padding(.horizontal, 22).padding(.top, 9).padding(.bottom, 5).background(paper)
     }
     private var daySwipeGesture: some Gesture {
