@@ -80,6 +80,7 @@ index.htmlはローカルのブラウザーで開く。GitHubでの閲覧には[
 | --demo | デモ表示付きのサンプル計画を読み込み、付箋・プリセットの変更は保存しない。通常起動の計画は保持 |
 | --reset-test-data | 付箋・プリセットの保存データを初期化。カレンダーの選択は保持 |
 | --calendar-test | Debugのシミュレーター限定で、許可後に検証用カレンダーと予定を準備 |
+| --short-events-test | --demoと併用し、Debugのシミュレーター限定で8:00から5分の付箋3件・固定予定2件を連続表示。通常データは変更しない |
 
 ```sh
 xcrun simctl launch --terminate-running-process \
