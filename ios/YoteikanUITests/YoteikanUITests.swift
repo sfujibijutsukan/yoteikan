@@ -5,6 +5,58 @@ final class YoteikanUITests: XCTestCase {
     override func setUpWithError() throws { continueAfterFailure = false; XCUIDevice.shared.orientation = .portrait }
     func launch(_ args: [String] = ["--demo"]) { app = XCUIApplication(); app.launchArguments = args; app.launch(); XCTAssertTrue(app.buttons["presetsButton"].waitForExistence(timeout: 10)) }
     func shot(_ name: String) { let attachment = XCTAttachment(screenshot: app.screenshot()); attachment.name = name; attachment.lifetime = .keepAlways; add(attachment) }
+    func test29SidebarPositionPersistsAndSupportsDragAndDetails() {
+        launch(["--reset-test-data", "--demo"])
+        let schedule = app.otherElements["scheduleZone"]
+        let side = app.otherElements["sideZone"]
+        XCTAssertLessThan(schedule.frame.maxX, side.frame.maxX)
+        app.buttons["plannerSettings"].tap()
+        app.segmentedControls["sidebarPosition"].buttons["左"].tap()
+        shot("34-sidebar-position-settings")
+        app.buttons["closePlannerSettings"].tap()
+        XCTAssertLessThanOrEqual(side.frame.maxX, schedule.frame.minX)
+        shot("35-sidebar-left")
+        let note = app.otherElements["inbox-読書"]
+        note.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).press(forDuration: 0.7, thenDragTo: app.scrollViews["timeline"].coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.2)))
+        let task = app.otherElements["task-読書"]
+        XCTAssertTrue(task.waitForExistence(timeout: 3))
+        let before = task.value as? String
+        app.buttons["showScheduleDetails"].tap()
+        XCTAssertLessThanOrEqual(side.frame.maxX, schedule.frame.minX)
+        XCTAssertTrue(app.textViews["detailMemo"].exists)
+        app.textViews["detailMemo"].tap(); app.textViews["detailMemo"].typeText("下書きを保持")
+        app.buttons["plannerSettings"].tap()
+        app.segmentedControls["sidebarPosition"].buttons["右"].tap()
+        app.buttons["closePlannerSettings"].tap()
+        XCTAssertLessThanOrEqual(schedule.frame.maxX, side.frame.minX)
+        XCTAssertEqual(app.textViews["detailMemo"].value as? String, "下書きを保持")
+        app.buttons["plannerSettings"].tap()
+        app.segmentedControls["sidebarPosition"].buttons["左"].tap()
+        app.buttons["closePlannerSettings"].tap()
+        XCTAssertEqual(app.textViews["detailMemo"].value as? String, "下書きを保持")
+        app.buttons["showStickyPool"].tap()
+        XCUIDevice.shared.orientation = .landscapeLeft
+        Thread.sleep(forTimeInterval: 1)
+        let memo = app.otherElements["memoZone"]
+        XCTAssertTrue(memo.waitForExistence(timeout: 3))
+        XCTAssertLessThanOrEqual(side.frame.maxX, memo.frame.minX)
+        XCTAssertLessThanOrEqual(memo.frame.maxX, schedule.frame.minX)
+        XCTAssertEqual(task.value as? String, before)
+        let attachment = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+        attachment.name = "36-sidebar-left-landscape"; attachment.lifetime = .keepAlways; add(attachment)
+        XCUIDevice.shared.orientation = .portrait
+        let handle = app.descendants(matching: .any).matching(identifier: "move-読書").firstMatch
+        XCTAssertTrue(handle.waitForExistence(timeout: 3))
+        handle.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).press(forDuration: 0.2, thenDragTo: app.otherElements["inboxTray"].coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)))
+        XCTAssertTrue(app.otherElements["inbox-読書"].exists)
+        app.terminate(); launch(["--demo"])
+        XCTAssertLessThanOrEqual(side.frame.maxX, schedule.frame.minX)
+        app.buttons["plannerSettings"].tap()
+        XCTAssertTrue(app.segmentedControls["sidebarPosition"].buttons["左"].isSelected)
+        app.segmentedControls["sidebarPosition"].buttons["右"].tap()
+        app.buttons["closePlannerSettings"].tap()
+        XCTAssertLessThanOrEqual(schedule.frame.maxX, side.frame.minX)
+    }
     func test28ReminderSettingsPersistAndSchedule() {
         launch(["--reset-test-data"])
         app.buttons["次の日"].tap()
