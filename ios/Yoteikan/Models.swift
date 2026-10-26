@@ -151,6 +151,37 @@ struct TimelineSlot {
     let column: Int
     let columns: Int
 }
+// A shared time mapping keeps overlapping cards aligned while compressing empty periods.
+struct FoldedTimeline {
+    struct Band {
+        let start: Int
+        let end: Int
+        let occupied: Bool
+        let y: CGFloat
+        let height: CGFloat
+    }
+    let bands: [Band]
+    var height: CGFloat { bands.last.map { $0.y + $0.height } ?? 0 }
+    init(items: [TimelineItem], start: Int, end: Int) {
+        let clipped = items.filter { $0.start < end && $0.end > start && $0.end > $0.start }
+        let boundaries = Set([start, end] + clipped.flatMap { [max(start, $0.start), min(end, $0.end)] }).sorted()
+        var result: [Band] = []
+        var y: CGFloat = 0
+        for (a, b) in zip(boundaries, boundaries.dropFirst()) {
+            let occupied = clipped.contains { $0.start < b && $0.end > a }
+            let height: CGFloat = occupied ? max(44, min(100, CGFloat(b - a))) : 32
+            result.append(Band(start: a, end: b, occupied: occupied, y: y, height: height))
+            y += height
+        }
+        bands = result
+    }
+    func position(_ minute: Int) -> CGFloat {
+        guard let band = bands.first(where: { minute >= $0.start && minute < $0.end }) else {
+            return minute <= (bands.first?.start ?? 0) ? 0 : height
+        }
+        return band.y + CGFloat(minute - band.start) / CGFloat(band.end - band.start) * band.height
+    }
+}
 enum PlannerMath {
     static let first = 5 * 60
     static let last = 24 * 60

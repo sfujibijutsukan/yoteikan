@@ -683,6 +683,55 @@ final class YoteikanUITests: XCTestCase {
         app.buttons["edit-preset-読書"].tap()
         XCTAssertTrue(app.steppers["presetDailyCount"].label.contains("0"))
     }
+    func test26FullScreenDayTimelineAndReturn() {
+        launch()
+        shot("30-fullscreen-entry")
+        app.buttons["zoomIn"].tap()
+        let task = app.otherElements["task-朝の読書"]
+        task.tap()
+        let before = task.value as? String
+        app.buttons["fullDayButton"].tap()
+        XCTAssertTrue(app.buttons["closeFullDay"].waitForExistence(timeout: 3))
+        XCTAssertFalse(app.buttons["fullDayButton"].isHittable)
+        let fullTimeline = app.scrollViews["fullDayTimeline"]
+        XCTAssertGreaterThan(fullTimeline.frame.width, app.frame.width * 0.85)
+        shot("28-fullscreen-day-timeline")
+        XCTAssertTrue(fullTimeline.staticTexts["05:00"].isHittable)
+        XCTAssertTrue(fullTimeline.staticTexts["24:00"].isHittable)
+        XCTAssertTrue(fullTimeline.descendants(matching: .any).matching(identifier: "fullDayBlock-チームミーティング").firstMatch.exists)
+        XCTAssertFalse(app.segmentedControls["fullDayMode"].exists)
+        XCUIDevice.shared.orientation = .landscapeLeft
+        Thread.sleep(forTimeInterval: 1)
+        XCTAssertTrue(fullTimeline.staticTexts["05:00"].isHittable)
+        app.scrollViews["fullDayTimeline"].swipeUp()
+        XCTAssertTrue(fullTimeline.staticTexts["24:00"].isHittable)
+        XCUIDevice.shared.orientation = .portrait
+        app.buttons["closeFullDay"].tap()
+        XCTAssertTrue(app.buttons["fullDayButton"].waitForExistence(timeout: 3))
+        XCTAssertEqual(app.staticTexts["zoomLevel"].label, "2倍")
+        XCTAssertEqual(task.value as? String, before)
+        XCTAssertTrue(app.buttons["editButton"].exists)
+    }
+    func test27FullScreenShortNotesAndUnscheduledDay() {
+        launch(["--demo", "--short-events-test"])
+        app.buttons["fullDayButton"].tap()
+        let timeline = app.scrollViews["fullDayTimeline"]
+        let reading = timeline.descendants(matching: .any).matching(identifier: "fullDayBlock-読書5分").firstMatch
+        let rest = timeline.descendants(matching: .any).matching(identifier: "fullDayBlock-休憩5分").firstMatch
+        XCTAssertTrue(reading.exists)
+        XCTAssertTrue(rest.exists)
+        XCTAssertGreaterThanOrEqual(reading.frame.height, 42)
+        XCTAssertTrue(reading.label.contains("読書5分"))
+        shot("31-folded-short-events")
+        XCTAssertLessThanOrEqual(reading.frame.maxY, rest.frame.minY)
+        XCTAssertFalse(app.segmentedControls["fullDayMode"].exists)
+        app.buttons["closeFullDay"].tap()
+        XCTAssertEqual(app.otherElements["task-読書5分"].value as? String, "08:00|5")
+        app.buttons["次の日"].tap()
+        app.buttons["fullDayButton"].tap()
+        XCTAssertTrue(app.staticTexts["予定を配置するとここに表示されます"].exists)
+        app.buttons["closeFullDay"].tap()
+    }
     func test22PinchTimelinePreservesTimeAndTasks() {
         launch()
         let timeline = app.scrollViews["timeline"]

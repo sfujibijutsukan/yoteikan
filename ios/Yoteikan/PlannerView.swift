@@ -2,6 +2,111 @@ import SwiftUI
 import UniformTypeIdentifiers
 import UIKit
 
+private struct FullDayOverview: View {
+    @Environment(\.dismiss) private var dismiss
+    let date: Date
+    let hours: PlanningHours
+    let stickies: [Sticky]
+    let fixed: [FixedEvent]
+    let colors: [StickyColor]
+    private struct Item: Identifiable {
+        let id: String
+        let title: String
+        let start: Int
+        let end: Int
+        let tone: Int?
+    }
+    private var allItems: [Item] {
+        let notes = stickies.compactMap { task -> Item? in
+            guard let start = task.start else { return nil }
+            return Item(id: task.id.uuidString, title: task.title, start: start, end: start + task.minutes, tone: task.tone)
+        }
+        let events = fixed.filter { !$0.allDay }.map {
+            Item(id: "fixed-" + $0.id, title: $0.title, start: $0.start, end: $0.end, tone: nil)
+        }
+        return (notes + events).sorted {
+            if $0.start != $1.start { return $0.start < $1.start }
+            if $0.end != $1.end { return $0.end < $1.end }
+            return $0.id < $1.id
+        }
+    }
+    private var items: [Item] { allItems.filter { hours.overlaps(start: $0.start, end: $0.end) } }
+    private var unplaced: [Sticky] { stickies.filter { $0.start == nil } }
+    private func color(_ item: Item) -> Color {
+        guard let tone = item.tone else { return Color(red: 0.89, green: 0.91, blue: 0.89) }
+        return colors.first { $0.id == tone }?.color ?? tones[0]
+    }
+    private func textColor(_ item: Item) -> Color {
+        guard let tone = item.tone else { return ink }
+        return colors.first { $0.id == tone }?.textColor ?? ink
+    }
+    var body: some View {
+        NavigationStack {
+            VStack(spacing: 8) {
+                if !fixed.filter(\.allDay).isEmpty {
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack { ForEach(fixed.filter(\.allDay)) { event in
+                            Label(event.title, systemImage: "sun.max").font(.caption).padding(6).background(.white, in: Capsule())
+                        } }
+                    }.padding(.horizontal, 12)
+                }
+                fittedTimeline
+                Text("空き時間を省略・\(hours.label)・未配置 \(unplaced.count)枚\(allItems.count == items.count ? "" : "・時間外 \(allItems.count - items.count)件")")
+                    .font(.caption2).foregroundStyle(.secondary).padding(.bottom, 4)
+            }.background(paper).foregroundStyle(ink)
+                .navigationTitle(date.formatted(.dateTime.month().day().weekday(.wide)))
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar { ToolbarItem(placement: .confirmationAction) {
+                    Button("閉じる") { dismiss() }.accessibilityIdentifier("closeFullDay")
+                } }
+                .accessibilityElement(children: .contain).accessibilityIdentifier("fullDayOverview")
+        }.tint(accent)
+    }
+    private var fittedTimeline: some View {
+        GeometryReader { geometry in
+            let timelineItems = items.map { TimelineItem(id: $0.id, start: max(hours.start, $0.start), end: min(hours.end, $0.end)) }
+            let folded = FoldedTimeline(items: timelineItems, start: hours.start, end: hours.end)
+            let slots = PlannerMath.layout(timelineItems)
+            ScrollView {
+                ZStack(alignment: .topLeading) {
+                    ForEach(folded.bands.indices, id: \.self) { index in
+                        let band = folded.bands[index]
+                        HStack(spacing: 6) {
+                            Text(clockText(band.start)).font(.system(size: 10, design: .monospaced)).frame(width: 38, alignment: .trailing)
+                            Rectangle().fill(ink.opacity(0.12)).frame(height: 1)
+                        }.frame(height: 14).offset(y: band.y)
+                        if !band.occupied {
+                            Text("空き \(durationText(band.end - band.start))")
+                                .font(.system(size: 10)).foregroundStyle(.secondary)
+                                .frame(width: max(1, geometry.size.width - 52), height: band.height)
+                                .offset(x: 48, y: band.y + 7)
+                        }
+                    }
+                    HStack(spacing: 6) {
+                        Text(clockText(hours.end)).font(.system(size: 10, design: .monospaced)).frame(width: 38, alignment: .trailing)
+                        Rectangle().fill(ink.opacity(0.12)).frame(height: 1)
+                    }.frame(height: 14).offset(y: folded.height)
+                    ForEach(items) { item in
+                        let start = max(hours.start, item.start)
+                        let slot = slots[item.id] ?? TimelineSlot(column: 0, columns: 1)
+                        let width = max(1, geometry.size.width - 48) / CGFloat(slot.columns)
+                        let cardHeight = folded.position(min(hours.end, item.end)) - folded.position(start) - 2
+                        Text(item.title)
+                            .font(.system(size: 13, weight: .medium)).lineLimit(2)
+                            .padding(.horizontal, 6).frame(width: max(1, width - 2), height: cardHeight, alignment: .leading)
+                            .foregroundStyle(textColor(item)).background(color(item), in: RoundedRectangle(cornerRadius: 5))
+                            .clipped().offset(x: 46 + width * CGFloat(slot.column), y: folded.position(start) + 7)
+                            .accessibilityLabel("\(clockText(item.start))〜\(clockText(item.end))、\(item.title)")
+                            .accessibilityIdentifier("fullDayBlock-\(item.title)")
+                    }
+                    if items.isEmpty { Text("予定を配置するとここに表示されます").font(.caption).foregroundStyle(.secondary).frame(maxWidth: .infinity).offset(y: folded.height + 28) }
+                }.frame(height: max(folded.height + 60, geometry.size.height), alignment: .topLeading)
+            }.accessibilityIdentifier("fullDayTimeline")
+        }.padding(.horizontal, 12)
+    }
+
+}
+
 private struct TimelinePinch: UIViewRepresentable {
     var changed: (CGFloat, CGFloat) -> Void
     var ended: () -> Void
@@ -131,6 +236,7 @@ struct PlannerView: View {
     @State private var inboxFrame = CGRect.zero
     @State private var returningToInbox = false
     @State private var showDetails = false
+    @State private var showFullDay = false
     @State private var sideShowsDetails = false
     @State private var memoDrafts: [UUID: String] = [:]
     @FocusState private var memoFocused: Bool
@@ -188,6 +294,9 @@ struct PlannerView: View {
         .background(paper).foregroundStyle(ink)
         .safeAreaInset(edge: .bottom, spacing: 0) { bottomBar }
         .sheet(isPresented: $showPresets) { PresetsView() }
+        .fullScreenCover(isPresented: $showFullDay) {
+            FullDayOverview(date: plans.date, hours: plans.hours, stickies: plans.today, fixed: fixed, colors: plans.plan.colors)
+        }
         .sheet(isPresented: $showCalendar) { CalendarSettingsView() }
         .sheet(isPresented: $showColors) { ColorNamesEditor(colors: plans.plan.colors) }
         .sheet(isPresented: $showHours) { PlanningHoursEditor(hours: plans.hours) }
@@ -620,6 +729,9 @@ struct PlannerView: View {
         HStack {
             Button { plans.restore() } label: { Label("元に戻す", systemImage: "arrow.uturn.backward").font(.system(size: 11, weight: .medium)).frame(height: 42) }.disabled(plans.undo == nil).accessibilityIdentifier("undoButton")
             Spacer()
+            Button { memoFocused = false; showFullDay = true } label: {
+                Label("1日一覧", systemImage: "arrow.up.left.and.arrow.down.right").font(.system(size: 11)).frame(height: 42)
+            }.accessibilityIdentifier("fullDayButton")
             Button { showDetails = true } label: { Label("詳細メモ", systemImage: "note.text").font(.system(size: 11)).frame(height: 42) }.accessibilityIdentifier("notesButton")
             if let id = selected, let task = plans.today.first(where: { $0.id == id }) {
                 Button { plans.put(id, at: nil); selected = nil } label: { Image(systemName: "tray.and.arrow.down").frame(width: 38, height: 42) }.accessibilityLabel("未配置に戻す").accessibilityIdentifier("unplaceButton")
