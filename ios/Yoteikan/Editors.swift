@@ -29,7 +29,7 @@ struct StickyEditor: View {
                 if isNew { Section { Toggle("プリセットにも保存", isOn: $saveAsPreset) } }
                 if !isNew {
                     Section {
-                        Button("この付箋をプリセットに保存") { let preset = Preset(title: task.title, minutes: task.minutes, tone: task.tone, memo: task.memo); plans.change { $0.presets.append(preset) }; dismiss() }
+                        Button("この付箋をプリセットに保存") { let preset = Preset(title: task.title, minutes: task.minutes, tone: task.tone, memo: task.memo); plans.change { $0.presets.append(preset); $0.markDailyPreset(preset.id, day: task.day) }; dismiss() }
                         Button("付箋を削除", role: .destructive) { plans.remove(task.id); dismiss() }.accessibilityIdentifier("deleteSticky")
                     }
                 }
@@ -55,7 +55,10 @@ struct StickyEditor: View {
         if isNew {
             plans.change {
                 $0.stickies.append(task)
-                if saveAsPreset { $0.presets.append(Preset(title: task.title, minutes: task.minutes, tone: task.tone, memo: task.memo)) }
+                if saveAsPreset {
+                    let preset = Preset(title: task.title, minutes: task.minutes, tone: task.tone, memo: task.memo)
+                    $0.presets.append(preset); $0.markDailyPreset(preset.id, day: task.day)
+                }
             }
         } else { plans.update(task) }
         dismiss()
@@ -103,7 +106,8 @@ struct PresetsView: View {
                         HStack(spacing: 12) {
                             RoundedRectangle(cornerRadius: 4).fill(plans.paletteColor(for: preset.tone).color).frame(width: 7, height: 42)
                             Button { plans.add(preset); added[preset.id, default: 0] += 1 } label: { HStack { VStack(alignment: .leading, spacing: 5) { Text(preset.title).font(.system(size: 16, weight: .medium)).foregroundStyle(ink); Text(durationText(preset.minutes)).font(.caption).foregroundStyle(.secondary) }; Spacer(); if let count = added[preset.id] { Text("\(count)").font(.system(size: 12, weight: .semibold, design: .rounded)).foregroundStyle(accent).accessibilityHidden(true) }; Image(systemName: "plus.circle.fill").font(.title3).foregroundStyle(accent) }.contentShape(Rectangle()) }.buttonStyle(.plain).accessibilityIdentifier("preset-\(preset.title)").accessibilityValue(added[preset.id].map { "\($0)枚追加済み" } ?? "")
-                            Button { editing = preset } label: { Image(systemName: "ellipsis").frame(width: 34, height: 44).foregroundStyle(.secondary) }.buttonStyle(.plain).accessibilityLabel("\(preset.title)のプリセットを編集")
+                            Text(preset.dailyCount == 0 ? "自動なし" : "毎日\(preset.dailyCount)枚").font(.caption2).foregroundStyle(.secondary)
+                            Button { editing = preset } label: { Image(systemName: "ellipsis").frame(width: 34, height: 44).foregroundStyle(.secondary) }.buttonStyle(.plain).accessibilityLabel("\(preset.title)のプリセットを編集").accessibilityIdentifier("edit-preset-\(preset.title)")
                         }.listRowBackground(Color.white)
                     }.onDelete { index in plans.change { $0.presets.remove(atOffsets: index) } }
                 }
@@ -126,6 +130,12 @@ struct PresetEditor: View {
             Form {
                 Section("名前") { TextField("例：読書", text: $preset.title).accessibilityIdentifier("presetTitle") }
                 Section("所要時間") { Stepper("\(preset.minutes)分", value: $preset.minutes, in: 5...720, step: 5) }
+                Section {
+                    Stepper("毎日 \(preset.dailyCount)枚", value: $preset.dailyCount, in: 0...Preset.maximumDailyCount)
+                        .accessibilityIdentifier("presetDailyCount")
+                } header: { Text("毎日の自動追加") } footer: {
+                    Text("その日の付箋置き場へ自動で追加します。0枚で停止。個数を増やすと今日の不足分も追加します。個数を減らしても、追加済みの付箋は残ります。")
+                }
                 Section("色") { NamedColorPicker(selection: $preset.tone) }
                 Section("メモ") { TextField("任意", text: $preset.memo, axis: .vertical) }
                 if !isNew { Section { Button("プリセットを削除", role: .destructive) { plans.change { $0.presets.removeAll { $0.id == preset.id } }; dismiss() } } }

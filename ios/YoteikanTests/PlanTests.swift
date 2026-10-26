@@ -4,7 +4,12 @@ import XCTest
 @MainActor final class PlanTests: XCTestCase {
     var defaults: UserDefaults!
     var suite: String!
-    override func setUp() { super.setUp(); suite = "test.\(UUID())"; defaults = UserDefaults(suiteName: suite)! }
+    override func setUp() {
+        super.setUp(); suite = "test.\(UUID())"; defaults = UserDefaults(suiteName: suite)!
+        var manual = SavedPlan()
+        for index in manual.presets.indices { manual.presets[index].dailyCount = 0 }
+        defaults.set(try! JSONEncoder().encode(manual), forKey: "yoteikan.plan.v1")
+    }
     override func tearDown() { defaults.removePersistentDomain(forName: suite); super.tearDown() }
     func testMemoEditPreservesTimingAndOtherNotesAndSupportsUndo() {
         let store = PlanStore(defaults: defaults)
@@ -24,6 +29,7 @@ import XCTest
     }
     func testLegacyPlanKeepsStickiesAndPresetsWhenAddingColorNames() throws {
         var old = SavedPlan()
+        for index in old.presets.indices { old.presets[index].dailyCount = 0 }
         old.stickies = [Sticky(title: "残す予定", minutes: 45, tone: 1, day: dayKey(Date()), start: 600)]
         var json = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(old)) as? [String: Any])
         json.removeValue(forKey: "colorNames")
@@ -231,5 +237,114 @@ import XCTest
         let slots = PlannerMath.layout([TimelineItem(id: "a", start: 600, end: 660), TimelineItem(id: "b", start: 600, end: 660), TimelineItem(id: "c", start: 600, end: 630)])
         XCTAssertEqual(slots["a"]?.columns, 3)
         XCTAssertEqual(Set(slots.values.map(\.column)).count, 3)
+    }
+    private func dailyStore(_ presets: [Preset]) throws -> PlanStore {
+        var plan = SavedPlan(); plan.presets = presets
+        defaults.set(try JSONEncoder().encode(plan), forKey: "yoteikan.plan.v1")
+        return PlanStore(defaults: defaults)
+    }
+    func testDailyPresetCountsAreIndependentAndPersistAcrossDates() throws {
+        let store = try dailyStore([
+            Preset(title: "歯磨き", minutes: 5, tone: 2, memo: "朝と夜", dailyCount: 2),
+            Preset(title: "ごはん", minutes: 30, dailyCount: 3),
+            Preset(title: "任意", minutes: 10, dailyCount: 0)
+        ])
+        let today = store.date
+        let original = store.today
+        XCTAssertEqual(original.count, 5)
+        XCTAssertEqual(Set(original.map(\.id)).count, 5)
+        XCTAssertEqual(original.filter { $0.title == "歯磨き" }.count, 2)
+        XCTAssertTrue(original.prefix(2).allSatisfy { $0.start == nil && $0.memo == "朝と夜" && $0.tone == 2 })
+        store.prepareDay(); store.prepareDay()
+        XCTAssertEqual(store.today, original)
+        XCTAssertEqual(PlanStore(defaults: defaults).today, original)
+        store.date = Calendar.current.date(byAdding: .day, value: 1, to: today)!
+        XCTAssertEqual(store.today.count, 5)
+        XCTAssertTrue(Set(store.today.map(\.id)).isDisjoint(with: Set(original.map(\.id))))
+        store.date = today
+        XCTAssertEqual(store.today, original)
+    }
+    func testDailyPresetDoesNotRecreateMovedEditedDeletedOrManualCopies() throws {
+        let store = try dailyStore([Preset(title: "歯磨き", minutes: 5, dailyCount: 2)])
+        let id = store.today[0].id
+        store.put(id, at: 600)
+        store.setMemo(id, memo: "変更したメモ")
+        var edited = store.today[0]; edited.minutes = 10; store.update(edited)
+        store.remove(store.today[1].id)
+        store.add(store.plan.presets[0])
+        let expected = store.plan
+        store.prepareDay()
+        XCTAssertEqual(store.plan, expected)
+        let restored = PlanStore(defaults: defaults)
+        XCTAssertEqual(restored.plan, expected)
+        XCTAssertEqual(restored.today.count, 2)
+        XCTAssertEqual(restored.today[0].minutes, 10)
+        XCTAssertEqual(restored.today[0].start, 600)
+        XCTAssertEqual(restored.today[0].memo, "変更したメモ")
+        store.remove(id); store.restore()
+        XCTAssertEqual(store.plan, expected)
+    }
+    func testDailyCountChangesAddOnlyDeficitAndUndoTogether() throws {
+        let store = try dailyStore([Preset(title: "ごはん", minutes: 30, dailyCount: 1)])
+        let original = store.plan
+        store.change { $0.presets[0].dailyCount = 3 }
+        XCTAssertEqual(store.today.count, 3)
+        store.restore()
+        XCTAssertEqual(store.plan, original)
+        store.change { $0.presets[0].dailyCount = 3 }
+        let copies = store.today
+        store.change { $0.presets[0].dailyCount = 1 }
+        XCTAssertEqual(store.today, copies)
+        store.change { $0.presets[0].dailyCount = 0 }
+        XCTAssertEqual(store.today, copies)
+        store.date = Calendar.current.date(byAdding: .day, value: 1, to: store.date)!
+        XCTAssertTrue(store.today.isEmpty)
+        store.change { $0.presets[0].dailyCount = 2 }
+        XCTAssertEqual(store.today.count, 2)
+        store.change { $0.presets.removeAll() }
+        XCTAssertEqual(store.today.count, 2)
+    }
+    func testLegacyPresetsDefaultToOneAndDoNotDuplicateAfterMigration() throws {
+        var old = SavedPlan()
+        let day = dayKey(Date())
+        old.stickies = [Sticky(title: "以前の予定", minutes: 30, day: day, start: 540)]
+        var json = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(old)) as? [String: Any])
+        var presets = try XCTUnwrap(json["presets"] as? [[String: Any]])
+        for index in presets.indices { presets[index].removeValue(forKey: "dailyCount") }
+        json["presets"] = presets
+        json.removeValue(forKey: "dailyPresetCounts")
+        defaults.set(try JSONSerialization.data(withJSONObject: json), forKey: "yoteikan.plan.v1")
+        let store = PlanStore(defaults: defaults)
+        XCTAssertTrue(store.plan.presets.allSatisfy { $0.dailyCount == 1 })
+        XCTAssertEqual(store.today.count, 5)
+        XCTAssertEqual(store.today.first, old.stickies.first)
+        XCTAssertEqual(PlanStore(defaults: defaults).plan, store.plan)
+        XCTAssertEqual(Preset(title: "範囲", minutes: 5, dailyCount: -1).dailyCount, 0)
+        XCTAssertEqual(Preset(title: "範囲", minutes: 5, dailyCount: 999).dailyCount, 20)
+    }
+    func testDailyRefreshFollowsTodayButKeepsBrowsedDate() throws {
+        let store = try dailyStore([Preset(title: "毎日", minutes: 5)])
+        let today = store.date
+        let tomorrow = Calendar.current.date(byAdding: .day, value: 1, to: today)!
+        store.refreshDay(now: tomorrow)
+        XCTAssertEqual(dayKey(store.date), dayKey(tomorrow))
+        XCTAssertEqual(store.today.count, 1)
+        let notes = store.today
+        store.refreshDay(now: tomorrow)
+        XCTAssertEqual(store.today, notes)
+        store.date = today
+        store.refreshDay(now: Calendar.current.date(byAdding: .day, value: 1, to: tomorrow)!)
+        XCTAssertEqual(dayKey(store.date), dayKey(today))
+        XCTAssertEqual(store.today.count, 1)
+    }
+    func testSavingExistingStickyAsPresetCountsItForToday() throws {
+        let store = try dailyStore([])
+        let preset = Preset(title: "読書", minutes: 30, memo: "次の章")
+        store.add(preset)
+        store.change { $0.presets.append(preset); $0.markDailyPreset(preset.id, day: dayKey(store.date)) }
+        XCTAssertEqual(store.today.count, 1)
+        store.date = Calendar.current.date(byAdding: .day, value: 1, to: store.date)!
+        XCTAssertEqual(store.today.count, 1)
+        XCTAssertEqual(store.today[0].memo, "次の章")
     }
 }

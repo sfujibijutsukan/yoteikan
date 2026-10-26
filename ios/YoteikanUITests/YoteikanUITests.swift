@@ -94,9 +94,9 @@ final class YoteikanUITests: XCTestCase {
         app.buttons["preset-散歩"].tap(); app.buttons["closePresets"].tap()
         XCTAssertTrue(app.descendants(matching: .any).matching(identifier: "inbox-散歩").firstMatch.exists)
         app.buttons["次の日"].tap()
-        XCTAssertFalse(app.descendants(matching: .any).matching(identifier: "inbox-散歩").firstMatch.exists)
+        XCTAssertEqual(app.descendants(matching: .any).matching(identifier: "inbox-散歩").count, 1)
         app.buttons["todayButton"].tap()
-        XCTAssertTrue(app.descendants(matching: .any).matching(identifier: "inbox-散歩").firstMatch.exists)
+        XCTAssertEqual(app.descendants(matching: .any).matching(identifier: "inbox-散歩").count, 2)
     }
     func test07CalendarSelectionChangesVisibleEvents() {
         launch(["--calendar-test"])
@@ -120,6 +120,7 @@ final class YoteikanUITests: XCTestCase {
         app.buttons["saveSticky"].tap()
         let inbox = app.descendants(matching: .any).matching(identifier: "inbox-移動の確認").firstMatch
         XCTAssertTrue(inbox.waitForExistence(timeout: 3))
+        revealInbox(inbox)
         let target = app.scrollViews["timeline"].coordinate(withNormalizedOffset: CGVector(dx: 0.6, dy: 0.4))
         inbox.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).press(forDuration: 0.7, thenDragTo: target)
         let task = app.otherElements["task-移動の確認"]
@@ -310,6 +311,7 @@ final class YoteikanUITests: XCTestCase {
         let target = timeline.coordinate(withNormalizedOffset: CGVector(dx: 0.6, dy: 0))
             .withOffset(CGVector(dx: 0, dy: firstHour.frame.minY - timeline.frame.minY + 1))
         let inbox = app.descendants(matching: .any).matching(identifier: "inbox-早朝の読書").firstMatch
+        revealInbox(inbox)
         inbox.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).press(forDuration: 0.7, thenDragTo: target)
         let task = app.otherElements["task-早朝の読書"]
         XCTAssertTrue(task.waitForExistence(timeout: 3))
@@ -354,8 +356,9 @@ final class YoteikanUITests: XCTestCase {
         let marker = app.staticTexts["20:00"]
         let target = timeline.coordinate(withNormalizedOffset: CGVector(dx: 0.6, dy: 0))
             .withOffset(CGVector(dx: 0, dy: marker.frame.minY - timeline.frame.minY + 1))
-        app.descendants(matching: .any).matching(identifier: "inbox-夜の計画").firstMatch
-            .coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).press(forDuration: 0.7, thenDragTo: target)
+        let evening = app.descendants(matching: .any).matching(identifier: "inbox-夜の計画").firstMatch
+        revealInbox(evening)
+        evening.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).press(forDuration: 0.7, thenDragTo: target)
         XCTAssertEqual(app.otherElements["task-夜の計画"].value as? String, "20:00|30")
         app.buttons["hoursSettings"].tap()
         chooseHour("21:00", picker: "planningStart")
@@ -377,13 +380,16 @@ final class YoteikanUITests: XCTestCase {
         }
         option.tap()
     }
-    private func editInbox(_ title: String) {
-        app.buttons["showStickyPool"].tap()
-        let note = app.descendants(matching: .any).matching(identifier: "inbox-\(title)").firstMatch
-        for _ in 0..<5 {
+    private func revealInbox(_ note: XCUIElement) {
+        for _ in 0..<8 {
             if note.exists && note.isHittable { break }
             app.otherElements["inboxTray"].scrollViews.firstMatch.swipeUp()
         }
+    }
+    private func editInbox(_ title: String) {
+        app.buttons["showStickyPool"].tap()
+        let note = app.descendants(matching: .any).matching(identifier: "inbox-\(title)").firstMatch
+        revealInbox(note)
         note.tap()
         if !app.textFields["stickyTitle"].exists { app.buttons["editButton"].tap() }
     }
@@ -599,6 +605,83 @@ final class YoteikanUITests: XCTestCase {
         XCTAssertEqual(task.value as? String, original)
         XCTAssertEqual(app.staticTexts["selectedDate"].label, date)
         shot("25-scroll-on-event")
+    }
+    private func adjustDailyCount(by delta: Int) {
+        let stepper = app.steppers["presetDailyCount"]
+        if !stepper.isHittable { app.swipeUp() }
+        for _ in 0..<abs(delta) { stepper.buttons.element(boundBy: delta > 0 ? 1 : 0).tap() }
+    }
+    private func inboxCount(_ title: String) -> Int {
+        app.descendants(matching: .any).matching(identifier: "inbox-\(title)").count
+    }
+    func test24DailyPresetCountsPersistWithoutRecreatingDeletedNotes() {
+        launch(["--reset-test-data"])
+        XCTAssertEqual(inboxCount("読書"), 1)
+        app.buttons["presetsButton"].tap()
+        for (name, extra) in [("歯磨き", 1), ("ごはん", 2)] {
+            app.buttons["newPreset"].tap()
+            app.textFields["presetTitle"].tap(); app.textFields["presetTitle"].typeText(name)
+            adjustDailyCount(by: extra)
+            app.buttons["savePreset"].tap()
+        }
+        app.buttons["edit-preset-歯磨き"].tap()
+        XCTAssertTrue(app.steppers["presetDailyCount"].label.contains("2"))
+        shot("26-daily-preset-count")
+        app.buttons["キャンセル"].tap()
+        app.buttons["closePresets"].tap()
+        XCTAssertEqual(inboxCount("歯磨き"), 2)
+        XCTAssertEqual(inboxCount("ごはん"), 3)
+        app.buttons["次の日"].tap()
+        XCTAssertEqual(inboxCount("歯磨き"), 2)
+        XCTAssertEqual(inboxCount("ごはん"), 3)
+        app.otherElements["inboxTray"].scrollViews.firstMatch.swipeUp()
+        shot("27-daily-stickies")
+        app.buttons["todayButton"].tap()
+        XCTAssertEqual(inboxCount("歯磨き"), 2)
+        app.terminate(); launch([])
+        XCTAssertEqual(inboxCount("歯磨き"), 2)
+        XCTAssertEqual(inboxCount("ごはん"), 3)
+        editInbox("歯磨き")
+        for _ in 0..<4 {
+            if app.buttons["deleteSticky"].exists && app.buttons["deleteSticky"].isHittable { break }
+            app.swipeUp()
+        }
+        app.buttons["deleteSticky"].tap()
+        app.buttons["showStickyPool"].tap()
+        XCTAssertEqual(inboxCount("歯磨き"), 1)
+        app.terminate(); launch([])
+        XCTAssertEqual(inboxCount("歯磨き"), 1)
+        app.buttons["次の日"].tap()
+        XCTAssertEqual(inboxCount("歯磨き"), 2)
+        app.buttons["todayButton"].tap()
+        XCTAssertEqual(inboxCount("歯磨き"), 1)
+    }
+    func test25DailyPresetCountEditCancelAndDisable() {
+        launch(["--reset-test-data"])
+        app.buttons["presetsButton"].tap()
+        app.buttons["edit-preset-読書"].tap()
+        adjustDailyCount(by: 2)
+        app.buttons["savePreset"].tap()
+        app.buttons["closePresets"].tap()
+        XCTAssertEqual(inboxCount("読書"), 3)
+        app.buttons["presetsButton"].tap()
+        app.buttons["edit-preset-読書"].tap()
+        adjustDailyCount(by: 1)
+        app.buttons["キャンセル"].tap()
+        app.buttons["edit-preset-読書"].tap()
+        XCTAssertTrue(app.steppers["presetDailyCount"].label.contains("3"))
+        adjustDailyCount(by: -3)
+        app.buttons["savePreset"].tap()
+        app.buttons["closePresets"].tap()
+        XCTAssertEqual(inboxCount("読書"), 3)
+        app.buttons["次の日"].tap()
+        XCTAssertEqual(inboxCount("読書"), 0)
+        app.buttons["todayButton"].tap()
+        XCTAssertEqual(inboxCount("読書"), 3)
+        app.terminate(); launch([])
+        app.buttons["presetsButton"].tap()
+        app.buttons["edit-preset-読書"].tap()
+        XCTAssertTrue(app.steppers["presetDailyCount"].label.contains("0"))
     }
     func test22PinchTimelinePreservesTimeAndTasks() {
         launch()

@@ -200,7 +200,8 @@ struct PlannerView: View {
         .sheet(isPresented: $showNew) { StickyEditor(task: Sticky(title: "", minutes: 30, day: dayKey(plans.date)), isNew: true) }
         .sheet(item: $editing) { StickyEditor(task: $0, isNew: false) }
         .onChange(of: plans.date) { _, value in calendar.refresh(date: value); selected = nil }
-        .onChange(of: phase) { _, value in if value == .active { calendar.refresh(date: plans.date) } }
+        .onChange(of: phase) { _, value in if value == .active { plans.refreshDay(); calendar.refresh(date: plans.date) } }
+        .onReceive(NotificationCenter.default.publisher(for: UIApplication.significantTimeChangeNotification)) { _ in plans.refreshDay(); calendar.refresh(date: plans.date) }
         .alert("付箋を配置できません", isPresented: Binding(get: { plans.notice != nil }, set: { if !$0 { plans.notice = nil } })) {
             Button("OK") { plans.notice = nil }
         } message: { Text(plans.notice ?? "") }

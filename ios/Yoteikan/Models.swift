@@ -16,6 +16,20 @@ struct Preset: Identifiable, Codable, Equatable {
     var minutes: Int
     var tone: Int = 0
     var memo: String = ""
+    var dailyCount: Int = 1
+    static let maximumDailyCount = 20
+    init(id: UUID = UUID(), title: String, minutes: Int, tone: Int = 0, memo: String = "", dailyCount: Int = 1) {
+        self.id = id; self.title = title; self.minutes = minutes; self.tone = tone; self.memo = memo
+        self.dailyCount = min(Self.maximumDailyCount, max(0, dailyCount))
+    }
+    private enum CodingKeys: String, CodingKey { case id, title, minutes, tone, memo, dailyCount }
+    init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        self.init(id: try values.decode(UUID.self, forKey: .id), title: try values.decode(String.self, forKey: .title),
+                  minutes: try values.decode(Int.self, forKey: .minutes), tone: try values.decodeIfPresent(Int.self, forKey: .tone) ?? 0,
+                  memo: try values.decodeIfPresent(String.self, forKey: .memo) ?? "",
+                  dailyCount: try values.decodeIfPresent(Int.self, forKey: .dailyCount) ?? 1)
+    }
 }
 struct FixedEvent: Identifiable {
     var id: String
@@ -63,6 +77,7 @@ struct SavedPlan: Codable, Equatable {
     }
     var colors = defaultColors
     var stickies: [Sticky] = []
+    var dailyPresetCounts: [String: [String: Int]] = [:]
     var presets: [Preset] = [
         Preset(title: "読書", minutes: 30, tone: 0),
         Preset(title: "資料作成", minutes: 60, tone: 1),
@@ -70,13 +85,14 @@ struct SavedPlan: Codable, Equatable {
         Preset(title: "休憩", minutes: 15, tone: 3)
     ]
     init() {}
-    private enum CodingKeys: String, CodingKey { case stickies, presets, colorNames, colors, hours }
+    private enum CodingKeys: String, CodingKey { case stickies, presets, colorNames, colors, hours, dailyPresetCounts }
     init(from decoder: Decoder) throws {
         self.init()
         let values = try decoder.container(keyedBy: CodingKeys.self)
         if let saved = try values.decodeIfPresent(PlanningHours.self, forKey: .hours), saved.isValid { hours = saved }
         stickies = try values.decodeIfPresent([Sticky].self, forKey: .stickies) ?? []
         presets = try values.decodeIfPresent([Preset].self, forKey: .presets) ?? presets
+        dailyPresetCounts = try values.decodeIfPresent([String: [String: Int]].self, forKey: .dailyPresetCounts) ?? [:]
         if let saved = try values.decodeIfPresent([StickyColor].self, forKey: .colors),
            !saved.isEmpty, Set(saved.map(\.id)).count == saved.count,
            saved.allSatisfy({ StickyColor.validHex($0.hex) && !$0.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }) {
@@ -97,6 +113,26 @@ struct SavedPlan: Codable, Equatable {
         try values.encode(presets, forKey: .presets)
         try values.encode(colors, forKey: .colors)
         try values.encode(hours, forKey: .hours)
+        try values.encode(dailyPresetCounts, forKey: .dailyPresetCounts)
+    }
+    @discardableResult mutating func populateDailyPresets(for day: String) -> Bool {
+        var counts = dailyPresetCounts[day] ?? [:]
+        var changed = false
+        for preset in presets {
+            let target = min(Preset.maximumDailyCount, max(0, preset.dailyCount))
+            let generated = max(0, counts[preset.id.uuidString] ?? 0)
+            guard target > generated else { continue }
+            for _ in generated..<target {
+                stickies.append(Sticky(title: preset.title, minutes: preset.minutes, tone: preset.tone, memo: preset.memo, day: day))
+            }
+            counts[preset.id.uuidString] = target
+            changed = true
+        }
+        if changed { dailyPresetCounts[day] = counts }
+        return changed
+    }
+    mutating func markDailyPreset(_ id: UUID, day: String) {
+        dailyPresetCounts[day, default: [:]][id.uuidString] = 1
     }
     static func normalizedColorNames(_ names: [String]) -> [String] {
         defaultColorNames.enumerated().map { index, fallback in
@@ -164,11 +200,12 @@ let tones: [Color] = [Color(red: 0.88, green: 0.93, blue: 0.80), Color(red: 0.97
 
 @MainActor final class PlanStore: ObservableObject {
     @Published var plan: SavedPlan
-    @Published var date = Date()
+    @Published var date = Date() { didSet { prepareDay() } }
     @Published var undo: SavedPlan?
     @Published var notice: String?
     private let defaults: UserDefaults
     private let key = "yoteikan.plan.v1"
+    private var lastRealDay = dayKey(Date())
     let demo: Bool
     init(defaults: UserDefaults = .standard, demo: Bool = false) {
         self.defaults = defaults; self.demo = demo
@@ -191,10 +228,12 @@ let tones: [Color] = [Color(red: 0.88, green: 0.93, blue: 0.80), Color(red: 0.97
                 ]
             }
             #endif
+            sample.dailyPresetCounts[day] = Dictionary(uniqueKeysWithValues: sample.presets.map { ($0.id.uuidString, $0.dailyCount) })
             plan = sample
         } else {
             plan = defaults.data(forKey: key).flatMap { try? JSONDecoder().decode(SavedPlan.self, from: $0) } ?? SavedPlan()
         }
+        prepareDay()
     }
     var today: [Sticky] { plan.stickies.filter { $0.day == dayKey(date) } }
     var hours: PlanningHours { plan.hours }
@@ -203,8 +242,15 @@ let tones: [Color] = [Color(red: 0.88, green: 0.93, blue: 0.80), Color(red: 0.97
         change { $0.hours = hours }
     }
     func save() { if !demo, let data = try? JSONEncoder().encode(plan) { defaults.set(data, forKey: key) } }
-    func change(_ body: (inout SavedPlan) -> Void) { undo = plan; body(&plan); save() }
-    func restore() { guard let old = undo else { return }; plan = old; undo = nil; save() }
+    func prepareDay() { if plan.populateDailyPresets(for: dayKey(date)) { save() } }
+    func refreshDay(now: Date = Date()) {
+        let current = dayKey(now)
+        let followsToday = dayKey(date) == lastRealDay
+        lastRealDay = current
+        if followsToday && dayKey(date) != current { date = now } else { prepareDay() }
+    }
+    func change(_ body: (inout SavedPlan) -> Void) { undo = plan; body(&plan); plan.populateDailyPresets(for: dayKey(date)); save() }
+    func restore() { guard let old = undo else { return }; plan = old; undo = nil; plan.populateDailyPresets(for: dayKey(date)); save() }
     func colorName(for tone: Int) -> String {
         paletteColor(for: tone).name
     }
