@@ -5,50 +5,35 @@ final class YoteikanUITests: XCTestCase {
     override func setUpWithError() throws { continueAfterFailure = false; XCUIDevice.shared.orientation = .portrait }
     func launch(_ args: [String] = ["--demo"]) { app = XCUIApplication(); app.launchArguments = args; app.launch(); XCTAssertTrue(app.buttons["presetsButton"].waitForExistence(timeout: 10)) }
     func shot(_ name: String) { let attachment = XCTAttachment(screenshot: app.screenshot()); attachment.name = name; attachment.lifetime = .keepAlways; add(attachment) }
-    func test31LongPressMemoFromBothPagesPersistsAndKeepsDraft() {
+    func test31LongPressPreviewAutomaticallyDisappearsOnBothPages() {
         launch()
         let task = app.otherElements["task-朝の読書"]
         let timing = task.value as? String
-        task.press(forDuration: 0.85)
-        let memo = app.textViews["scheduleMemo"]
-        XCTAssertTrue(memo.waitForExistence(timeout: 3))
-        XCTAssertEqual(memo.value as? String, "気になる章をゆっくり読む")
-        shot("42-plan-long-press-memo")
-        memo.tap(); memo.typeText("追記したメモ")
-        let saved = memo.value as? String
-        app.buttons["saveScheduleMemo"].tap()
+        task.press(forDuration: 8)
+        XCTAssertFalse(app.otherElements["memoPreview"].exists)
+        XCTAssertFalse(app.textViews["scheduleMemo"].exists)
+        XCTAssertFalse(app.buttons["closeScheduleMemo"].exists)
         XCTAssertEqual(task.value as? String, timing)
         selectTab("1日表示")
         let block = app.descendants(matching: .any).matching(identifier: "fullDayBlock-朝の読書").firstMatch
-        block.press(forDuration: 0.8)
-        XCTAssertTrue(memo.waitForExistence(timeout: 3))
-        XCTAssertEqual(memo.value as? String, saved)
-        shot("43-day-long-press-memo")
-        memo.tap(); memo.typeText("保存前の下書き")
-        let draft = memo.value as? String
-        app.buttons["closeScheduleMemo"].tap()
+        block.press(forDuration: 8)
+        XCTAssertFalse(app.otherElements["memoPreview"].exists)
+        XCTAssertFalse(app.buttons["closeScheduleMemo"].exists)
         XCTAssertTrue(app.tabBars.buttons["1日表示"].isSelected)
         selectTab("計画")
         selectDetails()
-        XCTAssertEqual(app.textViews["detailMemo"].value as? String, draft)
+        XCTAssertEqual(app.textViews["detailMemo"].value as? String, "気になる章をゆっくり読む")
         XCTAssertEqual(task.value as? String, timing)
-        XCTAssertEqual(app.otherElements["task-資料作成"].value as? String, "09:00|60")
     }
-    func test32LongPressCalendarMemoIsReadOnlyInBothPages() {
+    func test32CalendarPreviewDoesNotPresentEditor() {
         launch()
-        app.otherElements["fixed-チームミーティング"].press(forDuration: 0.8)
-        let memo = app.staticTexts["calendarScheduleMemo"]
-        XCTAssertTrue(memo.waitForExistence(timeout: 3))
-        XCTAssertEqual(memo.label, "進捗と次の作業を確認")
-        XCTAssertFalse(app.buttons["saveScheduleMemo"].exists)
-        shot("44-calendar-long-press-memo")
-        app.buttons["closeScheduleMemo"].tap()
+        app.otherElements["fixed-チームミーティング"].press(forDuration: 1)
+        XCTAssertFalse(app.otherElements["memoPreview"].exists)
+        XCTAssertFalse(app.buttons["closeScheduleMemo"].exists)
         selectTab("1日表示")
-        app.descendants(matching: .any).matching(identifier: "fullDayBlock-チームミーティング").firstMatch.press(forDuration: 0.8)
-        XCTAssertTrue(memo.waitForExistence(timeout: 3))
-        XCTAssertEqual(memo.label, "進捗と次の作業を確認")
+        app.descendants(matching: .any).matching(identifier: "fullDayBlock-チームミーティング").firstMatch.press(forDuration: 1)
+        XCTAssertFalse(app.otherElements["memoPreview"].exists)
         XCTAssertFalse(app.textViews["scheduleMemo"].exists)
-        app.buttons["closeScheduleMemo"].tap()
         XCTAssertTrue(app.tabBars.buttons["1日表示"].isSelected)
     }
     private func selectTab(_ name: String) { app.tabBars.buttons[name].tap() }

@@ -162,3 +162,10 @@ Test Case '-[YoteikanUITests.YoteikanUITests test33StickyPaperAppearance]' passe
 ** TEST SUCCEEDED **
 Test Case '-[YoteikanUITests.YoteikanUITests test31LongPressMemoFromBothPagesPersistsAndKeepsDraft]' passed (19.811 seconds).
 ** TEST SUCCEEDED **
+
+長押し中だけのメモプレビュー（2026-10-27）
+Test Case '-[YoteikanUITests.YoteikanUITests test03DragResizeAndUnplace]' passed (23.230 seconds).
+Test Case '-[YoteikanUITests.YoteikanUITests test23ScrollFromStickyAndCalendarEventPreservesPlans]' passed (11.097 seconds).
+Test Case '-[YoteikanUITests.YoteikanUITests test31LongPressPreviewAutomaticallyDisappearsOnBothPages]' passed (27.556 seconds).
+Test Case '-[YoteikanUITests.YoteikanUITests test32CalendarPreviewDoesNotPresentEditor]' passed (10.908 seconds).
+** TEST SUCCEEDED **

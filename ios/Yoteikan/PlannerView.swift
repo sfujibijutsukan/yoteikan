@@ -51,51 +51,75 @@ private enum ScheduleMemoTarget: Identifiable {
     }
 }
 
-private struct ScheduleMemoSheet: View {
-    @EnvironmentObject private var plans: PlanStore
-    @Environment(\.dismiss) private var dismiss
-    let target: ScheduleMemoTarget
-    @Binding var drafts: [UUID: String]
-    private var task: Sticky? {
-        guard case .sticky(let id) = target else { return nil }
-        return plans.plan.stickies.first { $0.id == id }
+private struct MemoPreviewContent {
+    let title: String
+    let time: String
+    let memo: String
+    init(target: ScheduleMemoTarget, stickies: [Sticky], drafts: [UUID: String]) {
+        switch target {
+        case .sticky(let id):
+            let task = stickies.first { $0.id == id }
+            title = task?.title ?? "付箋"
+            time = task?.start.map { "\(clockText($0))〜\(clockText($0 + (task?.minutes ?? 0)))" } ?? "未配置"
+            memo = drafts[id] ?? task?.memo ?? ""
+        case .fixed(let event):
+            title = event.title
+            time = event.allDay ? "終日" : "\(clockText(event.start))〜\(clockText(event.end))"
+            memo = event.memo
+        }
     }
-    var body: some View {
-        NavigationStack {
-            VStack(alignment: .leading, spacing: 16) {
-                if let task {
-                    Text(task.title).font(.title3.weight(.semibold))
-                    Text(task.start.map { "\(clockText($0))〜\(clockText($0 + task.minutes))" } ?? "未配置")
-                        .font(.subheadline).foregroundStyle(.secondary)
-                    TextEditor(text: Binding(get: { drafts[task.id] ?? task.memo }, set: { drafts[task.id] = $0 }))
-                        .scrollContentBackground(.hidden).padding(8).background(.white, in: RoundedRectangle(cornerRadius: 12))
-                        .accessibilityIdentifier("scheduleMemo")
-                } else if case .fixed(let event) = target {
-                    Text(event.title).font(.title3.weight(.semibold))
-                    Label(event.allDay ? "終日" : "\(clockText(event.start))〜\(clockText(event.end))", systemImage: "lock.fill")
-                        .font(.subheadline).foregroundStyle(.secondary)
-                    ScrollView {
-                        Text(event.memo.isEmpty ? "メモはありません" : event.memo)
-                            .frame(maxWidth: .infinity, alignment: .leading).textSelection(.enabled)
-                            .accessibilityIdentifier("calendarScheduleMemo")
-                    }
-                } else { Text("この付箋は削除されています").foregroundStyle(.secondary) }
-            }.padding(20).background(paper).foregroundStyle(ink)
-                .navigationTitle("詳細メモ").navigationBarTitleDisplayMode(.inline)
-                .toolbar {
-                    ToolbarItem(placement: .cancellationAction) { Button("閉じる") { dismiss() }.accessibilityIdentifier("closeScheduleMemo") }
-                    if let task {
-                        ToolbarItem(placement: .confirmationAction) {
-                            Button("保存") {
-                                plans.setMemo(task.id, memo: drafts[task.id] ?? task.memo)
-                                drafts.removeValue(forKey: task.id)
-                                dismiss()
-                            }.disabled((drafts[task.id] ?? task.memo) == task.memo).accessibilityIdentifier("saveScheduleMemo")
-                        }
-                    }
-                }
-        }.tint(accent)
+    var spoken: String { "\(title)、\(time)、\(memo.isEmpty ? "メモはありません" : memo)" }
+}
+
+/// A non-interactive, window-relative preview avoids clipping by timeline cards
+/// and leaves the original recognizer in control until the finger is released.
+private final class MemoPreviewPresenter {
+    private var bubble: UIView?
+    func hide() { bubble?.removeFromSuperview(); bubble = nil }
+    func show(_ content: MemoPreviewContent, from source: UIView) {
+        hide()
+        guard let window = source.window else { return }
+        let container = UIView()
+        container.backgroundColor = .secondarySystemBackground
+        container.layer.cornerRadius = 14
+        container.layer.borderWidth = 0.5
+        container.layer.borderColor = UIColor.separator.cgColor
+        container.layer.shadowColor = UIColor.black.cgColor
+        container.layer.shadowOpacity = 0.18
+        container.layer.shadowRadius = 12
+        container.layer.shadowOffset = CGSize(width: 0, height: 4)
+        container.isUserInteractionEnabled = false
+        container.accessibilityIdentifier = "memoPreview"
+        let stack = UIStackView()
+        stack.axis = .vertical; stack.spacing = 6
+        for (text, style, lines) in [(content.title, UIFont.TextStyle.headline, 2),
+                                     (content.time, .caption1, 1),
+                                     (content.memo.isEmpty ? "メモはありません" : content.memo, .subheadline, 5)] {
+            let label = UILabel()
+            label.text = text; label.font = .preferredFont(forTextStyle: style)
+            label.adjustsFontForContentSizeCategory = true
+            label.numberOfLines = lines; label.lineBreakMode = .byTruncatingTail
+            label.textColor = style == .caption1 ? .secondaryLabel : .label
+            stack.addArrangedSubview(label)
+        }
+        container.addSubview(stack)
+        let safe = window.bounds.inset(by: window.safeAreaInsets).insetBy(dx: 12, dy: 12)
+        let width = min(300, safe.width)
+        let size = stack.systemLayoutSizeFitting(CGSize(width: width - 28, height: 0),
+                                                withHorizontalFittingPriority: .required,
+                                                verticalFittingPriority: .fittingSizeLevel)
+        let height = min(size.height + 28, safe.height)
+        let anchor = source.convert(source.bounds, to: window)
+        let above = anchor.minY - height - 12
+        let y = above >= safe.minY ? above : min(safe.maxY - height, anchor.maxY + 12)
+        container.frame = CGRect(x: min(max(safe.minX, anchor.midX - width / 2), safe.maxX - width),
+                                 y: max(safe.minY, y), width: width, height: height)
+        stack.frame = container.bounds.insetBy(dx: 14, dy: 14)
+        stack.clipsToBounds = true
+        window.addSubview(container)
+        bubble = container
     }
+    deinit { hide() }
 }
 
 private struct FullDayOverview: View {
@@ -106,8 +130,7 @@ private struct FullDayOverview: View {
     let fixed: [FixedEvent]
     let colors: [StickyColor]
     @Binding var drafts: [UUID: String]
-    @State private var memoTarget: ScheduleMemoTarget?
-    private func showMemo(_ target: ScheduleMemoTarget) { memoTarget = target }
+    private func preview(_ target: ScheduleMemoTarget) -> MemoPreviewContent { MemoPreviewContent(target: target, stickies: stickies, drafts: drafts) }
     var showsClose = true
     private struct Item: Identifiable {
         let id: String
@@ -148,8 +171,8 @@ private struct FullDayOverview: View {
                     ScrollView(.horizontal, showsIndicators: false) {
                         HStack { ForEach(fixed.filter(\.allDay)) { event in
                             Label(event.title, systemImage: "sun.max").font(.caption).padding(6).background(.white, in: Capsule())
-                                .overlay(MemoHold { showMemo(.fixed(event)) })
-                                .accessibilityAction(named: "詳細メモ") { showMemo(.fixed(event)) }
+                                .overlay(MemoHold { preview(.fixed(event)) })
+                                .accessibilityAction(named: "詳細メモ") { UIAccessibility.post(notification: .announcement, argument: preview(.fixed(event)).spoken) }
                         } }
                     }.padding(.horizontal, 12)
                 }
@@ -164,7 +187,6 @@ private struct FullDayOverview: View {
                 } } }
                 .accessibilityElement(children: .contain).accessibilityIdentifier("fullDayOverview")
         }.tint(accent)
-            .sheet(item: $memoTarget) { ScheduleMemoSheet(target: $0, drafts: $drafts) }
     }
     private var fittedTimeline: some View {
         GeometryReader { geometry in
@@ -203,12 +225,12 @@ private struct FullDayOverview: View {
                                 if item.tone != nil { StickyPaper(color: color(item)) }
                                 else { RoundedRectangle(cornerRadius: 5).fill(color(item)) }
                             }
-                            .clipped().overlay(MemoHold { showMemo(item.target) })
+                            .clipped().overlay(MemoHold { preview(item.target) })
                             .offset(x: 46 + width * CGFloat(slot.column), y: folded.position(start) + 7)
                             .accessibilityLabel("\(clockText(item.start))〜\(clockText(item.end))、\(item.title)")
                             .accessibilityIdentifier("fullDayBlock-\(item.title)")
                             .accessibilityHint("長押しして詳細メモを表示")
-                            .accessibilityAction(named: "詳細メモ") { showMemo(item.target) }
+                            .accessibilityAction(named: "詳細メモ") { UIAccessibility.post(notification: .announcement, argument: preview(item.target).spoken) }
                     }
                     if items.isEmpty { Text("予定を配置するとここに表示されます").font(.caption).foregroundStyle(.secondary).frame(maxWidth: .infinity).offset(y: folded.height + 28) }
                 }.frame(height: max(folded.height + 60, geometry.size.height), alignment: .topLeading)
@@ -219,7 +241,7 @@ private struct FullDayOverview: View {
 }
 
 private struct MemoHold: UIViewRepresentable {
-    var open: () -> Void
+    var content: () -> MemoPreviewContent
     func makeCoordinator() -> Coordinator { Coordinator() }
     func makeUIView(context: Context) -> UIView {
         let view = UIView()
@@ -229,11 +251,17 @@ private struct MemoHold: UIViewRepresentable {
         view.isAccessibilityElement = false
         return view
     }
-    func updateUIView(_ view: UIView, context: Context) { context.coordinator.open = open }
+    func updateUIView(_ view: UIView, context: Context) { context.coordinator.content = content }
+    static func dismantleUIView(_ view: UIView, coordinator: Coordinator) { coordinator.presenter.hide() }
     final class Coordinator: NSObject {
-        var open: (() -> Void)?
+        var content: (() -> MemoPreviewContent)?
+        let presenter = MemoPreviewPresenter()
         @objc func press(_ gesture: UILongPressGestureRecognizer) {
-            if gesture.state == .began { open?() }
+            if gesture.state == .began, let source = gesture.view, let content = content?() {
+                presenter.show(content, from: source)
+            } else if gesture.state == .ended || gesture.state == .cancelled || gesture.state == .failed {
+                presenter.hide()
+            }
         }
     }
 }
@@ -295,7 +323,7 @@ private struct TimelinePinch: UIViewRepresentable {
 }
 
 private struct StickyTouch: UIViewRepresentable {
-    var held: () -> Void
+    var preview: () -> MemoPreviewContent
     var tapped: () -> Void
     var changed: (CGFloat, CGPoint) -> Void
     var ended: (CGFloat, CGPoint) -> Void
@@ -315,9 +343,10 @@ private struct StickyTouch: UIViewRepresentable {
         return view
     }
     func updateUIView(_ view: UIView, context: Context) { context.coordinator.actions = self }
-    static func dismantleUIView(_ view: UIView, coordinator: Coordinator) { coordinator.cancelPending() }
+    static func dismantleUIView(_ view: UIView, coordinator: Coordinator) { coordinator.cancelPending(); coordinator.presenter.hide() }
     final class Coordinator: NSObject {
         var actions: StickyTouch?
+        let presenter = MemoPreviewPresenter()
         var origin = CGPoint.zero
         var dragged = false
         var consumed = false
@@ -333,11 +362,12 @@ private struct StickyTouch: UIViewRepresentable {
                 origin = point; dragged = false; consumed = false
                 actions?.changed(0, point)
                 let current = token
-                let work = DispatchWorkItem { [weak self] in
+                let source = gesture.view
+                let work = DispatchWorkItem { [weak self, weak source] in
                     guard let self, self.token == current, !self.dragged, !self.consumed else { return }
                     self.consumed = true; self.pending = nil
                     self.actions?.cancelled()
-                    self.actions?.held()
+                    if let source, let content = self.actions?.preview() { self.presenter.show(content, from: source) }
                 }
                 pending = work
                 // Dragging soon after the hold keeps the existing move gesture.
@@ -347,11 +377,11 @@ private struct StickyTouch: UIViewRepresentable {
                 if hypot(point.x - origin.x, point.y - origin.y) > 8 { dragged = true; cancelPending() }
                 if dragged { actions?.changed(point.y - origin.y, point) }
             case .ended:
-                cancelPending()
+                cancelPending(); presenter.hide()
                 guard !consumed else { return }
                 if dragged || hypot(point.x - origin.x, point.y - origin.y) > 8 { actions?.ended(point.y - origin.y, point) }
-                else { actions?.cancelled(); actions?.held() }
-            case .cancelled, .failed: cancelPending(); actions?.cancelled()
+                else { actions?.cancelled() }
+            case .cancelled, .failed: cancelPending(); presenter.hide(); actions?.cancelled()
             default: break
             }
         }
@@ -397,7 +427,6 @@ struct PlannerView: View {
     @State private var sideShowsDetails = false
     @State private var memoDrafts: [UUID: String] = [:]
     @State private var tab = 0
-    @State private var memoTarget: ScheduleMemoTarget?
     @FocusState private var memoFocused: Bool
     private var selectedTask: Sticky? { plans.today.first { $0.id == selected } }
     private var scale: CGFloat { overview ? max(0.15, (viewportHeight - 32) / CGFloat(plans.hours.totalMinutes)) : 1.55 * zoomFactor }
@@ -412,6 +441,7 @@ struct PlannerView: View {
         }
         return calendar.events
     }
+    private func preview(_ target: ScheduleMemoTarget) -> MemoPreviewContent { MemoPreviewContent(target: target, stickies: plans.plan.stickies, drafts: memoDrafts) }
     private var placed: [Sticky] { plans.today.filter { task in task.start.map { plans.hours.overlaps(start: $0, end: $0 + task.minutes) } ?? false }.sorted { $0.start! < $1.start! } }
     private var inbox: [Sticky] { plans.today.filter { $0.start == nil } }
     private var outside: [Sticky] { plans.today.filter { task in task.start.map { !plans.hours.overlaps(start: $0, end: $0 + task.minutes) } ?? false } }
@@ -425,7 +455,6 @@ struct PlannerView: View {
     var body: some View {
         nativeTabs
             .onChange(of: tab) { _, _ in memoFocused = false }
-        .sheet(item: $memoTarget) { ScheduleMemoSheet(target: $0, drafts: $memoDrafts) }
         .sheet(isPresented: $showPresets) { PresetsView() }
         .sheet(isPresented: $showCalendar) { CalendarSettingsView() }
         .sheet(isPresented: $showNew) { StickyEditor(task: Sticky(title: "", minutes: 30, day: dayKey(plans.date)), isNew: true) }
@@ -449,7 +478,7 @@ struct PlannerView: View {
                 }.accessibilityIdentifier("calendarConnectBanner")
             }
             if !fixed.filter(\.allDay).isEmpty {
-                ScrollView(.horizontal, showsIndicators: false) { HStack { ForEach(fixed.filter(\.allDay)) { event in Label(event.title, systemImage: "sun.max").font(.caption2).padding(7).background(.white.opacity(0.6), in: Capsule()).overlay(MemoHold { memoTarget = .fixed(event) }).accessibilityAction(named: "詳細メモ") { memoTarget = .fixed(event) } } }.padding(.horizontal, 20) }
+                ScrollView(.horizontal, showsIndicators: false) { HStack { ForEach(fixed.filter(\.allDay)) { event in Label(event.title, systemImage: "sun.max").font(.caption2).padding(7).background(.white.opacity(0.6), in: Capsule()).overlay(MemoHold { preview(.fixed(event)) }).accessibilityAction(named: "詳細メモ") { UIAccessibility.post(notification: .announcement, argument: preview(.fixed(event)).spoken) } } }.padding(.horizontal, 20) }
             }
             let zones = sidebarLeading ? (wide && !sideShowsDetails ? ["side", "memo", "schedule"] : ["side", "schedule"]) : (wide && !sideShowsDetails ? ["schedule", "memo", "side"] : ["schedule", "side"])
             HStack(spacing: 0) {
@@ -646,7 +675,7 @@ struct PlannerView: View {
         return taskCard(task, compact: overview || slotCount > 1, height: height)
             .frame(width: width - 3, height: height)
             .overlay(StickyTouch(
-                held: { selected = task.id; memoTarget = .sticky(task.id) },
+                preview: { preview(.sticky(task.id)) },
                 tapped: { if selected == task.id { editing = task } else { selected = task.id } },
                 changed: { delta, point in updateMove(task, delta: delta, location: point) },
                 ended: { delta, point in finishMove(task, delta: delta, location: point) },
@@ -659,7 +688,7 @@ struct PlannerView: View {
                 if selected == task.id && !overview && height >= 32 { moveHandle(task).padding(3) }
             }
             .clipped()
-            .accessibilityAction(named: "詳細メモ") { selected = task.id; memoTarget = .sticky(task.id) }
+            .accessibilityAction(named: "詳細メモ") { UIAccessibility.post(notification: .announcement, argument: preview(.sticky(task.id)).spoken) }
             .overlay(alignment: .top) {
                 if moving == task.id && !returningToInbox {
                     let start = task.start! + PlannerMath.snap(Double(shift / scale))
@@ -693,11 +722,11 @@ struct PlannerView: View {
                             let width = (geometry.size.width - 42) / CGFloat(slot.columns)
                             let height = cardHeight(min(event.end, plans.hours.end) - start)
                             fixedCard(event, height: height).frame(width: width - 3, height: height).clipped()
-                                .overlay(MemoHold { memoTarget = .fixed(event) })
+                                .overlay(MemoHold { preview(.fixed(event)) })
                                 .accessibilityElement(children: .ignore)
                                 .accessibilityLabel("\(event.title)、\(clockText(event.start))から\(clockText(event.end))、カレンダーの固定予定")
                                 .accessibilityIdentifier("fixed-\(event.title)")
-                                .accessibilityAction(named: "詳細メモ") { memoTarget = .fixed(event) }
+                                .accessibilityAction(named: "詳細メモ") { UIAccessibility.post(notification: .announcement, argument: preview(.fixed(event)).spoken) }
                                 .offset(x: 40 + width * CGFloat(slot.column), y: CGFloat(start - plans.hours.start) * scale + 2)
                         }
                         ForEach(placed) { task in
