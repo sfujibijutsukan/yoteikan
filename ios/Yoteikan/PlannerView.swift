@@ -1,5 +1,62 @@
 import SwiftUI
 import UniformTypeIdentifiers
+import UIKit
+
+private struct TimelinePinch: UIViewRepresentable {
+    var changed: (CGFloat, CGFloat) -> Void
+    var ended: () -> Void
+    func makeCoordinator() -> Coordinator { Coordinator() }
+    func makeUIView(context: Context) -> UIView {
+        let view = UIView()
+        view.isUserInteractionEnabled = false
+        return view
+    }
+    func updateUIView(_ view: UIView, context: Context) {
+        context.coordinator.changed = changed
+        context.coordinator.ended = ended
+        DispatchQueue.main.async { context.coordinator.install(from: view) }
+    }
+    static func dismantleUIView(_ view: UIView, coordinator: Coordinator) { coordinator.detach() }
+    final class Coordinator: NSObject, UIGestureRecognizerDelegate {
+        var changed: ((CGFloat, CGFloat) -> Void)?
+        var ended: (() -> Void)?
+        weak var scroll: UIScrollView?
+        var originalTouches = Int.max
+        lazy var recognizer = UIPinchGestureRecognizer(target: self, action: #selector(pinch(_:)))
+        func install(from view: UIView) {
+            var ancestor = view.superview
+            while let current = ancestor {
+                if let target = current as? UIScrollView {
+                    guard scroll !== target else { return }
+                    detach()
+                    scroll = target
+                    originalTouches = target.panGestureRecognizer.maximumNumberOfTouches
+                    target.panGestureRecognizer.maximumNumberOfTouches = 1
+                    recognizer.delegate = self
+                    target.addGestureRecognizer(recognizer)
+                    return
+                }
+                ancestor = current.superview
+            }
+        }
+        func detach() {
+            scroll?.removeGestureRecognizer(recognizer)
+            scroll?.panGestureRecognizer.maximumNumberOfTouches = originalTouches
+            scroll = nil
+        }
+        @objc func pinch(_ gesture: UIPinchGestureRecognizer) {
+            guard let scroll else { return }
+            switch gesture.state {
+            case .began, .changed:
+                let y = (gesture.location(in: scroll).y - scroll.bounds.minY) / max(1, scroll.bounds.height)
+                changed?(gesture.scale, y)
+            case .ended, .cancelled, .failed: ended?()
+            default: break
+            }
+        }
+        func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldRecognizeSimultaneouslyWith otherGestureRecognizer: UIGestureRecognizer) -> Bool { true }
+    }
+}
 
 private struct HourPositions: PreferenceKey {
     static var defaultValue: [Int: CGFloat] = [:]
@@ -18,10 +75,15 @@ struct PlannerView: View {
     @State private var editing: Sticky?
     @State private var selected: UUID?
     @State private var overview = false
-    @State private var zoomLevel = 0
+    @State private var zoomFactor: CGFloat = 1
+    @State private var pinchBase: CGFloat?
+    @State private var pinchMinute: CGFloat?
+    @State private var pinchAnchor = UnitPoint.center
+    @State private var minuteAtTop: CGFloat = 480
     @State private var visibleHour: Int?
     @State private var zoomAnchor = 8
     @State private var viewportTop: CGFloat = 0
+    @State private var viewportFrame = CGRect.zero
     private let zoomSteps: [CGFloat] = [1, 2, 4, 8]
     @State private var dropActive = false
     @State private var moving: UUID?
@@ -38,7 +100,7 @@ struct PlannerView: View {
     @State private var memoDrafts: [UUID: String] = [:]
     @FocusState private var memoFocused: Bool
     private var selectedTask: Sticky? { plans.today.first { $0.id == selected } }
-    private var scale: CGFloat { overview ? max(0.15, (viewportHeight - 32) / CGFloat(plans.hours.totalMinutes)) : 1.55 * zoomSteps[zoomLevel] }
+    private var scale: CGFloat { overview ? max(0.15, (viewportHeight - 32) / CGFloat(plans.hours.totalMinutes)) : 1.55 * zoomFactor }
     private var fixed: [FixedEvent] {
         if plans.demo, dayKey(plans.date) == dayKey(Date()) {
             #if DEBUG && targetEnvironment(simulator)
@@ -229,16 +291,16 @@ struct PlannerView: View {
             Text("時間割").font(.system(size: 11, weight: .semibold))
             if plans.demo { Text("デモ").font(.system(size: 8)).padding(3).background(tones[1], in: Capsule()) }
             Spacer(minLength: 0)
-            Button { zoomAnchor = selectedTask?.start.map { $0 / 60 } ?? visibleHour ?? initialHour; zoomLevel -= 1 } label: {
+            Button { setZoom(zoomSteps.last(where: { $0 < zoomFactor - 0.001 }) ?? 1) } label: {
                 Image(systemName: "minus.magnifyingglass").frame(width: 44, height: 44)
-            }.disabled(overview || zoomLevel == 0).accessibilityLabel("時間割を縮小").accessibilityIdentifier("zoomOut")
-            Text(overview ? "全日" : "\(Int(zoomSteps[zoomLevel]))倍")
-                .font(.system(size: 11, weight: .medium)).frame(width: 28)
+            }.disabled(overview || zoomFactor <= 1).accessibilityLabel("時間割を縮小").accessibilityIdentifier("zoomOut")
+            Text(overview ? "全日" : "\(Double(zoomFactor).formatted(.number.precision(.fractionLength(0...1))))倍")
+                .font(.system(size: 10, weight: .medium)).frame(width: 32)
                 .accessibilityIdentifier("zoomLevel")
-            Button { if overview { overview = false } else { zoomAnchor = selectedTask?.start.map { $0 / 60 } ?? visibleHour ?? initialHour; zoomLevel += 1 } } label: {
+            Button { if overview { pinchMinute = nil; overview = false } else { setZoom(zoomSteps.first(where: { $0 > zoomFactor + 0.001 }) ?? 8) } } label: {
                 Image(systemName: "plus.magnifyingglass").frame(width: 44, height: 44)
-            }.disabled(!overview && zoomLevel == zoomSteps.count - 1).accessibilityLabel("時間割を拡大").accessibilityIdentifier("zoomIn")
-            Button { overview.toggle() } label: {
+            }.disabled(!overview && zoomFactor >= 8).accessibilityLabel("時間割を拡大").accessibilityIdentifier("zoomIn")
+            Button { pinchMinute = nil; overview.toggle() } label: {
                 Image(systemName: overview ? "plus.magnifyingglass" : "rectangle.expand.vertical").frame(width: 44, height: 44)
             }.accessibilityLabel(overview ? "拡大する" : "1日を見る").accessibilityIdentifier("zoomToggle")
         }.padding(.horizontal, 8)
@@ -247,6 +309,87 @@ struct PlannerView: View {
         let slot = CGFloat(minutes) * scale
         return max(0, slot - min(overview ? 1 : 4, slot * 0.25))
     }
+    private func setZoom(_ factor: CGFloat) {
+        pinchMinute = nil
+        zoomAnchor = selectedTask?.start.map { $0 / 60 } ?? visibleHour ?? initialHour
+        zoomFactor = factor
+    }
+    private func updatePinch(_ magnification: CGFloat, anchor: CGFloat) {
+        if overview && magnification <= 1 { return }
+        if pinchBase == nil {
+            pinchBase = scale / 1.55
+            pinchAnchor = UnitPoint(x: 0.5, y: min(1, max(0, anchor)))
+            pinchMinute = min(CGFloat(plans.hours.end), max(CGFloat(plans.hours.start), minuteAtTop + pinchAnchor.y * viewportHeight / scale))
+            moving = nil; stretching = nil; shift = 0; stretch = 0
+            overview = false
+        }
+        zoomFactor = min(8, max(1, (pinchBase ?? zoomFactor) * magnification))
+    }
+    @ViewBuilder private func pinchMarker(_ hour: Int) -> some View {
+        if let minute = pinchMinute, Int(minute / 60) == hour {
+            let offset: CGFloat = (minute - CGFloat(hour * 60)) * scale
+            VStack(spacing: 0) {
+                Color.clear.frame(height: offset)
+                Color.clear.frame(height: 1).id("pinch-anchor")
+                Spacer(minLength: 0)
+            }.frame(width: 1).allowsHitTesting(false).accessibilityHidden(true)
+        }
+    }
+    private func hourRow(_ hour: Int) -> some View {
+        ZStack(alignment: .topLeading) {
+            HStack(spacing: 6) {
+                Text(String(format: "%02d:00", hour)).font(.system(size: 9, weight: .medium, design: .monospaced)).foregroundStyle(ink.opacity(0.55)).frame(width: 34, alignment: .trailing)
+                Rectangle().fill(ink.opacity(0.09)).frame(height: 1)
+            }
+            if !overview && zoomFactor >= 4 && hour < plans.hours.end / 60 {
+                ForEach(1..<12) { step in
+                    HStack(spacing: 6) {
+                        Text(String(format: ":%02d", step * 5)).font(.system(size: 8, design: .monospaced)).frame(width: 34, alignment: .trailing)
+                        Rectangle().frame(height: 0.5)
+                    }.foregroundStyle(ink.opacity(0.22)).offset(y: CGFloat(step * 5) * scale)
+                }
+            }
+        }.frame(height: 60 * scale, alignment: .top).id("hour-\(hour)")
+            .background { GeometryReader { proxy in Color.clear.preference(key: HourPositions.self, value: [hour: proxy.frame(in: .global).minY]) } }
+            .overlay(alignment: .topLeading) { pinchMarker(hour) }
+    }
+    private func placedCard(_ task: Sticky, availableWidth: CGFloat) -> some View {
+        let visibleStart = max(task.start!, plans.hours.start)
+        let visibleEnd = min(task.start! + task.minutes, plans.hours.end)
+        let collision = conflicts(task)
+        let slot = slots[task.id.uuidString] ?? TimelineSlot(column: 0, columns: 1)
+        let slotCount = slot.columns
+        let width = (availableWidth - 42) / CGFloat(slotCount)
+        let height = max(0, cardHeight(visibleEnd - visibleStart) + (stretching == task.id ? stretch : 0))
+        return taskCard(task, compact: overview || slotCount > 1, height: height)
+            .frame(width: width - 3, height: height)
+            .overlay { if collision { RoundedRectangle(cornerRadius: 9).stroke(.orange, lineWidth: 1.5).allowsHitTesting(false) } }
+            .overlay(alignment: .bottom) { if !overview && (height >= 54 || stretching == task.id) { resizeHandle(task) } }
+            .contentShape(Rectangle())
+            .overlay(alignment: .topTrailing) {
+                if selected == task.id && !overview && height >= 32 { moveHandle(task).padding(3) }
+            }
+            .clipped()
+            .overlay(alignment: .top) {
+                if moving == task.id && !returningToInbox {
+                    let start = task.start! + PlannerMath.snap(Double(shift / scale))
+                    Text("\(clockText(start)) – \(clockText(start + task.minutes))")
+                        .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                        .padding(.horizontal, 10).padding(.vertical, 5)
+                        .background(ink, in: Capsule()).foregroundStyle(.white)
+                        .offset(y: -29).allowsHitTesting(false)
+                }
+            }
+            .offset(x: 40 + width * CGFloat(slot.column), y: CGFloat((moving == task.id ? task.start! : visibleStart) - plans.hours.start) * scale + 2 + (moving == task.id ? shift : 0))
+            .zIndex(moving == task.id || stretching == task.id ? 5 : selected == task.id ? 3 : 1)
+            .onTapGesture { if selected == task.id { editing = task } else { selected = task.id } }
+            .gesture(moveGesture(task))
+            .simultaneousGesture(DragGesture(minimumDistance: 0, coordinateSpace: .global).onChanged { value in touchStart = value.startLocation; touchTask = task.id })
+            .accessibilityElement(children: .contain)
+            .accessibilityIdentifier("task-\(task.title)")
+            .accessibilityValue("\(clockText(task.start!))|\(task.minutes)")
+            .accessibilityHint(collision ? "ほかの予定と重なっています" : "")
+    }
     private var timeline: some View {
         ScrollViewReader { reader in
             ScrollView(.vertical) {
@@ -254,18 +397,7 @@ struct PlannerView: View {
                     ZStack(alignment: .topLeading) {
                         VStack(spacing: 0) {
                         ForEach((plans.hours.start / 60)...(plans.hours.end / 60), id: \.self) { hour in
-                            ZStack(alignment: .topLeading) {
-                                HStack(spacing: 6) { Text(String(format: "%02d:00", hour)).font(.system(size: 9, weight: .medium, design: .monospaced)).foregroundStyle(ink.opacity(0.55)).frame(width: 34, alignment: .trailing); Rectangle().fill(ink.opacity(0.09)).frame(height: 1) }
-                                if !overview && zoomLevel >= 2 && hour < plans.hours.end / 60 {
-                                    ForEach(1..<12) { step in
-                                        HStack(spacing: 6) {
-                                            Text(String(format: ":%02d", step * 5)).font(.system(size: 8, design: .monospaced)).frame(width: 34, alignment: .trailing)
-                                            Rectangle().frame(height: 0.5)
-                                        }.foregroundStyle(ink.opacity(0.22)).offset(y: CGFloat(step * 5) * scale)
-                                    }
-                                }
-                            }.frame(height: 60 * scale, alignment: .top).id("hour-\(hour)")
-                                .background { GeometryReader { proxy in Color.clear.preference(key: HourPositions.self, value: [hour: proxy.frame(in: .global).minY]) } }
+                            hourRow(hour)
                         }
                         }.contentShape(Rectangle()).simultaneousGesture(daySwipeGesture)
                         ForEach(visibleFixed) { event in
@@ -280,41 +412,7 @@ struct PlannerView: View {
                                 .offset(x: 40 + width * CGFloat(slot.column), y: CGFloat(start - plans.hours.start) * scale + 2)
                         }
                         ForEach(placed) { task in
-                            let visibleStart = max(task.start!, plans.hours.start)
-                            let visibleEnd = min(task.start! + task.minutes, plans.hours.end)
-                            let collision = conflicts(task)
-                            let slot = slots[task.id.uuidString] ?? TimelineSlot(column: 0, columns: 1)
-                            let slotCount = slot.columns
-                            let width = (geometry.size.width - 42) / CGFloat(slotCount)
-                            let height = max(0, cardHeight(visibleEnd - visibleStart) + (stretching == task.id ? stretch : 0))
-                            taskCard(task, compact: overview || slotCount > 1, height: height)
-                                .frame(width: width - 3, height: height)
-                                .overlay { if collision { RoundedRectangle(cornerRadius: 9).stroke(.orange, lineWidth: 1.5).allowsHitTesting(false) } }
-                                .overlay(alignment: .bottom) { if !overview && (height >= 54 || stretching == task.id) { resizeHandle(task) } }
-                                .contentShape(Rectangle())
-                                .overlay(alignment: .topTrailing) {
-                                    if selected == task.id && !overview && height >= 32 { moveHandle(task).padding(3) }
-                                }
-                                .clipped()
-                                .overlay(alignment: .top) {
-                                    if moving == task.id && !returningToInbox {
-                                        let start = task.start! + PlannerMath.snap(Double(shift / scale))
-                                        Text("\(clockText(start)) – \(clockText(start + task.minutes))")
-                                            .font(.system(size: 11, weight: .semibold, design: .monospaced))
-                                            .padding(.horizontal, 10).padding(.vertical, 5)
-                                            .background(ink, in: Capsule()).foregroundStyle(.white)
-                                            .offset(y: -29).allowsHitTesting(false)
-                                    }
-                                }
-                                .offset(x: 40 + width * CGFloat(slot.column), y: CGFloat((moving == task.id ? task.start! : visibleStart) - plans.hours.start) * scale + 2 + (moving == task.id ? shift : 0))
-                                .zIndex(moving == task.id || stretching == task.id ? 5 : selected == task.id ? 3 : 1)
-                                .onTapGesture { if selected == task.id { editing = task } else { selected = task.id } }
-                                .gesture(moveGesture(task))
-                                .simultaneousGesture(DragGesture(minimumDistance: 0, coordinateSpace: .global).onChanged { value in touchStart = value.startLocation; touchTask = task.id })
-                                .accessibilityElement(children: .contain)
-                                .accessibilityIdentifier("task-\(task.title)")
-                                .accessibilityValue("\(clockText(task.start!))|\(task.minutes)")
-                                .accessibilityHint(collision ? "ほかの予定と重なっています" : "")
+                            placedCard(task, availableWidth: geometry.size.width)
                         }
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
@@ -324,19 +422,28 @@ struct PlannerView: View {
                         plans.put(id, at: plans.hours.start + PlannerMath.snap(Double(location.y / scale))); selected = id; return true
                     } isTargeted: { dropActive = $0 }
                     .background(dropActive ? accent.opacity(0.05) : Color.clear)
+                    .background(TimelinePinch(changed: updatePinch, ended: {
+                        Task { @MainActor in await Task.yield(); pinchBase = nil }
+                    }))
                 }.frame(height: CGFloat(plans.hours.end - plans.hours.start) * scale + 18).padding(.top, 12).padding(.horizontal, 5)
             }.coordinateSpace(name: "timelineViewport").accessibilityIdentifier("timeline")
                 .onPreferenceChange(HourPositions.self) { positions in
                     visibleHour = positions.filter { $0.value <= viewportTop + 16 }.max(by: { $0.value < $1.value })?.key ?? initialHour
-                }
-                .task { await Task.yield(); reader.scrollTo("hour-\(initialHour)", anchor: .top) }
-                .onChange(of: zoomLevel) { _, _ in
-                    Task { @MainActor in
-                        await Task.yield()
-                        reader.scrollTo("hour-\(zoomAnchor)", anchor: .top)
+                    if let hour = visibleHour, let y = positions[hour] {
+                        minuteAtTop = CGFloat(hour * 60) + (viewportTop - y) / scale
                     }
                 }
-                .onChange(of: overview) { _, value in reader.scrollTo("hour-\(value ? plans.hours.start / 60 : initialHour)", anchor: .top) }
+                .task { await Task.yield(); reader.scrollTo("hour-\(initialHour)", anchor: .top) }
+                .onChange(of: zoomFactor) { _, _ in
+                    Task { @MainActor in
+                        await Task.yield()
+                        if pinchMinute != nil { reader.scrollTo("pinch-anchor", anchor: pinchAnchor) }
+                        else { reader.scrollTo("hour-\(zoomAnchor)", anchor: .top) }
+                    }
+                }
+                .onChange(of: overview) { _, value in
+                    if pinchBase == nil { reader.scrollTo("hour-\(value ? plans.hours.start / 60 : initialHour)", anchor: .top) }
+                }
                 .onChange(of: plans.date) { _, _ in reader.scrollTo("hour-\(overview ? plans.hours.start / 60 : initialHour)", anchor: .top) }
                 .onChange(of: plans.hours) { _, _ in
                     selected = nil; moving = nil; stretching = nil; shift = 0; stretch = 0
@@ -344,7 +451,21 @@ struct PlannerView: View {
                 }
         }
         .background(.white.opacity(0.62))
-        .background { GeometryReader { proxy in Color.clear.onAppear { viewportHeight = proxy.size.height; viewportTop = proxy.frame(in: .global).minY }.onChange(of: proxy.size) { _, size in viewportHeight = size.height; viewportTop = proxy.frame(in: .global).minY } } }
+        .overlay {
+            Color.clear.accessibilityElement(children: .ignore)
+                .accessibilityLabel("時間割の拡大率")
+                .accessibilityValue("\(Double(zoomFactor).formatted(.number.precision(.fractionLength(0...1))))倍")
+                .accessibilityIdentifier("timelineZoomSurface")
+                .accessibilityAdjustableAction { direction in
+                    switch direction {
+                    case .increment: overview = false; setZoom(zoomSteps.first(where: { $0 > zoomFactor + 0.001 }) ?? 8)
+                    case .decrement: if !overview { setZoom(zoomSteps.last(where: { $0 < zoomFactor - 0.001 }) ?? 1) }
+                    @unknown default: break
+                    }
+                }
+                .padding(24).allowsHitTesting(false)
+        }
+        .background { GeometryReader { proxy in Color.clear.onAppear { viewportHeight = proxy.size.height; viewportFrame = proxy.frame(in: .global); viewportTop = viewportFrame.minY }.onChange(of: proxy.frame(in: .global)) { _, frame in viewportHeight = frame.height; viewportFrame = frame; viewportTop = frame.minY } } }
         .overlay(alignment: .top) { Rectangle().fill(ink.opacity(0.06)).frame(height: 1) }
     }
     private func fixedCard(_ event: FixedEvent, height: CGFloat) -> some View {
@@ -385,10 +506,12 @@ struct PlannerView: View {
         ZStack { Color.clear; Capsule().fill(plans.paletteColor(for: task.tone).textColor.opacity(selected == task.id ? 0.6 : 0.35)).frame(width: 24, height: 3) }
             .frame(width: 44, height: 22).contentShape(Rectangle())
             .highPriorityGesture(DragGesture(minimumDistance: 0, coordinateSpace: .global).onChanged { value in
+                guard pinchBase == nil else { return }
                 selected = task.id; stretching = task.id
                 let newDuration = PlannerMath.duration(task.minutes + PlannerMath.snap(Double(value.translation.height / scale)), start: task.start!, to: plans.hours.end)
                 stretch = CGFloat(newDuration - task.minutes) * scale
             }.onEnded { value in
+                guard pinchBase == nil, stretching == task.id else { return }
                 plans.resize(task.id, minutes: task.minutes + PlannerMath.snap(Double(value.translation.height / scale))); stretching = nil; stretch = 0
             })
             .accessibilityLabel("\(task.title)の長さを変更").accessibilityIdentifier("resize-\(task.title)")
@@ -412,7 +535,7 @@ struct PlannerView: View {
             .accessibilityIdentifier("move-\(task.title)")
     }
     private func updateMove(_ task: Sticky, delta: CGFloat, location: CGPoint) {
-        guard let start = task.start else { return }
+        guard pinchBase == nil, let start = task.start else { return }
         selected = task.id; moving = task.id
         returningToInbox = inboxFrame.contains(location)
         let newStart = PlannerMath.start(start + PlannerMath.snap(Double(delta / scale)), duration: task.minutes, from: plans.hours.start, to: plans.hours.end)
@@ -420,7 +543,7 @@ struct PlannerView: View {
     }
     private func finishMove(_ task: Sticky, delta: CGFloat, location: CGPoint) {
         defer { moving = nil; shift = 0; returningToInbox = false }
-        guard let start = task.start else { return }
+        guard pinchBase == nil, moving == task.id, let start = task.start else { return }
         if inboxFrame.contains(location) { plans.put(task.id, at: nil); selected = nil; sideShowsDetails = false }
         else { plans.move(task.id, start: start + PlannerMath.snap(Double(delta / scale))) }
     }

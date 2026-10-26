@@ -575,4 +575,46 @@ final class YoteikanUITests: XCTestCase {
         XCTAssertLessThanOrEqual(schedule.frame.maxX, memo.frame.minX + 1)
         XCUIDevice.shared.orientation = .portrait
     }
+    func test22PinchTimelinePreservesTimeAndTasks() {
+        launch()
+        let timeline = app.scrollViews["timeline"]
+        let surface = app.descendants(matching: .any).matching(identifier: "timelineZoomSurface").firstMatch
+        func zoom() -> Double { Double(app.staticTexts["zoomLevel"].label.replacingOccurrences(of: "倍", with: "")) ?? 0 }
+        let reading = app.otherElements["task-朝の読書"].value as? String
+        let work = app.otherElements["task-資料作成"].value as? String
+        let eleven = app.staticTexts["11:00"]
+        let beforeY = eleven.frame.midY
+        let center = timeline.frame.midY
+        surface.pinch(withScale: 2, velocity: 1)
+        XCTAssertGreaterThan(zoom(), 1.4)
+        XCTAssertLessThan(zoom(), 8)
+        XCTAssertTrue(eleven.isHittable)
+        XCTAssertEqual(eleven.frame.midY, center + (beforeY - center) * zoom(), accuracy: 65)
+        XCTAssertEqual(app.otherElements["task-朝の読書"].value as? String, reading)
+        XCTAssertEqual(app.otherElements["task-資料作成"].value as? String, work)
+        shot("24-pinch-timeline")
+        let expanded = zoom()
+        surface.pinch(withScale: 0.5, velocity: -1)
+        XCTAssertLessThan(zoom(), expanded)
+        while app.buttons["zoomOut"].isEnabled { app.buttons["zoomOut"].tap() }
+        XCTAssertEqual(zoom(), 1)
+        surface.pinch(withScale: 0.5, velocity: -1)
+        XCTAssertEqual(zoom(), 1)
+        for _ in 0..<3 { app.buttons["zoomIn"].tap() }
+        XCTAssertEqual(zoom(), 8)
+        surface.pinch(withScale: 2, velocity: 1)
+        XCTAssertEqual(zoom(), 8)
+        surface.pinch(withScale: 0.5, velocity: -1)
+        XCTAssertLessThan(zoom(), 7)
+        let retained = app.staticTexts["zoomLevel"].label
+        app.buttons["zoomToggle"].tap()
+        XCTAssertEqual(app.staticTexts["zoomLevel"].label, "全日")
+        app.buttons["zoomToggle"].tap()
+        XCTAssertEqual(app.staticTexts["zoomLevel"].label, retained)
+        app.buttons["zoomToggle"].tap()
+        surface.pinch(withScale: 2, velocity: 1)
+        XCTAssertGreaterThanOrEqual(zoom(), 1)
+        XCTAssertEqual(app.otherElements["task-朝の読書"].value as? String, reading)
+        XCTAssertEqual(app.otherElements["task-資料作成"].value as? String, work)
+    }
 }

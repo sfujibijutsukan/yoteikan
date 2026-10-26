@@ -67,3 +67,14 @@ Test Case '-[YoteikanUITests.YoteikanUITests test15CustomizeHoursPersistAndRecov
 Test Case '-[YoteikanUITests.YoteikanUITests test17LandscapeShowsThreeZonesAndKeepsSelection]' passed (9.780 seconds).
 Test Case '-[YoteikanUITests.YoteikanUITests test18SwitchSideZoneInOneTapAndKeepMemoDraft]' passed (9.666 seconds).
 Test Case '-[YoteikanUITests.YoteikanUITests test20ZoomShortEventsWithoutVisualOverlap]' passed (22.354 seconds).
+
+ピンチによる連続拡大・縮小 / 2026-10-25
+新規のピンチ操作1件を含む関連UI5件がすべて成功。
+結果: artifacts/PinchReleaseCheck.xcresult / artifacts/pinch-release-check.log
+1〜8倍の連続調整、時刻位置、予定データ保持、上下限、全日表示の復帰を確認。
+操作領域内で2本指の拡縮を行い、1本指の移動・伸縮と横画面も再確認。
+Test Case '-[YoteikanUITests.YoteikanUITests test01DemoAndPresets]' passed (9.310 seconds).
+Test Case '-[YoteikanUITests.YoteikanUITests test03DragResizeAndUnplace]' passed (13.963 seconds).
+Test Case '-[YoteikanUITests.YoteikanUITests test20ZoomShortEventsWithoutVisualOverlap]' passed (24.316 seconds).
+Test Case '-[YoteikanUITests.YoteikanUITests test21ZoomKeepsVisibleHourAndZoneLayout]' passed (9.007 seconds).
+Test Case '-[YoteikanUITests.YoteikanUITests test22PinchTimelinePreservesTimeAndTasks]' passed (20.203 seconds).
