@@ -51,7 +51,7 @@ private struct FullDayOverview: View {
                     }.padding(.horizontal, 12)
                 }
                 fittedTimeline
-                Text("\(hours.label)・未配置 \(unplaced.count)枚\(allItems.count == items.count ? "" : "・時間外 \(allItems.count - items.count)件")")
+                Text("空き時間を省略・\(hours.label)・未配置 \(unplaced.count)枚\(allItems.count == items.count ? "" : "・時間外 \(allItems.count - items.count)件")")
                     .font(.caption2).foregroundStyle(.secondary).padding(.bottom, 4)
             }.background(paper).foregroundStyle(ink)
                 .navigationTitle(date.formatted(.dateTime.month().day().weekday(.wide)))
@@ -64,33 +64,47 @@ private struct FullDayOverview: View {
     }
     private var fittedTimeline: some View {
         GeometryReader { geometry in
-            let height = max(1, geometry.size.height - 16)
-            let scale = height / CGFloat(hours.totalMinutes)
-            let slots = PlannerMath.layout(items.map { TimelineItem(id: $0.id, start: max(hours.start, $0.start), end: min(hours.end, $0.end)) })
-            ZStack(alignment: .topLeading) {
-                ForEach((hours.start / 60)...(hours.end / 60), id: \.self) { hour in
+            let timelineItems = items.map { TimelineItem(id: $0.id, start: max(hours.start, $0.start), end: min(hours.end, $0.end)) }
+            let folded = FoldedTimeline(items: timelineItems, start: hours.start, end: hours.end)
+            let slots = PlannerMath.layout(timelineItems)
+            ScrollView {
+                ZStack(alignment: .topLeading) {
+                    ForEach(folded.bands.indices, id: \.self) { index in
+                        let band = folded.bands[index]
+                        HStack(spacing: 6) {
+                            Text(clockText(band.start)).font(.system(size: 10, design: .monospaced)).frame(width: 38, alignment: .trailing)
+                            Rectangle().fill(ink.opacity(0.12)).frame(height: 1)
+                        }.frame(height: 14).offset(y: band.y)
+                        if !band.occupied {
+                            Text("空き \(durationText(band.end - band.start))")
+                                .font(.system(size: 10)).foregroundStyle(.secondary)
+                                .frame(width: max(1, geometry.size.width - 52), height: band.height)
+                                .offset(x: 48, y: band.y + 7)
+                        }
+                    }
                     HStack(spacing: 6) {
-                        Text(clockText(hour * 60)).font(.system(size: 9, design: .monospaced)).frame(width: 36, alignment: .trailing)
+                        Text(clockText(hours.end)).font(.system(size: 10, design: .monospaced)).frame(width: 38, alignment: .trailing)
                         Rectangle().fill(ink.opacity(0.12)).frame(height: 1)
-                    }.frame(height: 14).offset(y: min(height, CGFloat(hour * 60 - hours.start) * scale))
-                }
-                ForEach(items) { item in
-                    let start = max(hours.start, item.start)
-                    let slot = slots[item.id] ?? TimelineSlot(column: 0, columns: 1)
-                    let width = max(1, geometry.size.width - 46) / CGFloat(slot.columns)
-                    let cardHeight = max(0, CGFloat(min(hours.end, item.end) - start) * scale - 1)
-                    Text(cardHeight >= 11 ? item.title : "")
-                        .font(.system(size: 10, weight: .medium)).lineLimit(1)
-                        .padding(.horizontal, 4).frame(width: max(1, width - 2), height: cardHeight, alignment: .leading)
-                        .foregroundStyle(textColor(item)).background(color(item), in: RoundedRectangle(cornerRadius: 3))
-                        .clipped().offset(x: 44 + width * CGFloat(slot.column), y: CGFloat(start - hours.start) * scale + 6)
-                        .accessibilityLabel("\(clockText(item.start))〜\(clockText(item.end))、\(item.title)")
-                        .accessibilityIdentifier("fullDayBlock-\(item.title)")
-                }
-                if items.isEmpty { Text("予定を配置するとここに表示されます").font(.caption).foregroundStyle(.secondary).frame(maxWidth: .infinity, maxHeight: .infinity) }
-            }
-        }.padding(.horizontal, 12).accessibilityElement(children: .contain).accessibilityIdentifier("fullDayTimeline")
+                    }.frame(height: 14).offset(y: folded.height)
+                    ForEach(items) { item in
+                        let start = max(hours.start, item.start)
+                        let slot = slots[item.id] ?? TimelineSlot(column: 0, columns: 1)
+                        let width = max(1, geometry.size.width - 48) / CGFloat(slot.columns)
+                        let cardHeight = folded.position(min(hours.end, item.end)) - folded.position(start) - 2
+                        Text(item.title)
+                            .font(.system(size: 13, weight: .medium)).lineLimit(2)
+                            .padding(.horizontal, 6).frame(width: max(1, width - 2), height: cardHeight, alignment: .leading)
+                            .foregroundStyle(textColor(item)).background(color(item), in: RoundedRectangle(cornerRadius: 5))
+                            .clipped().offset(x: 46 + width * CGFloat(slot.column), y: folded.position(start) + 7)
+                            .accessibilityLabel("\(clockText(item.start))〜\(clockText(item.end))、\(item.title)")
+                            .accessibilityIdentifier("fullDayBlock-\(item.title)")
+                    }
+                    if items.isEmpty { Text("予定を配置するとここに表示されます").font(.caption).foregroundStyle(.secondary).frame(maxWidth: .infinity).offset(y: folded.height + 28) }
+                }.frame(height: max(folded.height + 60, geometry.size.height), alignment: .topLeading)
+            }.accessibilityIdentifier("fullDayTimeline")
+        }.padding(.horizontal, 12)
     }
+
 }
 
 private struct TimelinePinch: UIViewRepresentable {

@@ -11,6 +11,17 @@ import XCTest
         defaults.set(try! JSONEncoder().encode(manual), forKey: "yoteikan.plan.v1")
     }
     override func tearDown() { defaults.removePersistentDomain(forName: suite); super.tearDown() }
+    func testFoldedTimelineCompressesGapsAndKeepsShortOverlappingEventsReadable() {
+        let events = [TimelineItem(id: "a", start: 480, end: 485), TimelineItem(id: "b", start: 485, end: 490), TimelineItem(id: "c", start: 482, end: 488)]
+        let folded = FoldedTimeline(items: events, start: 300, end: 1440)
+        XCTAssertEqual(folded.position(300), 0)
+        XCTAssertEqual(folded.position(1440), folded.height)
+        XCTAssertEqual(folded.bands.filter { !$0.occupied }.map(\.height), [32, 32])
+        for event in events { XCTAssertGreaterThanOrEqual(folded.position(event.end) - folded.position(event.start), 44) }
+        XCTAssertEqual(folded.position(485), folded.bands.first { $0.start == 485 }?.y)
+        let dense = (0..<30).map { TimelineItem(id: "\($0)", start: 300 + $0 * 5, end: 305 + $0 * 5) }
+        XCTAssertGreaterThan(FoldedTimeline(items: dense, start: 300, end: 1440).height, 1000)
+    }
     func testMemoEditPreservesTimingAndOtherNotesAndSupportsUndo() {
         let store = PlanStore(defaults: defaults)
         store.add(store.plan.presets[0]); store.add(store.plan.presets[1])

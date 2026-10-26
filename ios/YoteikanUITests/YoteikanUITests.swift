@@ -693,7 +693,7 @@ final class YoteikanUITests: XCTestCase {
         app.buttons["fullDayButton"].tap()
         XCTAssertTrue(app.buttons["closeFullDay"].waitForExistence(timeout: 3))
         XCTAssertFalse(app.buttons["fullDayButton"].isHittable)
-        let fullTimeline = app.otherElements["fullDayTimeline"]
+        let fullTimeline = app.scrollViews["fullDayTimeline"]
         XCTAssertGreaterThan(fullTimeline.frame.width, app.frame.width * 0.85)
         shot("28-fullscreen-day-timeline")
         XCTAssertTrue(fullTimeline.staticTexts["05:00"].isHittable)
@@ -703,6 +703,7 @@ final class YoteikanUITests: XCTestCase {
         XCUIDevice.shared.orientation = .landscapeLeft
         Thread.sleep(forTimeInterval: 1)
         XCTAssertTrue(fullTimeline.staticTexts["05:00"].isHittable)
+        app.scrollViews["fullDayTimeline"].swipeUp()
         XCTAssertTrue(fullTimeline.staticTexts["24:00"].isHittable)
         XCUIDevice.shared.orientation = .portrait
         app.buttons["closeFullDay"].tap()
@@ -714,11 +715,14 @@ final class YoteikanUITests: XCTestCase {
     func test27FullScreenShortNotesAndUnscheduledDay() {
         launch(["--demo", "--short-events-test"])
         app.buttons["fullDayButton"].tap()
-        let timeline = app.otherElements["fullDayTimeline"]
+        let timeline = app.scrollViews["fullDayTimeline"]
         let reading = timeline.descendants(matching: .any).matching(identifier: "fullDayBlock-読書5分").firstMatch
         let rest = timeline.descendants(matching: .any).matching(identifier: "fullDayBlock-休憩5分").firstMatch
         XCTAssertTrue(reading.exists)
         XCTAssertTrue(rest.exists)
+        XCTAssertGreaterThanOrEqual(reading.frame.height, 42)
+        XCTAssertTrue(reading.label.contains("読書5分"))
+        shot("31-folded-short-events")
         XCTAssertLessThanOrEqual(reading.frame.maxY, rest.frame.minY)
         XCTAssertFalse(app.segmentedControls["fullDayMode"].exists)
         app.buttons["closeFullDay"].tap()

@@ -74,3 +74,15 @@ Test Case '-[YoteikanUITests.YoteikanUITests test27FullScreenShortNotesAndUnsche
 	 Executed 2 tests, with 0 failures (0 unexpected) in 22.534 (22.538) seconds
 	 Executed 2 tests, with 0 failures (0 unexpected) in 22.534 (22.539) seconds
 ** TEST SUCCEEDED **
+
+空き時間の折りたたみと予定の可読性 (2026-10-26)
+Test Case '-[YoteikanTests.PlanTests testFoldedTimelineCompressesGapsAndKeepsShortOverlappingEventsReadable]' passed (0.004 seconds).
+	 Executed 1 test, with 0 failures (0 unexpected) in 0.004 (0.005) seconds
+	 Executed 1 test, with 0 failures (0 unexpected) in 0.004 (0.006) seconds
+	 Executed 1 test, with 0 failures (0 unexpected) in 0.004 (0.006) seconds
+Test Case '-[YoteikanUITests.YoteikanUITests test26FullScreenDayTimelineAndReturn]' passed (13.409 seconds).
+Test Case '-[YoteikanUITests.YoteikanUITests test27FullScreenShortNotesAndUnscheduledDay]' passed (9.635 seconds).
+	 Executed 2 tests, with 0 failures (0 unexpected) in 23.044 (23.047) seconds
+	 Executed 2 tests, with 0 failures (0 unexpected) in 23.044 (23.048) seconds
+	 Executed 2 tests, with 0 failures (0 unexpected) in 23.044 (23.049) seconds
+** TEST SUCCEEDED **
