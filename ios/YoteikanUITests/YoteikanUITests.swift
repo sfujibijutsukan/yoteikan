@@ -683,7 +683,7 @@ final class YoteikanUITests: XCTestCase {
         app.buttons["edit-preset-読書"].tap()
         XCTAssertTrue(app.steppers["presetDailyCount"].label.contains("0"))
     }
-    func test26FullScreenDayTimelineListAndReturn() {
+    func test26FullScreenDayTimelineAndReturn() {
         launch()
         shot("30-fullscreen-entry")
         app.buttons["zoomIn"].tap()
@@ -699,14 +699,9 @@ final class YoteikanUITests: XCTestCase {
         XCTAssertTrue(fullTimeline.staticTexts["05:00"].isHittable)
         XCTAssertTrue(fullTimeline.staticTexts["24:00"].isHittable)
         XCTAssertTrue(fullTimeline.descendants(matching: .any).matching(identifier: "fullDayBlock-チームミーティング").firstMatch.exists)
-        app.segmentedControls["fullDayMode"].buttons["一覧"].tap()
-        XCTAssertTrue(app.descendants(matching: .any).matching(identifier: "fullDayList").firstMatch.exists)
-        let work = app.descendants(matching: .any).matching(identifier: "fullDay-資料作成").firstMatch
-        XCTAssertEqual(work.value as? String, "09:00|60")
-        shot("29-fullscreen-day-list")
+        XCTAssertFalse(app.segmentedControls["fullDayMode"].exists)
         XCUIDevice.shared.orientation = .landscapeLeft
         Thread.sleep(forTimeInterval: 1)
-        app.segmentedControls["fullDayMode"].buttons["時間割"].tap()
         XCTAssertTrue(fullTimeline.staticTexts["05:00"].isHittable)
         XCTAssertTrue(fullTimeline.staticTexts["24:00"].isHittable)
         XCUIDevice.shared.orientation = .portrait
@@ -719,21 +714,18 @@ final class YoteikanUITests: XCTestCase {
     func test27FullScreenShortNotesAndUnscheduledDay() {
         launch(["--demo", "--short-events-test"])
         app.buttons["fullDayButton"].tap()
-        app.segmentedControls["fullDayMode"].buttons["一覧"].tap()
-        let reading = app.descendants(matching: .any).matching(identifier: "fullDay-読書5分").firstMatch
-        let rest = app.descendants(matching: .any).matching(identifier: "fullDay-休憩5分").firstMatch
-        XCTAssertEqual(reading.value as? String, "08:00|5")
-        XCTAssertEqual(rest.value as? String, "08:05|5")
-        XCTAssertGreaterThan(reading.frame.height, 40)
+        let timeline = app.otherElements["fullDayTimeline"]
+        let reading = timeline.descendants(matching: .any).matching(identifier: "fullDayBlock-読書5分").firstMatch
+        let rest = timeline.descendants(matching: .any).matching(identifier: "fullDayBlock-休憩5分").firstMatch
+        XCTAssertTrue(reading.exists)
+        XCTAssertTrue(rest.exists)
         XCTAssertLessThanOrEqual(reading.frame.maxY, rest.frame.minY)
+        XCTAssertFalse(app.segmentedControls["fullDayMode"].exists)
         app.buttons["closeFullDay"].tap()
         XCTAssertEqual(app.otherElements["task-読書5分"].value as? String, "08:00|5")
         app.buttons["次の日"].tap()
         app.buttons["fullDayButton"].tap()
         XCTAssertTrue(app.staticTexts["予定を配置するとここに表示されます"].exists)
-        app.segmentedControls["fullDayMode"].buttons["一覧"].tap()
-        XCTAssertTrue(app.staticTexts["配置した予定はありません"].exists)
-        XCTAssertTrue(app.staticTexts["未配置"].exists)
         app.buttons["closeFullDay"].tap()
     }
     func test22PinchTimelinePreservesTimeAndTasks() {

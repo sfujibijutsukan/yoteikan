@@ -66,3 +66,11 @@ Test Case '-[YoteikanUITests.YoteikanUITests test27FullScreenShortNotesAndUnsche
 	 Executed 2 tests, with 0 failures (0 unexpected) in 31.505 (31.509) seconds
 ** TEST SUCCEEDED **
 Test Case '-[YoteikanUITests.YoteikanUITests test20ZoomShortEventsWithoutVisualOverlap]' passed (24.369 seconds).
+
+時間割のみの全画面表示 追加検証 (2026-10-26)
+Test Case '-[YoteikanUITests.YoteikanUITests test26FullScreenDayTimelineAndReturn]' passed (13.087 seconds).
+Test Case '-[YoteikanUITests.YoteikanUITests test27FullScreenShortNotesAndUnscheduledDay]' passed (9.447 seconds).
+	 Executed 2 tests, with 0 failures (0 unexpected) in 22.534 (22.537) seconds
+	 Executed 2 tests, with 0 failures (0 unexpected) in 22.534 (22.538) seconds
+	 Executed 2 tests, with 0 failures (0 unexpected) in 22.534 (22.539) seconds
+** TEST SUCCEEDED **

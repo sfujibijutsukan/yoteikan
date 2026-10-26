@@ -9,22 +9,20 @@ private struct FullDayOverview: View {
     let stickies: [Sticky]
     let fixed: [FixedEvent]
     let colors: [StickyColor]
-    @State private var listMode = false
     private struct Item: Identifiable {
         let id: String
         let title: String
         let start: Int
         let end: Int
         let tone: Int?
-        let memo: String
     }
     private var allItems: [Item] {
         let notes = stickies.compactMap { task -> Item? in
             guard let start = task.start else { return nil }
-            return Item(id: task.id.uuidString, title: task.title, start: start, end: start + task.minutes, tone: task.tone, memo: task.memo)
+            return Item(id: task.id.uuidString, title: task.title, start: start, end: start + task.minutes, tone: task.tone)
         }
         let events = fixed.filter { !$0.allDay }.map {
-            Item(id: "fixed-" + $0.id, title: $0.title, start: $0.start, end: $0.end, tone: nil, memo: "")
+            Item(id: "fixed-" + $0.id, title: $0.title, start: $0.start, end: $0.end, tone: nil)
         }
         return (notes + events).sorted {
             if $0.start != $1.start { return $0.start < $1.start }
@@ -45,23 +43,16 @@ private struct FullDayOverview: View {
     var body: some View {
         NavigationStack {
             VStack(spacing: 8) {
-                Picker("表示", selection: $listMode) {
-                    Text("時間割").tag(false)
-                    Text("一覧").tag(true)
-                }.pickerStyle(.segmented).padding(.horizontal, 12).accessibilityIdentifier("fullDayMode")
-                if listMode { scheduleList }
-                else {
-                    if !fixed.filter(\.allDay).isEmpty {
-                        ScrollView(.horizontal, showsIndicators: false) {
-                            HStack { ForEach(fixed.filter(\.allDay)) { event in
-                                Label(event.title, systemImage: "sun.max").font(.caption).padding(6).background(.white, in: Capsule())
-                            } }
-                        }.padding(.horizontal, 12)
-                    }
-                    fittedTimeline
-                    Text("\(hours.label)・未配置 \(unplaced.count)枚\(allItems.count == items.count ? "" : "・時間外 \(allItems.count - items.count)件")")
-                        .font(.caption2).foregroundStyle(.secondary).padding(.bottom, 4)
+                if !fixed.filter(\.allDay).isEmpty {
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack { ForEach(fixed.filter(\.allDay)) { event in
+                            Label(event.title, systemImage: "sun.max").font(.caption).padding(6).background(.white, in: Capsule())
+                        } }
+                    }.padding(.horizontal, 12)
                 }
+                fittedTimeline
+                Text("\(hours.label)・未配置 \(unplaced.count)枚\(allItems.count == items.count ? "" : "・時間外 \(allItems.count - items.count)件")")
+                    .font(.caption2).foregroundStyle(.secondary).padding(.bottom, 4)
             }.background(paper).foregroundStyle(ink)
                 .navigationTitle(date.formatted(.dateTime.month().day().weekday(.wide)))
                 .navigationBarTitleDisplayMode(.inline)
@@ -70,37 +61,6 @@ private struct FullDayOverview: View {
                 } }
                 .accessibilityElement(children: .contain).accessibilityIdentifier("fullDayOverview")
         }.tint(accent)
-    }
-    private var scheduleList: some View {
-        List {
-            if !fixed.filter(\.allDay).isEmpty {
-                Section("終日") { ForEach(fixed.filter(\.allDay)) { event in Label(event.title, systemImage: "sun.max") } }
-            }
-            Section("時間が決まっている予定") {
-                if allItems.isEmpty { Text("配置した予定はありません").foregroundStyle(.secondary) }
-                ForEach(allItems) { item in
-                    HStack(alignment: .top, spacing: 12) {
-                        VStack(alignment: .leading, spacing: 3) {
-                            Text(clockText(item.start))
-                            Text(clockText(item.end)).foregroundStyle(.secondary)
-                        }.font(.system(size: 12, design: .monospaced)).frame(width: 48, alignment: .leading)
-                        VStack(alignment: .leading, spacing: 5) {
-                            if item.tone == nil { Label(item.title, systemImage: "lock.fill") }
-                            else { Text(item.title).fontWeight(.medium) }
-                            Text(durationText(item.end - item.start)).font(.caption).foregroundStyle(.secondary)
-                            if !item.memo.isEmpty { Text(item.memo).font(.caption).foregroundStyle(.secondary) }
-                        }
-                    }.padding(.vertical, 3)
-                        .accessibilityElement(children: .combine).accessibilityIdentifier("fullDay-\(item.title)")
-                        .accessibilityValue("\(clockText(item.start))|\(item.end - item.start)")
-                }
-            }
-            if !unplaced.isEmpty {
-                Section("未配置") { ForEach(unplaced) { task in
-                    HStack { Text(task.title); Spacer(); Text(durationText(task.minutes)).font(.caption).foregroundStyle(.secondary) }
-                } }
-            }
-        }.scrollContentBackground(.hidden).accessibilityIdentifier("fullDayList")
     }
     private var fittedTimeline: some View {
         GeometryReader { geometry in
