@@ -268,10 +268,8 @@ struct PlannerView: View {
             .accessibilityElement(children: .contain).accessibilityIdentifier("dayNavigation")
     }
     private var stats: some View {
-            VStack(spacing: 4) {
-                timeBar("空き時間", minutes: plans.hours.totalMinutes - occupied, color: accent, identifier: "freeTimeBar")
-                timeBar("未配置", minutes: inbox.reduce(0) { $0 + $1.minutes }, color: Color(red: 0.73, green: 0.55, blue: 0.24), identifier: "unplacedTimeBar")
-            }.padding(.horizontal, 12).padding(.vertical, 4)
+        timeBar("空き時間", minutes: plans.hours.totalMinutes - occupied, color: accent, identifier: "freeTimeBar")
+            .padding(.horizontal, 12).padding(.vertical, 4)
     }
     private func timeBar(_ title: String, minutes: Int, color: Color, identifier: String) -> some View {
         HStack(spacing: 8) {
