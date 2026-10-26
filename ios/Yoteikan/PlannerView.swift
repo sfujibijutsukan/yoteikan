@@ -2,6 +2,44 @@ import SwiftUI
 import UniformTypeIdentifiers
 import UIKit
 
+/// Paper treatment stays inside the card's bounds so even five-minute notes
+/// retain their full touch target and never cover the next time slot.
+private struct StickyPaper: View {
+    let color: Color
+    var selected = false
+    var lifted = false
+    var body: some View {
+        GeometryReader { proxy in
+            let fold = min(10, proxy.size.height * 0.18, proxy.size.width * 0.12)
+            let width = proxy.size.width
+            let height = proxy.size.height
+            ZStack(alignment: .top) {
+                color
+                LinearGradient(colors: [.black.opacity(0.055), .white.opacity(0.16), .clear],
+                               startPoint: .top, endPoint: .bottom)
+                    .frame(height: min(24, height * 0.45))
+                Path { path in
+                    path.move(to: CGPoint(x: width - fold, y: height))
+                    path.addLine(to: CGPoint(x: width - fold, y: height - fold))
+                    path.addLine(to: CGPoint(x: width, y: height - fold))
+                    path.closeSubpath()
+                }.fill(.white.opacity(0.38))
+                Path { path in
+                    path.move(to: CGPoint(x: width - fold, y: height))
+                    path.addLine(to: CGPoint(x: width - fold, y: height - fold))
+                    path.addLine(to: CGPoint(x: width, y: height - fold))
+                }.stroke(.black.opacity(0.1), lineWidth: 0.5)
+            }
+            .clipShape(RoundedRectangle(cornerRadius: 2))
+            .overlay {
+                RoundedRectangle(cornerRadius: 2)
+                    .strokeBorder(selected ? accent : .black.opacity(0.08), lineWidth: selected ? 2 : 0.5)
+            }
+            .shadow(color: .black.opacity(lifted ? 0.22 : 0.12), radius: lifted ? 7 : 1.5, x: 0, y: lifted ? 4 : 1)
+        }.allowsHitTesting(false).accessibilityHidden(true)
+    }
+}
+
 private enum ScheduleMemoTarget: Identifiable {
     case sticky(UUID)
     case fixed(FixedEvent)
@@ -160,7 +198,11 @@ private struct FullDayOverview: View {
                         Text(item.title)
                             .font(.system(size: 13, weight: .medium)).lineLimit(2)
                             .padding(.horizontal, 6).frame(width: max(1, width - 2), height: cardHeight, alignment: .leading)
-                            .foregroundStyle(textColor(item)).background(color(item), in: RoundedRectangle(cornerRadius: 5))
+                            .foregroundStyle(textColor(item))
+                            .background {
+                                if item.tone != nil { StickyPaper(color: color(item)) }
+                                else { RoundedRectangle(cornerRadius: 5).fill(color(item)) }
+                            }
                             .clipped().overlay(MemoHold { showMemo(item.target) })
                             .offset(x: 46 + width * CGFloat(slot.column), y: folded.position(start) + 7)
                             .accessibilityLabel("\(clockText(item.start))〜\(clockText(item.end))、\(item.title)")
@@ -747,11 +789,8 @@ struct PlannerView: View {
             }
         }.padding(.horizontal, overview ? 3 : 7).padding(.top, height < 44 ? 1 : (compact ? 5 : 7)).frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             .foregroundStyle(textColor)
-            .background(plans.paletteColor(for: task.tone).color, in: RoundedRectangle(cornerRadius: 9))
-            .overlay(alignment: .leading) { RoundedRectangle(cornerRadius: 2).fill(ink.opacity(0.22)).frame(width: 3).padding(.vertical, 9) }
-            .overlay { RoundedRectangle(cornerRadius: 9).stroke(selected == task.id ? accent : .clear, lineWidth: 2).allowsHitTesting(false) }
-            .shadow(color: ink.opacity(moving == task.id ? 0.18 : 0.04), radius: moving == task.id ? 8 : 2, y: 2)
-            .clipped()
+            .background(StickyPaper(color: plans.paletteColor(for: task.tone).color,
+                                    selected: selected == task.id, lifted: moving == task.id))
             .accessibilityLabel("\(task.title)、\(clockText(start))から\(duration)分")
     }
     private func resizeHandle(_ task: Sticky) -> some View {
@@ -813,8 +852,8 @@ struct PlannerView: View {
                                 Text(task.title).font(.system(size: 12, weight: .semibold)).lineLimit(3)
                                 Text(task.start.map { "時間外 \(clockText($0))" } ?? durationText(task.minutes)).font(.system(size: 10))
                             }.frame(maxWidth: .infinity, minHeight: 52, alignment: .topLeading).padding(10)
-                                .background(plans.paletteColor(for: task.tone).color, in: RoundedRectangle(cornerRadius: 7))
-                                .overlay { RoundedRectangle(cornerRadius: 7).stroke(selected == task.id ? accent : .clear, lineWidth: 2) }
+                                .background(StickyPaper(color: plans.paletteColor(for: task.tone).color,
+                                                        selected: selected == task.id))
                                 .foregroundStyle(plans.paletteColor(for: task.tone).textColor)
                                 .onTapGesture { selected = task.id; sideShowsDetails = true }.draggable(task.id.uuidString)
                                 .accessibilityElement(children: .ignore).accessibilityLabel("\(task.title)、\(task.minutes)分、\(task.start.map { "時間外 \(clockText($0))" } ?? "未配置")")

@@ -201,3 +201,9 @@ iPhone 17eシミュレーター / iOS 27.0でXCTestを使って実際に操作�
 ## カレンダー予定のメモ
 
 <img src="44-calendar-long-press-memo.png" width="300" alt="カレンダーの予定はメモを読み取り専用で表示">
+
+## 紙らしい付箋（Issue #32）
+
+<img src="45-sticky-paper-plan.png" width="300" alt="未配置と時間割の付箋に紙の陰影と折り返しを追加">
+
+<img src="46-sticky-paper-day.png" width="300" alt="1日表示でも同じ紙の表現を使用">

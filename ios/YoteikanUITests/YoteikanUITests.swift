@@ -901,6 +901,15 @@ final class YoteikanUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["予定を配置するとここに表示されます"].exists)
         selectTab("計画")
     }
+    func test33StickyPaperAppearance() {
+        launch()
+        XCTAssertTrue(app.otherElements["inbox-運動"].exists)
+        XCTAssertEqual(app.otherElements["task-朝の読書"].value as? String, "08:00|30")
+        shot("45-sticky-paper-plan")
+        selectTab("1日表示")
+        XCTAssertTrue(app.descendants(matching: .any).matching(identifier: "fullDayBlock-朝の読書").firstMatch.exists)
+        shot("46-sticky-paper-day")
+    }
     func test22PinchTimelinePreservesTimeAndTasks() {
         launch()
         let task = app.otherElements["task-朝の読書"]
