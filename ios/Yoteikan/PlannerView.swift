@@ -286,6 +286,12 @@ private struct TimelinePinch: UIViewRepresentable {
         var ended: (() -> Void)?
         weak var scroll: UIScrollView?
         var originalTouches = Int.max
+        var sizeObservation: NSKeyValueObservation?
+        var startHeight: CGFloat = 1
+        var anchorContentY: CGFloat = 0
+        var anchorViewportY: CGFloat = 0
+        var tracking = false
+        var generation = UUID()
         lazy var recognizer = UIPinchGestureRecognizer(target: self, action: #selector(pinch(_:)))
         func install(from view: UIView) {
             var ancestor = view.superview
@@ -298,12 +304,17 @@ private struct TimelinePinch: UIViewRepresentable {
                     target.panGestureRecognizer.maximumNumberOfTouches = 1
                     recognizer.delegate = self
                     target.addGestureRecognizer(recognizer)
+                    sizeObservation = target.observe(\.contentSize, options: [.new]) { [weak self] _, _ in
+                        self?.restoreAnchor()
+                    }
                     return
                 }
                 ancestor = current.superview
             }
         }
         func detach() {
+            sizeObservation = nil
+            tracking = false
             scroll?.removeGestureRecognizer(recognizer)
             scroll?.panGestureRecognizer.maximumNumberOfTouches = originalTouches
             scroll = nil
@@ -311,11 +322,41 @@ private struct TimelinePinch: UIViewRepresentable {
         @objc func pinch(_ gesture: UIPinchGestureRecognizer) {
             guard let scroll else { return }
             switch gesture.state {
-            case .began, .changed:
+            case .began:
+                generation = UUID()
+                tracking = true
+                // The timeline adds 12 points above and 18 below its scaled content.
+                startHeight = max(1, scroll.contentSize.height - 30)
+                anchorViewportY = gesture.location(in: scroll).y - scroll.bounds.minY
+                anchorContentY = scroll.contentOffset.y + anchorViewportY - 12
+                scroll.setContentOffset(scroll.contentOffset, animated: false)
+                let y = anchorViewportY / max(1, scroll.bounds.height)
+                changed?(gesture.scale, y)
+            case .changed:
+                anchorViewportY = gesture.location(in: scroll).y - scroll.bounds.minY
                 let y = (gesture.location(in: scroll).y - scroll.bounds.minY) / max(1, scroll.bounds.height)
                 changed?(gesture.scale, y)
-            case .ended, .cancelled, .failed: ended?()
+                restoreAnchor()
+            case .ended, .cancelled, .failed:
+                ended?()
+                let current = generation
+                // Allow the final SwiftUI layout to settle before releasing the anchor.
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
+                    guard let self, self.generation == current else { return }
+                    self.restoreAnchor(); self.tracking = false
+                }
             default: break
+            }
+        }
+        private func restoreAnchor() {
+            guard tracking, let scroll else { return }
+            let ratio = max(1, scroll.contentSize.height - 30) / startHeight
+            let proposed = (anchorContentY * ratio) + 12 - anchorViewportY
+            let minimum = -scroll.adjustedContentInset.top
+            let maximum = max(minimum, scroll.contentSize.height - scroll.bounds.height + scroll.adjustedContentInset.bottom)
+            let offset = min(maximum, max(minimum, proposed))
+            if abs(scroll.contentOffset.y - offset) > 0.25 {
+                scroll.setContentOffset(CGPoint(x: scroll.contentOffset.x, y: offset), animated: false)
             }
         }
         func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldRecognizeSimultaneouslyWith otherGestureRecognizer: UIGestureRecognizer) -> Bool { true }
@@ -758,11 +799,8 @@ struct PlannerView: View {
                     await Task.yield(); reader.scrollTo("hour-\(initialHour)", anchor: .top)
                 }
                 .onChange(of: zoomFactor) { _, _ in
-                    Task { @MainActor in
-                        await Task.yield()
-                        if pinchMinute != nil { reader.scrollTo("pinch-anchor", anchor: pinchAnchor) }
-                        else { reader.scrollTo("hour-\(zoomAnchor)", anchor: .top) }
-                    }
+                    guard pinchMinute == nil else { return }
+                    reader.scrollTo("hour-\(zoomAnchor)", anchor: .top)
                 }
                 .onChange(of: overview) { _, value in
                     if pinchBase == nil { reader.scrollTo("hour-\(value ? plans.hours.start / 60 : initialHour)", anchor: .top) }
