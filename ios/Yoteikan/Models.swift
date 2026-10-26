@@ -159,6 +159,7 @@ struct FixedEvent: Identifiable {
     var start: Int
     var end: Int
     var allDay = false
+    var memo: String = ""
 }
 struct StickyColor: Identifiable, Codable, Equatable {
     var id: Int

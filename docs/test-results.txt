@@ -146,3 +146,11 @@ Test Case '-[YoteikanUITests.YoteikanUITests test29SidebarPositionPersistsAndSup
 タブ往復後の表示位置保持の追加確認
 Test Case '-[YoteikanUITests.YoteikanUITests test22PinchTimelinePreservesTimeAndTasks]' passed (30.882 seconds).
 ** TEST SUCCEEDED **
+
+予定の長押しによる詳細メモ (2026-10-27)
+Test Case '-[YoteikanUITests.YoteikanUITests test03DragResizeAndUnplace]' passed (23.170 seconds).
+Test Case '-[YoteikanUITests.YoteikanUITests test23ScrollFromStickyAndCalendarEventPreservesPlans]' passed (10.661 seconds).
+Test Case '-[YoteikanUITests.YoteikanUITests test32LongPressCalendarMemoIsReadOnlyInBothPages]' passed (14.190 seconds).
+** TEST SUCCEEDED **
+Test Case '-[YoteikanUITests.YoteikanUITests test31LongPressMemoFromBothPagesPersistsAndKeepsDraft]' passed (19.795 seconds).
+** TEST SUCCEEDED **

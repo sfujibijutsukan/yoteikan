@@ -50,7 +50,7 @@ import EventKit
         let end = Calendar.current.date(byAdding: .day, value: 1, to: start)!
         let predicate = store.predicateForEvents(withStart: start, end: end, calendars: selected)
         events = store.events(matching: predicate).map {
-            FixedEvent(id: $0.eventIdentifier ?? UUID().uuidString, title: $0.title ?? "予定", start: max(0, Int($0.startDate.timeIntervalSince(start) / 60)), end: min(1440, Int($0.endDate.timeIntervalSince(start) / 60)), allDay: $0.isAllDay)
+            FixedEvent(id: $0.eventIdentifier ?? UUID().uuidString, title: $0.title ?? "予定", start: max(0, Int($0.startDate.timeIntervalSince(start) / 60)), end: min(1440, Int($0.endDate.timeIntervalSince(start) / 60)), allDay: $0.isAllDay, memo: $0.notes ?? "")
         }.sorted { $0.start < $1.start }
     }
     #if DEBUG && targetEnvironment(simulator)

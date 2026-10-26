@@ -189,3 +189,15 @@ iPhone 17eシミュレーター / iOS 27.0でXCTestを使って実際に操作�
 <img src="40-glass-day-tab.png" width="300" alt="1日表示タブで空き時間を縮めた時間割を表示">
 
 <img src="41-glass-settings-tab.png" width="300" alt="設定タブに時間帯・付箋編集などを集約">
+
+## 計画の長押しで詳細メモ（10月27日）
+
+<img src="42-plan-long-press-memo.png" width="300" alt="計画ページで予定を長押ししてメモを表示">
+
+## 1日表示の長押しで同じメモ
+
+<img src="43-day-long-press-memo.png" width="300" alt="1日表示から保存済みの同じメモを確認">
+
+## カレンダー予定のメモ
+
+<img src="44-calendar-long-press-memo.png" width="300" alt="カレンダーの予定はメモを読み取り専用で表示">

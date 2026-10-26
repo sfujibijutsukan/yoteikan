@@ -4,7 +4,16 @@
 
 Issue #18・#19・#20を含め、ユニット23件・UI25件の全48件が成功しました（1件の再実行を含む）。スクリーンショット抽出・一覧作成ツールはGoで実装しています。Pythonへの依存はありません。
 
+## 予定の長押しで詳細メモ（2026年10月27日）
+
+- 計画・1日表示の両方で長押しからメモを開き、付箋の保存内容と下書きをサイドバーと共有することを確認。時刻・所要時間・他の付箋は保持。
+- カレンダー予定のメモは両ページで読み取り専用。保存操作や付箋用の編集欄を表示しないことを確認。
+- 既存の長押し移動・伸縮・未配置への戻し・Undo、予定上からのスクロールも確認。関連UI4件成功。
+- 新規UIの最終結果: artifacts/LongPressSharedMemo.xcresult / artifacts/long-press-shared-memo.log、artifacts/LongPressDayHit.xcresult / artifacts/long-press-day-hit.log。既存操作の成功行は artifacts/long-press-memos.log（移動・伸縮）と artifacts/long-press-memos-final.log（スクロール）。1日表示のタッチ判定を調整して再実行。
+- [計画から](screenshots/42-plan-long-press-memo.png) / [1日表示から](screenshots/43-day-long-press-memo.png) / [カレンダー予定](screenshots/44-calendar-long-press-memo.png)。実機は未確認。
+
 ## Liquid Glassの下部タブ（2026年10月27日）
+
 
 - 旧下部操作バー・上部の拡大率操作列・歯車を削除。「計画・1日表示・設定」を標準TabViewで表示。iOS 27シミュレーターでLiquid Glassの外観を目視確認。
 - ピンチの連続調整・最小／最大倍率、タブ往復後の倍率と選択、1日の時間割、設定経由の編集・保存を確認。
