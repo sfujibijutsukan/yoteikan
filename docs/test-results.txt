@@ -119,3 +119,9 @@ Test Case '-[YoteikanUITests.YoteikanUITests test02CreatePersistEditAndUndo]' pa
 Test Case '-[YoteikanUITests.YoteikanUITests test03DragResizeAndUnplace]' passed (13.786 seconds).
 Test Case '-[YoteikanUITests.YoteikanUITests test28ReminderSettingsPersistAndSchedule]' passed (31.415 seconds).
 ** TEST SUCCEEDED **
+
+Issue #23 サイドバー位置 (2026-10-26)
+Test Case '-[YoteikanUITests.YoteikanUITests test01DemoAndPresets]' passed (8.716 seconds).
+Test Case '-[YoteikanUITests.YoteikanUITests test17LandscapeShowsThreeZonesAndKeepsSelection]' passed (10.036 seconds).
+Test Case '-[YoteikanUITests.YoteikanUITests test29SidebarPositionPersistsAndSupportsDragAndDetails]' passed (37.347 seconds).
+** TEST SUCCEEDED **

@@ -8,6 +8,7 @@ import SwiftUI
     init() {
         if ProcessInfo.processInfo.arguments.contains("--reset-test-data") {
             UserDefaults.standard.removeObject(forKey: "yoteikan.plan.v1")
+            UserDefaults.standard.removeObject(forKey: "planner.sidebarLeading")
         }
     }
     var body: some Scene {

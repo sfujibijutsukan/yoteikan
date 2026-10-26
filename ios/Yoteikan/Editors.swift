@@ -279,12 +279,19 @@ struct CalendarSettingsView: View {
 }
 
 struct PlannerSettingsView: View {
+    @AppStorage("planner.sidebarLeading") private var sidebarLeading = false
     @EnvironmentObject private var reminders: ReminderStore
     @Environment(\.dismiss) private var dismiss
     @Environment(\.openURL) private var openURL
     var body: some View {
         NavigationStack {
             Form {
+                Section("サイドバーの位置") {
+                    Picker("付箋・詳細", selection: $sidebarLeading) {
+                        Text("左").tag(true)
+                        Text("右").tag(false)
+                    }.pickerStyle(.segmented).accessibilityIdentifier("sidebarPosition")
+                }
                 Section {
                     switch reminders.authorization {
                     case .notDetermined:
