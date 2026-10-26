@@ -444,6 +444,7 @@ struct PlannerView: View {
     @State private var showNew = false
     @State private var editing: Sticky?
     @State private var selected: UUID?
+    @State private var folded = false
     @State private var overview = false
     @State private var zoomFactor: CGFloat = 1
     @State private var pinchBase: CGFloat?
@@ -525,7 +526,23 @@ struct PlannerView: View {
             HStack(spacing: 0) {
                 ForEach(zones, id: \.self) { zone in
                     if zone == "schedule" {
-                        VStack(spacing: 0) { timeline }
+                        VStack(spacing: 0) {
+                            HStack {
+                                Spacer()
+                                Button {
+                                    moving = nil; stretching = nil; shift = 0; stretch = 0
+                                    var transaction = Transaction()
+                                    transaction.disablesAnimations = true
+                                    withTransaction(transaction) { folded.toggle() }
+                                } label: {
+                                    Label(folded ? "広げる" : "空きをたたむ", systemImage: folded ? "arrow.up.and.down" : "arrow.down.and.line.horizontal.and.arrow.up")
+                                        .font(.system(size: 11, weight: .medium)).padding(.horizontal, 8).frame(minHeight: 28)
+                                }.buttonStyle(.plain).foregroundStyle(accent)
+                                    .accessibilityIdentifier("foldPlanner")
+                                    .accessibilityValue(folded ? "折りたたみ中" : "通常表示")
+                            }
+                            timeline
+                        }
                             .accessibilityElement(children: .contain).accessibilityIdentifier("scheduleZone")
                     } else if zone == "memo" {
                         VStack(spacing: 0) { zoneTitle("詳細メモ"); memoPane }
@@ -705,6 +722,25 @@ struct PlannerView: View {
             .background { GeometryReader { proxy in Color.clear.preference(key: HourPositions.self, value: [hour: proxy.frame(in: .global).minY]) } }
             .overlay(alignment: .topLeading) { pinchMarker(hour) }
     }
+    private var foldedLayout: FoldedTimeline {
+        FoldedTimeline(items: placed.map { TimelineItem(id: $0.id.uuidString, start: $0.start!, end: $0.start! + $0.minutes) }
+                       + visibleFixed.map { TimelineItem(id: "fixed-" + $0.id, start: $0.start, end: $0.end) },
+                       start: plans.hours.start, end: plans.hours.end)
+    }
+    private func timelineY(_ minute: Int) -> CGFloat {
+        folded ? foldedLayout.position(minute) : CGFloat(minute - plans.hours.start) * scale
+    }
+    private func timelineMinute(_ y: CGFloat) -> CGFloat {
+        folded ? foldedLayout.minute(at: y) : CGFloat(plans.hours.start) + y / scale
+    }
+    private func movedStart(_ task: Sticky, delta: CGFloat) -> Int {
+        PlannerMath.start(PlannerMath.snap(Double(timelineMinute(timelineY(task.start!) + delta))),
+                          duration: task.minutes, from: plans.hours.start, to: plans.hours.end)
+    }
+    private func resizedDuration(_ task: Sticky, delta: CGFloat) -> Int {
+        PlannerMath.duration(PlannerMath.snap(Double(timelineMinute(timelineY(task.start! + task.minutes) + delta))) - task.start!,
+                             start: task.start!, to: plans.hours.end)
+    }
     private func placedCard(_ task: Sticky, availableWidth: CGFloat) -> some View {
         let visibleStart = max(task.start!, plans.hours.start)
         let visibleEnd = min(task.start! + task.minutes, plans.hours.end)
@@ -712,7 +748,7 @@ struct PlannerView: View {
         let slot = slots[task.id.uuidString] ?? TimelineSlot(column: 0, columns: 1)
         let slotCount = slot.columns
         let width = (availableWidth - 42) / CGFloat(slotCount)
-        let height = max(0, cardHeight(visibleEnd - visibleStart) + (stretching == task.id ? stretch : 0))
+        let height = max(0, timelineY(visibleEnd) - timelineY(visibleStart) - (folded ? 2 : min(4, CGFloat(visibleEnd - visibleStart) * scale * 0.25)) + (stretching == task.id ? stretch : 0))
         return taskCard(task, compact: overview || slotCount > 1, height: height)
             .frame(width: width - 3, height: height)
             .overlay(StickyTouch(
@@ -732,7 +768,7 @@ struct PlannerView: View {
             .accessibilityAction(named: "詳細メモ") { UIAccessibility.post(notification: .announcement, argument: preview(.sticky(task.id)).spoken) }
             .overlay(alignment: .top) {
                 if moving == task.id && !returningToInbox {
-                    let start = task.start! + PlannerMath.snap(Double(shift / scale))
+                    let start = movedStart(task, delta: shift)
                     Text("\(clockText(start)) – \(clockText(start + task.minutes))")
                         .font(.system(size: 11, weight: .semibold, design: .monospaced))
                         .padding(.horizontal, 10).padding(.vertical, 5)
@@ -740,7 +776,7 @@ struct PlannerView: View {
                         .offset(y: -29).allowsHitTesting(false)
                 }
             }
-            .offset(x: 40 + width * CGFloat(slot.column), y: CGFloat((moving == task.id ? task.start! : visibleStart) - plans.hours.start) * scale + 2 + (moving == task.id ? shift : 0))
+            .offset(x: 40 + width * CGFloat(slot.column), y: timelineY(visibleStart) + 2 + (moving == task.id ? shift : 0))
             .zIndex(moving == task.id || stretching == task.id ? 5 : selected == task.id ? 3 : 1)
             .accessibilityElement(children: .contain)
             .accessibilityIdentifier("task-\(task.title)")
@@ -748,6 +784,59 @@ struct PlannerView: View {
             .accessibilityHint(collision ? "ほかの予定と重なっています" : "")
     }
     private var timeline: some View {
+        Group {
+            if folded { foldedPlanningTimeline }
+            else { expandedTimeline }
+        }
+    }
+    private var foldedPlanningTimeline: some View {
+        GeometryReader { geometry in
+            let layout = foldedLayout
+            ScrollView {
+                ZStack(alignment: .topLeading) {
+                    ForEach(layout.bands.indices, id: \.self) { index in
+                        let band = layout.bands[index]
+                        HStack(spacing: 6) {
+                            Text(clockText(band.start)).font(.system(size: 9, design: .monospaced)).frame(width: 34, alignment: .trailing)
+                            Rectangle().fill(ink.opacity(0.12)).frame(height: 1)
+                        }.frame(height: 12).offset(y: band.y)
+                        if !band.occupied {
+                            Text("空き \(durationText(band.end - band.start))").font(.system(size: 9)).foregroundStyle(.secondary)
+                                .frame(width: max(1, geometry.size.width - 42), height: band.height)
+                                .offset(x: 40, y: band.y + 6).allowsHitTesting(false)
+                        }
+                    }
+                    Text(clockText(plans.hours.end)).font(.system(size: 9, design: .monospaced))
+                        .frame(width: 34, alignment: .trailing).offset(y: layout.height)
+                    ForEach(visibleFixed) { event in
+                        let start = max(plans.hours.start, event.start)
+                        let slot = slots["fixed-" + event.id] ?? TimelineSlot(column: 0, columns: 1)
+                        let width = (geometry.size.width - 42) / CGFloat(slot.columns)
+                        let height = timelineY(min(event.end, plans.hours.end)) - timelineY(start) - 2
+                        fixedCard(event, height: height).frame(width: width - 3, height: height).clipped()
+                            .overlay(MemoHold { preview(.fixed(event)) })
+                            .accessibilityElement(children: .ignore)
+                            .accessibilityLabel("\(event.title)、\(clockText(event.start))から\(clockText(event.end))、カレンダーの固定予定")
+                            .accessibilityIdentifier("fixed-\(event.title)")
+                            .accessibilityAction(named: "詳細メモ") { UIAccessibility.post(notification: .announcement, argument: preview(.fixed(event)).spoken) }
+                            .offset(x: 40 + width * CGFloat(slot.column), y: timelineY(start) + 2)
+                    }
+                    ForEach(placed) { task in placedCard(task, availableWidth: geometry.size.width) }
+                }
+                .frame(width: geometry.size.width, height: max(layout.height + 18, geometry.size.height), alignment: .topLeading)
+                .background(Color.white.opacity(0.01))
+                .contentShape(Rectangle())
+                .dropDestination(for: String.self) { values, point in
+                    guard let raw = values.first, let id = UUID(uuidString: raw), plans.today.contains(where: { $0.id == id }) else { return false }
+                    plans.put(id, at: PlannerMath.snap(Double(timelineMinute(point.y)))); selected = id; return true
+                } isTargeted: { dropActive = $0 }
+                .background(dropActive ? accent.opacity(0.05) : .clear)
+                .padding(.top, 12)
+            }.scrollDisabled(moving != nil || stretching != nil)
+                .accessibilityIdentifier("foldedPlannerTimeline")
+        }.background(.white.opacity(0.62))
+    }
+    private var expandedTimeline: some View {
         ScrollViewReader { reader in
             ScrollView(.vertical) {
                 GeometryReader { geometry in
@@ -832,7 +921,7 @@ struct PlannerView: View {
     private func fixedCard(_ event: FixedEvent, height: CGFloat) -> some View {
         VStack(alignment: .leading, spacing: overview ? 0 : 5) {
             if height < 44 {
-                if height >= 14 { Text(event.title).font(.system(size: 10, weight: .medium)).lineLimit(1) }
+                if height >= 14 { Text(event.title).font(.system(size: folded ? 12 : 10, weight: .medium)).lineLimit(folded ? 2 : 1) }
             } else if overview { Text(event.title).font(.system(size: 7, weight: .medium)).lineLimit(1) }
             else { HStack { Image(systemName: "lock.fill").font(.system(size: 9)); Text("\(clockText(event.start)) – \(clockText(event.end))").font(.system(size: 10, weight: .medium)); Spacer(minLength: 0) }.foregroundStyle(ink.opacity(0.55))
             if !overview { Text(event.title).font(.system(size: 13, weight: .medium)).lineLimit(2) }
@@ -842,11 +931,11 @@ struct PlannerView: View {
     }
     private func taskCard(_ task: Sticky, compact: Bool, height: CGFloat) -> some View {
         let textColor = plans.paletteColor(for: task.tone).textColor
-        let start = (task.start ?? 0) + (moving == task.id ? PlannerMath.snap(Double(shift / scale)) : 0)
-        let duration = task.minutes + (stretching == task.id ? PlannerMath.snap(Double(stretch / scale)) : 0)
+        let start = moving == task.id ? movedStart(task, delta: shift) : (task.start ?? 0)
+        let duration = stretching == task.id ? resizedDuration(task, delta: stretch) : task.minutes
         return VStack(alignment: .leading, spacing: 4) {
             if height < 44 {
-                if height >= 14 { Text(task.title).font(.system(size: 10, weight: .semibold)).lineLimit(1) }
+                if height >= 14 { Text(task.title).font(.system(size: folded ? 12 : 10, weight: .semibold)).lineLimit(folded ? 2 : 1) }
             } else if overview {
                 if duration >= 45 { Text(task.title).font(.system(size: 7, weight: .semibold)).lineLimit(1) }
             } else {
@@ -866,11 +955,11 @@ struct PlannerView: View {
             .highPriorityGesture(DragGesture(minimumDistance: 0, coordinateSpace: .global).onChanged { value in
                 guard pinchBase == nil else { return }
                 selected = task.id; stretching = task.id
-                let newDuration = PlannerMath.duration(task.minutes + PlannerMath.snap(Double(value.translation.height / scale)), start: task.start!, to: plans.hours.end)
-                stretch = CGFloat(newDuration - task.minutes) * scale
+                let newDuration = resizedDuration(task, delta: value.translation.height)
+                stretch = timelineY(task.start! + newDuration) - timelineY(task.start! + task.minutes)
             }.onEnded { value in
                 guard pinchBase == nil, stretching == task.id else { return }
-                plans.resize(task.id, minutes: task.minutes + PlannerMath.snap(Double(value.translation.height / scale))); stretching = nil; stretch = 0
+                plans.resize(task.id, minutes: resizedDuration(task, delta: value.translation.height)); stretching = nil; stretch = 0
             })
             .accessibilityLabel("\(task.title)の長さを変更").accessibilityIdentifier("resize-\(task.title)")
     }
@@ -896,14 +985,14 @@ struct PlannerView: View {
         guard pinchBase == nil, let start = task.start else { return }
         selected = task.id; moving = task.id
         returningToInbox = inboxFrame.contains(location)
-        let newStart = PlannerMath.start(start + PlannerMath.snap(Double(delta / scale)), duration: task.minutes, from: plans.hours.start, to: plans.hours.end)
-        shift = CGFloat(newStart - start) * scale
+        let newStart = movedStart(task, delta: delta)
+        shift = timelineY(newStart) - timelineY(start)
     }
     private func finishMove(_ task: Sticky, delta: CGFloat, location: CGPoint) {
         defer { moving = nil; shift = 0; returningToInbox = false }
         guard pinchBase == nil, moving == task.id, let start = task.start else { return }
         if inboxFrame.contains(location) { plans.put(task.id, at: nil); selected = nil; sideShowsDetails = false }
-        else { plans.move(task.id, start: start + PlannerMath.snap(Double(delta / scale))) }
+        else { plans.move(task.id, start: movedStart(task, delta: delta)) }
     }
     private var inboxView: some View {
         VStack(spacing: 0) {
@@ -922,6 +1011,7 @@ struct PlannerView: View {
                                 .background(StickyPaper(color: plans.paletteColor(for: task.tone).color,
                                                         selected: selected == task.id))
                                 .foregroundStyle(plans.paletteColor(for: task.tone).textColor)
+                                .contentShape(Rectangle())
                                 .onTapGesture { selected = task.id; sideShowsDetails = true }.draggable(task.id.uuidString)
                                 .accessibilityElement(children: .ignore).accessibilityLabel("\(task.title)、\(task.minutes)分、\(task.start.map { "時間外 \(clockText($0))" } ?? "未配置")")
                                 .accessibilityIdentifier("inbox-\(task.title)")

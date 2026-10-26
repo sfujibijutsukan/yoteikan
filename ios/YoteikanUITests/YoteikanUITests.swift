@@ -886,6 +886,65 @@ final class YoteikanUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["予定を配置するとここに表示されます"].exists)
         selectTab("計画")
     }
+    func test37PinchKeepsTimeUnderFingerCenter() {
+        launch()
+        let reading = app.otherElements["task-朝の読書"]
+        let surface = app.descendants(matching: .any).matching(identifier: "timelineZoomSurface").firstMatch
+        func centerMinute() -> CGFloat {
+            480 + (surface.frame.midY - reading.frame.minY) / (reading.frame.height + 4) * 30
+        }
+        let before = centerMinute()
+        pinch(1.6)
+        XCTAssertEqual(centerMinute(), before, accuracy: 5)
+        pinch(0.8)
+        XCTAssertEqual(centerMinute(), before, accuracy: 5)
+        XCTAssertEqual(reading.value as? String, "08:00|30")
+    }
+    func test35FoldedPlanningKeepsTasksEditable() {
+        launch()
+        app.buttons["foldPlanner"].tap()
+        let timeline = app.scrollViews["foldedPlannerTimeline"]
+        XCTAssertTrue(timeline.exists)
+        let reading = app.otherElements["task-朝の読書"]
+        let work = app.otherElements["task-資料作成"]
+        XCTAssertGreaterThanOrEqual(reading.frame.height, 42)
+        XCTAssertTrue(app.otherElements["fixed-打ち合わせ"].isHittable)
+        shot("49-folded-planning")
+        work.tap()
+        let move = app.otherElements["move-資料作成"]
+        let origin = move.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+        origin.press(forDuration: 0.1, thenDragTo: origin.withOffset(CGVector(dx: 0, dy: 20)))
+        XCTAssertEqual(work.value as? String, "09:20|60")
+        XCTAssertEqual(reading.value as? String, "08:00|30")
+        let resize = app.otherElements["resize-資料作成"].coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+        resize.press(forDuration: 0.15, thenDragTo: resize.withOffset(CGVector(dx: 0, dy: 22)))
+        XCTAssertEqual(work.value as? String, "09:20|80")
+        XCTAssertEqual(reading.value as? String, "08:00|30")
+        work.press(forDuration: 1)
+        XCTAssertFalse(app.otherElements["memoPreview"].exists)
+        XCTAssertFalse(app.buttons["closeScheduleMemo"].exists)
+        app.buttons["foldPlanner"].tap()
+        XCTAssertTrue(app.scrollViews["timeline"].exists)
+        XCTAssertEqual(work.value as? String, "09:20|80")
+    }
+    func test36FoldedPlanningKeepsFiveMinuteNotesReadable() {
+        launch(["--demo", "--short-events-test"])
+        app.buttons["newStickyButton"].tap()
+        app.textFields["stickyTitle"].tap()
+        app.textFields["stickyTitle"].typeText("運動")
+        app.buttons["saveSticky"].tap()
+        app.buttons["foldPlanner"].tap()
+        let reading = app.otherElements["task-読書5分"]
+        let rest = app.otherElements["task-休憩5分"]
+        XCTAssertGreaterThanOrEqual(reading.frame.height, 42)
+        XCTAssertLessThanOrEqual(reading.frame.maxY, rest.frame.minY)
+        shot("50-folded-planning-short-notes")
+        let note = app.descendants(matching: .any).matching(identifier: "inbox-運動").firstMatch
+        let destination = reading.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0)).withOffset(CGVector(dx: 0, dy: -16))
+        note.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).press(forDuration: 0.8, thenDragTo: destination)
+        XCTAssertTrue(app.otherElements["task-運動"].waitForExistence(timeout: 3))
+        XCTAssertEqual(reading.value as? String, "08:00|5")
+    }
     func test33StickyPaperAppearance() {
         launch()
         XCTAssertTrue(app.otherElements["inbox-運動"].exists)

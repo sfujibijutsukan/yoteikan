@@ -215,3 +215,9 @@ iPhone 17eシミュレーター / iOS 27.0でXCTestを使って実際に操作�
 <img src="48-compact-day-preview.png" width="300" alt="1日表示でも予定の近くに小さくメモを表示">
 
 画面47・48はUIテストの長押し中にシミュレーターから直接撮影しました。指を離すとプレビューは消えます。画面42〜44は変更前の詳細シートです。
+
+## 計画ページで空き時間を折りたたむ（Issue #34）
+
+<img src="49-folded-planning.png" width="300" alt="付箋置き場を残したまま、計画の空き時間を折りたたむ">
+
+<img src="50-folded-planning-short-notes.png" width="300" alt="5分の予定も文字が読める高さで重ならずに表示">

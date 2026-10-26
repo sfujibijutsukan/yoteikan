@@ -304,6 +304,12 @@ struct FoldedTimeline {
         }
         return band.y + CGFloat(minute - band.start) / CGFloat(band.end - band.start) * band.height
     }
+    func minute(at position: CGFloat) -> CGFloat {
+        guard let band = bands.first(where: { position >= $0.y && position < $0.y + $0.height }) else {
+            return CGFloat(position <= 0 ? (bands.first?.start ?? 0) : (bands.last?.end ?? 0))
+        }
+        return CGFloat(band.start) + (position - band.y) / band.height * CGFloat(band.end - band.start)
+    }
 }
 enum PlannerMath {
     static let first = 5 * 60
