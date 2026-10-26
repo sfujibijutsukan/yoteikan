@@ -147,3 +147,11 @@ iPhone 17eシミュレーター / iOS 27.0でXCTestを使って実際に操作�
 歯磨き2枚・ごはん3枚を設定し、翌日の付箋置き場にも自動追加しています。標準プリセットも含めた枚数を右上に表示します。
 
 <img src="27-daily-stickies.png" width="300" alt="翌日にも自動追加された付箋">
+
+## 予定ごとの通知タイミング（Issue #17）
+
+<img src="32-sticky-reminder.png" width="300" alt="付箋ごとに何分前に通知するか設定">
+
+## 通知許可と予約件数（Issue #17）
+
+<img src="33-reminder-settings.png" width="300" alt="通知の許可とOSに予約した通知件数">

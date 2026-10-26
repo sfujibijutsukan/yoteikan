@@ -237,6 +237,7 @@ struct PlannerView: View {
     @State private var returningToInbox = false
     @State private var showDetails = false
     @State private var showFullDay = false
+    @State private var showSettings = false
     @State private var sideShowsDetails = false
     @State private var memoDrafts: [UUID: String] = [:]
     @FocusState private var memoFocused: Bool
@@ -293,6 +294,7 @@ struct PlannerView: View {
         }
         .background(paper).foregroundStyle(ink)
         .safeAreaInset(edge: .bottom, spacing: 0) { bottomBar }
+        .sheet(isPresented: $showSettings) { PlannerSettingsView() }
         .sheet(isPresented: $showPresets) { PresetsView() }
         .fullScreenCover(isPresented: $showFullDay) {
             FullDayOverview(date: plans.date, hours: plans.hours, stickies: plans.today, fixed: fixed, colors: plans.plan.colors)
@@ -389,6 +391,9 @@ struct PlannerView: View {
     }
     private var header: some View {
         HStack(spacing: 0) {
+            Button { showSettings = true } label: {
+                Image(systemName: "gearshape").font(.system(size: 17)).frame(width: 36, height: 44)
+            }.accessibilityLabel("アプリ設定").accessibilityIdentifier("plannerSettings")
             Button { showHours = true } label: {
                 Image(systemName: "clock").font(.system(size: 17)).frame(width: 44, height: 44)
             }.accessibilityLabel("計画の時間帯").accessibilityIdentifier("hoursSettings")
