@@ -575,6 +575,31 @@ final class YoteikanUITests: XCTestCase {
         XCTAssertLessThanOrEqual(schedule.frame.maxX, memo.frame.minX + 1)
         XCUIDevice.shared.orientation = .portrait
     }
+    func test23ScrollFromStickyAndCalendarEventPreservesPlans() {
+        launch()
+        let task = app.otherElements["task-資料作成"]
+        let original = task.value as? String
+        let date = app.staticTexts["selectedDate"].label
+        let marker = app.staticTexts["10:00"]
+        let before = marker.frame.minY
+        let point = task.coordinate(withNormalizedOffset: CGVector(dx: 0.35, dy: 0.4))
+        point.press(forDuration: 0.01, thenDragTo: point.withOffset(CGVector(dx: 0, dy: -140)))
+        XCTAssertLessThan(marker.frame.minY, before - 50)
+        XCTAssertEqual(task.value as? String, original)
+        XCTAssertEqual(app.staticTexts["selectedDate"].label, date)
+        let viewport = app.scrollViews["timeline"].frame.insetBy(dx: 8, dy: 12)
+        let fixed = ["fixed-チームミーティング", "fixed-打ち合わせ"].map { app.otherElements[$0] }
+            .first { $0.isHittable && $0.frame.intersection(viewport).height > 30 }
+        guard let fixed else { return XCTFail("No calendar event is visible after scrolling") }
+        let movedY = marker.frame.minY
+        let hit = fixed.frame.intersection(viewport)
+        let from = app.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(dx: hit.midX, dy: hit.midY))
+        from.press(forDuration: 0.01, thenDragTo: from.withOffset(CGVector(dx: 0, dy: 110)))
+        XCTAssertGreaterThan(marker.frame.minY, movedY + 40)
+        XCTAssertEqual(task.value as? String, original)
+        XCTAssertEqual(app.staticTexts["selectedDate"].label, date)
+        shot("25-scroll-on-event")
+    }
     func test22PinchTimelinePreservesTimeAndTasks() {
         launch()
         let timeline = app.scrollViews["timeline"]
