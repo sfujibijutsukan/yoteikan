@@ -64,16 +64,11 @@ struct PlannerView: View {
         GeometryReader { geometry in
             let wide = geometry.size.width >= 700
         VStack(spacing: 0) {
-            if wide {
-                HStack(spacing: 0) { header.frame(width: 310); dateBar }
-            } else {
-            header
-            dateBar
-            }
-            stats(compact: wide)
+            HStack(spacing: 0) { dateBar; header }.padding(.horizontal, 6)
+            stats
             if !calendar.connected && !plans.demo {
                 Button { showCalendar = true } label: {
-                    HStack(spacing: 8) { Image(systemName: "calendar.badge.plus"); Text("カレンダーを接続").font(.system(size: 12, weight: .medium)); Spacer(); Image(systemName: "chevron.right") }.padding(.horizontal, 20).padding(.vertical, 10).foregroundStyle(accent)
+                    HStack(spacing: 8) { Image(systemName: "calendar.badge.plus"); Text("カレンダーを接続").font(.system(size: 11, weight: .medium)); Spacer(); Image(systemName: "chevron.right") }.padding(.horizontal, 12).padding(.vertical, 5).foregroundStyle(accent)
                 }.accessibilityIdentifier("calendarConnectBanner")
             }
             if !fixed.filter(\.allDay).isEmpty {
@@ -186,46 +181,35 @@ struct PlannerView: View {
             .accessibilityValue(sideShowsDetails == details ? "選択中" : "")
     }
     private var header: some View {
-        HStack {
-            if plans.demo {
-                Text("デモ").font(.system(size: 9)).padding(.horizontal, 6).padding(.vertical, 2)
-                    .background(tones[1], in: Capsule())
-            }
-            Spacer()
+        HStack(spacing: 0) {
             Button { showHours = true } label: {
-                Image(systemName: "clock").font(.system(size: 19))
-                    .frame(width: 44, height: 44).background(.white.opacity(0.8), in: Circle())
+                Image(systemName: "clock").font(.system(size: 17)).frame(width: 44, height: 44)
             }.accessibilityLabel("計画の時間帯").accessibilityIdentifier("hoursSettings")
             Button { showColors = true } label: {
-                Image(systemName: "paintpalette").font(.system(size: 19))
-                    .frame(width: 44, height: 44).background(.white.opacity(0.8), in: Circle())
+                Image(systemName: "paintpalette").font(.system(size: 17)).frame(width: 44, height: 44)
             }.accessibilityLabel("付箋の色を設定").accessibilityIdentifier("colorSettings")
             Button { showCalendar = true } label: {
-                Image(systemName: "calendar.badge.clock").font(.system(size: 19))
-                    .frame(width: 44, height: 44).background(.white.opacity(0.8), in: Circle())
+                Image(systemName: "calendar.badge.clock").font(.system(size: 17)).frame(width: 44, height: 44)
             }.accessibilityLabel("カレンダー設定").accessibilityIdentifier("calendarSettings")
-        }.padding(.horizontal, 22).padding(.top, 8).padding(.bottom, 8)
+        }
     }
     private var dateBar: some View {
-        HStack(spacing: 9) {
-            Button { changeDay(-1) } label: { Image(systemName: "chevron.left").frame(width: 32, height: 36) }.accessibilityLabel("前の日")
-            Text(plans.date, format: .dateTime.month().day().weekday(.wide)).font(.system(size: 15, weight: .semibold)).accessibilityIdentifier("selectedDate")
-            Button { changeDay(1) } label: { Image(systemName: "chevron.right").frame(width: 32, height: 36) }.accessibilityLabel("次の日")
+        HStack(spacing: 0) {
+            Button { changeDay(-1) } label: { Image(systemName: "chevron.left").frame(width: 28, height: 44) }.accessibilityLabel("前の日")
+            Text(plans.date, format: .dateTime.month().day().weekday(.abbreviated)).font(.system(size: 12, weight: .semibold)).lineLimit(1).minimumScaleFactor(0.75).accessibilityIdentifier("selectedDate")
+            Button { changeDay(1) } label: { Image(systemName: "chevron.right").frame(width: 28, height: 44) }.accessibilityLabel("次の日")
             Spacer(minLength: 0)
-            Button { plans.date = Date() } label: { Text("今日").font(.system(size: 11, weight: .semibold)).padding(.horizontal, 10).padding(.vertical, 7).background(.white, in: Capsule()) }.accessibilityIdentifier("todayButton")
-        }.padding(.horizontal, 12)
+            Button { plans.date = Date() } label: { Text("今日").font(.system(size: 10, weight: .semibold)).frame(width: 36, height: 44) }.accessibilityIdentifier("todayButton")
+        }
             .contentShape(Rectangle())
             .simultaneousGesture(daySwipeGesture)
             .accessibilityElement(children: .contain).accessibilityIdentifier("dayNavigation")
     }
-    private func stats(compact: Bool) -> some View {
-        HStack(spacing: 14) {
-            VStack(spacing: compact ? 5 : 8) {
+    private var stats: some View {
+            VStack(spacing: 4) {
                 timeBar("空き時間", minutes: plans.hours.totalMinutes - occupied, color: accent, identifier: "freeTimeBar")
                 timeBar("未配置", minutes: inbox.reduce(0) { $0 + $1.minutes }, color: Color(red: 0.73, green: 0.55, blue: 0.24), identifier: "unplacedTimeBar")
-            }
-            Button { overview.toggle() } label: { VStack(spacing: 2) { Image(systemName: overview ? "plus.magnifyingglass" : "rectangle.expand.vertical").font(.system(size: 17)); Text(overview ? "拡大する" : "1日を見る").font(.system(size: 10)) }.frame(width: 60, height: 44) }.accessibilityIdentifier("zoomToggle")
-        }.padding(.horizontal, 18).padding(.vertical, compact ? 2 : 6)
+            }.padding(.horizontal, 12).padding(.vertical, 4)
     }
     private func timeBar(_ title: String, minutes: Int, color: Color, identifier: String) -> some View {
         HStack(spacing: 8) {
@@ -243,6 +227,7 @@ struct PlannerView: View {
     private var zoomControls: some View {
         HStack(spacing: 0) {
             Text("時間割").font(.system(size: 11, weight: .semibold))
+            if plans.demo { Text("デモ").font(.system(size: 8)).padding(3).background(tones[1], in: Capsule()) }
             Spacer(minLength: 0)
             Button { zoomAnchor = selectedTask?.start.map { $0 / 60 } ?? visibleHour ?? initialHour; zoomLevel -= 1 } label: {
                 Image(systemName: "minus.magnifyingglass").frame(width: 44, height: 44)
@@ -253,6 +238,9 @@ struct PlannerView: View {
             Button { if overview { overview = false } else { zoomAnchor = selectedTask?.start.map { $0 / 60 } ?? visibleHour ?? initialHour; zoomLevel += 1 } } label: {
                 Image(systemName: "plus.magnifyingglass").frame(width: 44, height: 44)
             }.disabled(!overview && zoomLevel == zoomSteps.count - 1).accessibilityLabel("時間割を拡大").accessibilityIdentifier("zoomIn")
+            Button { overview.toggle() } label: {
+                Image(systemName: overview ? "plus.magnifyingglass" : "rectangle.expand.vertical").frame(width: 44, height: 44)
+            }.accessibilityLabel(overview ? "拡大する" : "1日を見る").accessibilityIdentifier("zoomToggle")
         }.padding(.horizontal, 8)
     }
     private func cardHeight(_ minutes: Int) -> CGFloat {
@@ -491,7 +479,7 @@ struct PlannerView: View {
                 Button { plans.put(id, at: nil); selected = nil } label: { Image(systemName: "tray.and.arrow.down").frame(width: 38, height: 42) }.accessibilityLabel("未配置に戻す").accessibilityIdentifier("unplaceButton")
                 Button { editing = task } label: { Image(systemName: "slider.horizontal.3").frame(width: 38, height: 42) }.accessibilityLabel("付箋を編集").accessibilityIdentifier("editButton")
             }
-        }.padding(.horizontal, 22).padding(.top, 9).padding(.bottom, 5).background(paper)
+        }.padding(.horizontal, 14).padding(.vertical, 1).background(paper)
     }
     private var daySwipeGesture: some Gesture {
         DragGesture(minimumDistance: 30).onEnded { value in

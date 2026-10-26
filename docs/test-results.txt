@@ -55,3 +55,15 @@ Test Case '-[YoteikanUITests.YoteikanUITests test01DemoAndPresets]' passed (8.77
 Test Case '-[YoteikanUITests.YoteikanUITests test15CustomizeHoursPersistAndRecoverOutsideSticky]' passed (39.968 seconds).
 Test Case '-[YoteikanUITests.YoteikanUITests test17LandscapeShowsThreeZonesAndKeepsSelection]' passed (9.981 seconds).
 Test Case '-[YoteikanUITests.YoteikanUITests test20ZoomShortEventsWithoutVisualOverlap]' passed (23.392 seconds).
+
+上部操作列の圧縮 / 2026-10-25
+関連UI6件がすべて成功。
+結果: artifacts/CompactToolbar.xcresult / artifacts/compact-toolbar.log
+iPhone 17e縦画面のタイムライン: 高さ510→594ポイント、開始位置244→172ポイント。
+縦画面のタイムライン高さが画面の65%以上、上端位置が25%未満であることを検証。
+Test Case '-[YoteikanUITests.YoteikanUITests test01DemoAndPresets]' passed (8.674 seconds).
+Test Case '-[YoteikanUITests.YoteikanUITests test10SwipeDaysAndKeepEachDaysPlan]' passed (20.086 seconds).
+Test Case '-[YoteikanUITests.YoteikanUITests test15CustomizeHoursPersistAndRecoverOutsideSticky]' passed (40.259 seconds).
+Test Case '-[YoteikanUITests.YoteikanUITests test17LandscapeShowsThreeZonesAndKeepsSelection]' passed (9.780 seconds).
+Test Case '-[YoteikanUITests.YoteikanUITests test18SwitchSideZoneInOneTapAndKeepMemoDraft]' passed (9.666 seconds).
+Test Case '-[YoteikanUITests.YoteikanUITests test20ZoomShortEventsWithoutVisualOverlap]' passed (22.354 seconds).
