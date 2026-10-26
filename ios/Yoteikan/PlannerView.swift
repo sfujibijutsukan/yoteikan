@@ -58,6 +58,43 @@ private struct TimelinePinch: UIViewRepresentable {
     }
 }
 
+private struct StickyTouch: UIViewRepresentable {
+    var tapped: () -> Void
+    var changed: (CGFloat, CGPoint) -> Void
+    var ended: (CGFloat, CGPoint) -> Void
+    var cancelled: () -> Void
+    func makeCoordinator() -> Coordinator { Coordinator() }
+    func makeUIView(context: Context) -> UIView {
+        let view = UIView()
+        let press = UILongPressGestureRecognizer(target: context.coordinator, action: #selector(Coordinator.press(_:)))
+        press.minimumPressDuration = 0.3
+        press.allowableMovement = 10
+        press.numberOfTouchesRequired = 1
+        let tap = UITapGestureRecognizer(target: context.coordinator, action: #selector(Coordinator.tap))
+        tap.require(toFail: press)
+        view.addGestureRecognizer(press)
+        view.addGestureRecognizer(tap)
+        view.isAccessibilityElement = false
+        return view
+    }
+    func updateUIView(_ view: UIView, context: Context) { context.coordinator.actions = self }
+    final class Coordinator: NSObject {
+        var actions: StickyTouch?
+        var startY: CGFloat = 0
+        @objc func tap() { actions?.tapped() }
+        @objc func press(_ gesture: UILongPressGestureRecognizer) {
+            let point = gesture.location(in: nil)
+            switch gesture.state {
+            case .began: startY = point.y; actions?.changed(0, point)
+            case .changed: actions?.changed(point.y - startY, point)
+            case .ended: actions?.ended(point.y - startY, point)
+            case .cancelled, .failed: actions?.cancelled()
+            default: break
+            }
+        }
+    }
+}
+
 private struct HourPositions: PreferenceKey {
     static var defaultValue: [Int: CGFloat] = [:]
     static func reduce(value: inout [Int: CGFloat], nextValue: () -> [Int: CGFloat]) { value.merge(nextValue(), uniquingKeysWith: { _, new in new }) }
@@ -91,8 +128,6 @@ struct PlannerView: View {
     @State private var stretching: UUID?
     @State private var stretch: CGFloat = 0
     @State private var viewportHeight: CGFloat = 350
-    @State private var touchStart = CGPoint.zero
-    @State private var touchTask: UUID?
     @State private var inboxFrame = CGRect.zero
     @State private var returningToInbox = false
     @State private var showDetails = false
@@ -361,6 +396,12 @@ struct PlannerView: View {
         let height = max(0, cardHeight(visibleEnd - visibleStart) + (stretching == task.id ? stretch : 0))
         return taskCard(task, compact: overview || slotCount > 1, height: height)
             .frame(width: width - 3, height: height)
+            .overlay(StickyTouch(
+                tapped: { if selected == task.id { editing = task } else { selected = task.id } },
+                changed: { delta, point in updateMove(task, delta: delta, location: point) },
+                ended: { delta, point in finishMove(task, delta: delta, location: point) },
+                cancelled: { moving = nil; shift = 0; returningToInbox = false }
+            ))
             .overlay { if collision { RoundedRectangle(cornerRadius: 9).stroke(.orange, lineWidth: 1.5).allowsHitTesting(false) } }
             .overlay(alignment: .bottom) { if !overview && (height >= 54 || stretching == task.id) { resizeHandle(task) } }
             .contentShape(Rectangle())
@@ -380,9 +421,6 @@ struct PlannerView: View {
             }
             .offset(x: 40 + width * CGFloat(slot.column), y: CGFloat((moving == task.id ? task.start! : visibleStart) - plans.hours.start) * scale + 2 + (moving == task.id ? shift : 0))
             .zIndex(moving == task.id || stretching == task.id ? 5 : selected == task.id ? 3 : 1)
-            .onTapGesture { if selected == task.id { editing = task } else { selected = task.id } }
-            .gesture(moveGesture(task))
-            .simultaneousGesture(DragGesture(minimumDistance: 0, coordinateSpace: .global).onChanged { value in touchStart = value.startLocation; touchTask = task.id })
             .accessibilityElement(children: .contain)
             .accessibilityIdentifier("task-\(task.title)")
             .accessibilityValue("\(clockText(task.start!))|\(task.minutes)")
@@ -424,7 +462,8 @@ struct PlannerView: View {
                         Task { @MainActor in await Task.yield(); pinchBase = nil }
                     }))
                 }.frame(height: CGFloat(plans.hours.end - plans.hours.start) * scale + 18).padding(.top, 12).padding(.horizontal, 5)
-            }.coordinateSpace(name: "timelineViewport").accessibilityIdentifier("timeline")
+            }.scrollDisabled(moving != nil || stretching != nil)
+                .coordinateSpace(name: "timelineViewport").accessibilityIdentifier("timeline")
                 .onPreferenceChange(HourPositions.self) { positions in
                     visibleHour = positions.filter { $0.value <= viewportTop + 16 }.max(by: { $0.value < $1.value })?.key ?? initialHour
                     if let hour = visibleHour, let y = positions[hour] {
@@ -544,21 +583,6 @@ struct PlannerView: View {
         guard pinchBase == nil, moving == task.id, let start = task.start else { return }
         if inboxFrame.contains(location) { plans.put(task.id, at: nil); selected = nil; sideShowsDetails = false }
         else { plans.move(task.id, start: start + PlannerMath.snap(Double(delta / scale))) }
-    }
-    private func moveGesture(_ task: Sticky) -> some Gesture {
-        LongPressGesture(minimumDuration: 0.25).sequenced(before: DragGesture(minimumDistance: 0, coordinateSpace: .global))
-            .onChanged { value in
-                if case .second(true, let drag?) = value {
-                    let delta = drag.location.y - (touchTask == task.id ? touchStart.y : drag.startLocation.y)
-                    updateMove(task, delta: delta, location: drag.location)
-                }
-            }.onEnded { value in
-                if case .second(true, let drag?) = value {
-                    let delta = drag.location.y - (touchTask == task.id ? touchStart.y : drag.startLocation.y)
-                    finishMove(task, delta: delta, location: drag.location)
-                }
-                moving = nil; shift = 0; returningToInbox = false
-            }
     }
     private var inboxView: some View {
         VStack(spacing: 0) {
