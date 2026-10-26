@@ -132,3 +132,17 @@ Test Case '-[YoteikanUITests.YoteikanUITests test30UnifiedSettingsAndStickyEditi
 Test Case '-[YoteikanUITests.YoteikanUITests test28ReminderSettingsPersistAndSchedule]' passed (36.001 seconds).
 Test Case '-[YoteikanUITests.YoteikanUITests test29SidebarPositionPersistsAndSupportsDragAndDetails]' passed (37.697 seconds).
 ** TEST SUCCEEDED **
+
+Liquid Glassの下部タブ (2026-10-27)
+Test Case '-[YoteikanUITests.YoteikanUITests test22PinchTimelinePreservesTimeAndTasks]' passed (25.503 seconds).
+Test Case '-[YoteikanUITests.YoteikanUITests test26FullScreenDayTimelineAndReturn]' passed (18.452 seconds).
+Test Case '-[YoteikanUITests.YoteikanUITests test30UnifiedSettingsAndStickyEditing]' passed (43.411 seconds).
+** TEST SUCCEEDED **
+Test Case '-[YoteikanUITests.YoteikanUITests test03DragResizeAndUnplace]' passed (23.179 seconds).
+Test Case '-[YoteikanUITests.YoteikanUITests test28ReminderSettingsPersistAndSchedule]' passed (52.368 seconds).
+Test Case '-[YoteikanUITests.YoteikanUITests test29SidebarPositionPersistsAndSupportsDragAndDetails]' passed (48.299 seconds).
+** TEST SUCCEEDED **
+
+タブ往復後の表示位置保持の追加確認
+Test Case '-[YoteikanUITests.YoteikanUITests test22PinchTimelinePreservesTimeAndTasks]' passed (30.882 seconds).
+** TEST SUCCEEDED **

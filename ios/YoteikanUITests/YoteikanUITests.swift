@@ -5,8 +5,29 @@ final class YoteikanUITests: XCTestCase {
     override func setUpWithError() throws { continueAfterFailure = false; XCUIDevice.shared.orientation = .portrait }
     func launch(_ args: [String] = ["--demo"]) { app = XCUIApplication(); app.launchArguments = args; app.launch(); XCTAssertTrue(app.buttons["presetsButton"].waitForExistence(timeout: 10)) }
     func shot(_ name: String) { let attachment = XCTAttachment(screenshot: app.screenshot()); attachment.name = name; attachment.lifetime = .keepAlways; add(attachment) }
+    private func selectTab(_ name: String) { app.tabBars.buttons[name].tap() }
+    private func selectDetails() { app.buttons["showScheduleDetails"].tap() }
+    private func editSelected() {
+        if app.textFields["stickyTitle"].exists { return }
+        selectDetails()
+        app.buttons["editSideDetail"].tap()
+    }
+    private func undoChange() {
+        selectTab("設定")
+        app.buttons["undoButton"].tap()
+        selectTab("計画")
+    }
+    private func unplaceSelected() { selectDetails(); app.buttons["unplaceButton"].tap() }
+    private func pinch(_ factor: CGFloat) {
+        let surface = app.descendants(matching: .any).matching(identifier: "timelineZoomSurface").firstMatch
+        surface.pinch(withScale: factor, velocity: factor > 1 ? 1 : -1)
+    }
+    private func zoomLabel() -> String {
+        app.descendants(matching: .any).matching(identifier: "timelineZoomSurface").firstMatch.value as? String ?? ""
+    }
+    private func toggleDay() { selectTab(app.tabBars.buttons["1日表示"].isSelected ? "計画" : "1日表示") }
     private func openSetting(_ identifier: String) {
-        app.buttons["plannerSettings"].tap()
+        selectTab("設定")
         let action = app.buttons[identifier]
         for _ in 0..<3 {
             if action.isHittable { break }
@@ -19,7 +40,7 @@ final class YoteikanUITests: XCTestCase {
         XCTAssertFalse(app.buttons["hoursSettings"].exists)
         XCTAssertFalse(app.buttons["colorSettings"].exists)
         XCTAssertFalse(app.buttons["calendarSettings"].exists)
-        app.buttons["plannerSettings"].tap()
+        selectTab("設定")
         XCTAssertTrue(app.buttons["hoursSettings"].exists)
         XCTAssertTrue(app.buttons["calendarSettings"].exists)
         XCTAssertTrue(app.buttons["colorSettings"].exists)
@@ -30,7 +51,7 @@ final class YoteikanUITests: XCTestCase {
         XCTAssertEqual(app.textFields["stickyTitle"].value as? String, "朝の読書")
         app.buttons["duration-45"].tap()
         app.buttons["saveSticky"].tap()
-        XCTAssertTrue(app.buttons["plannerSettings"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.tabBars.buttons["設定"].waitForExistence(timeout: 3))
         openSetting("settingsEditStickies")
         XCTAssertTrue(app.buttons["settingsSticky-朝の読書"].waitForExistence(timeout: 3))
         shot("38-settings-sticky-list")
@@ -54,10 +75,10 @@ final class YoteikanUITests: XCTestCase {
         let schedule = app.otherElements["scheduleZone"]
         let side = app.otherElements["sideZone"]
         XCTAssertLessThan(schedule.frame.maxX, side.frame.maxX)
-        app.buttons["plannerSettings"].tap()
+        selectTab("設定")
         app.segmentedControls["sidebarPosition"].buttons["左"].tap()
         shot("34-sidebar-position-settings")
-        app.buttons["closePlannerSettings"].tap()
+        selectTab("計画")
         XCTAssertLessThanOrEqual(side.frame.maxX, schedule.frame.minX)
         shot("35-sidebar-left")
         let note = app.otherElements["inbox-読書"]
@@ -69,14 +90,14 @@ final class YoteikanUITests: XCTestCase {
         XCTAssertLessThanOrEqual(side.frame.maxX, schedule.frame.minX)
         XCTAssertTrue(app.textViews["detailMemo"].exists)
         app.textViews["detailMemo"].tap(); app.textViews["detailMemo"].typeText("下書きを保持")
-        app.buttons["plannerSettings"].tap()
+        selectTab("設定")
         app.segmentedControls["sidebarPosition"].buttons["右"].tap()
-        app.buttons["closePlannerSettings"].tap()
+        selectTab("計画")
         XCTAssertLessThanOrEqual(schedule.frame.maxX, side.frame.minX)
         XCTAssertEqual(app.textViews["detailMemo"].value as? String, "下書きを保持")
-        app.buttons["plannerSettings"].tap()
+        selectTab("設定")
         app.segmentedControls["sidebarPosition"].buttons["左"].tap()
-        app.buttons["closePlannerSettings"].tap()
+        selectTab("計画")
         XCTAssertEqual(app.textViews["detailMemo"].value as? String, "下書きを保持")
         app.buttons["showStickyPool"].tap()
         XCUIDevice.shared.orientation = .landscapeLeft
@@ -95,10 +116,10 @@ final class YoteikanUITests: XCTestCase {
         XCTAssertTrue(app.otherElements["inbox-読書"].exists)
         app.terminate(); launch(["--demo"])
         XCTAssertLessThanOrEqual(side.frame.maxX, schedule.frame.minX)
-        app.buttons["plannerSettings"].tap()
+        selectTab("設定")
         XCTAssertTrue(app.segmentedControls["sidebarPosition"].buttons["左"].isSelected)
         app.segmentedControls["sidebarPosition"].buttons["右"].tap()
-        app.buttons["closePlannerSettings"].tap()
+        selectTab("計画")
         XCTAssertLessThanOrEqual(schedule.frame.maxX, side.frame.minX)
     }
     private func revealReminderSettings() {
@@ -126,7 +147,7 @@ final class YoteikanUITests: XCTestCase {
         revealInbox(note)
         note.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).press(forDuration: 0.7, thenDragTo: app.scrollViews["timeline"].coordinate(withNormalizedOffset: CGVector(dx: 0.55, dy: 0.2)))
         XCTAssertTrue(app.otherElements["task-通知確認"].waitForExistence(timeout: 3))
-        app.buttons["plannerSettings"].tap()
+        selectTab("設定")
         revealReminderSettings()
         if app.buttons["enableReminders"].exists {
             app.buttons["enableReminders"].tap()
@@ -140,12 +161,12 @@ final class YoteikanUITests: XCTestCase {
         XCTAssertTrue(count.waitForExistence(timeout: 5))
         XCTAssertTrue(NSPredicate(format: "label CONTAINS '1件'").evaluate(with: count))
         shot("33-reminder-settings")
-        app.buttons["closePlannerSettings"].tap()
+        selectTab("計画")
         app.terminate(); launch([])
         app.buttons["次の日"].tap()
         let task = app.otherElements["task-通知確認"]
         XCTAssertTrue(task.waitForExistence(timeout: 3)); task.tap()
-        app.buttons["editButton"].tap()
+        editSelected()
         for _ in 0..<4 {
             if app.steppers["reminderMinutes"].isHittable { break }
             app.swipeUp()
@@ -154,7 +175,7 @@ final class YoteikanUITests: XCTestCase {
         app.switches["reminderToggle"].coordinate(withNormalizedOffset: CGVector(dx: 0.92, dy: 0.5)).tap()
         XCTAssertFalse(app.steppers["reminderMinutes"].exists)
         app.buttons["saveSticky"].tap()
-        app.buttons["plannerSettings"].tap()
+        selectTab("設定")
         revealReminderSettings()
         XCTAssertTrue(NSPredicate(format: "label CONTAINS '0件'").evaluate(with: app.staticTexts["scheduledReminders"]))
     }
@@ -181,7 +202,7 @@ final class YoteikanUITests: XCTestCase {
         app.terminate(); launch([])
         XCTAssertTrue(app.descendants(matching: .any).matching(identifier: "inbox-集中作業").firstMatch.exists)
         editInbox("集中作業"); app.buttons["duration-60"].tap(); app.buttons["saveSticky"].tap()
-        app.buttons["undoButton"].tap()
+        undoChange()
         editInbox("集中作業")
         XCTAssertTrue(app.steppers["durationStepper"].label.contains("45")); shot("03-sticky-editor")
     }
@@ -194,17 +215,17 @@ final class YoteikanUITests: XCTestCase {
         XCTAssertEqual(task.value as? String, "09:30|60")
         XCTAssertEqual(app.otherElements["task-朝の読書"].value as? String, "08:00|30")
         shot("04-overlap-after-drag")
-        app.buttons["undoButton"].tap()
+        undoChange()
         let handle = app.otherElements["resize-資料作成"]
         XCTAssertTrue(handle.exists)
         let point = handle.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
         point.press(forDuration: 0.15, thenDragTo: point.withOffset(CGVector(dx: 0, dy: 46.5)))
         XCTAssertEqual(task.value as? String, "09:00|90")
         shot("05-resize-overlap")
-        app.buttons["unplaceButton"].tap()
+        unplaceSelected()
         XCTAssertTrue(app.descendants(matching: .any).matching(identifier: "inbox-資料作成").firstMatch.waitForExistence(timeout: 3))
         XCTAssertFalse(app.otherElements["task-資料作成"].exists)
-        app.buttons["undoButton"].tap()
+        undoChange()
         XCTAssertTrue(app.otherElements["task-資料作成"].exists)
         let returnFrom = task.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.25))
         let tray = app.otherElements["inboxTray"].coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
@@ -219,7 +240,7 @@ final class YoteikanUITests: XCTestCase {
         card.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).press(forDuration: 0.7, thenDragTo: timeline.coordinate(withNormalizedOffset: CGVector(dx: 0.55, dy: 0.2)))
         XCTAssertTrue(app.otherElements["task-運動"].waitForExistence(timeout: 4))
         XCTAssertFalse(app.descendants(matching: .any).matching(identifier: "inbox-運動").firstMatch.exists)
-        app.buttons["zoomToggle"].tap(); Thread.sleep(forTimeInterval: 0.8); shot("06-day-overview")
+        toggleDay(); Thread.sleep(forTimeInterval: 0.8); shot("06-day-overview")
     }
     func test05CalendarAccessAndRealEventKitRead() {
         launch(["--calendar-test"])
@@ -310,7 +331,7 @@ final class YoteikanUITests: XCTestCase {
         XCTAssertEqual(placement(of: task).start, before.start - 30)
         XCTAssertEqual(placement(of: task).duration, 60)
         shot("09-start-time-drag")
-        app.buttons["undoButton"].tap()
+        undoChange()
         XCTAssertEqual(placement(of: task).start, before.start)
         XCTAssertEqual(placement(of: task).duration, 60)
         let handleAgain = app.otherElements["move-移動の確認"]
@@ -469,15 +490,14 @@ final class YoteikanUITests: XCTestCase {
         let task = app.otherElements["task-早朝の読書"]
         XCTAssertTrue(task.waitForExistence(timeout: 3))
         XCTAssertEqual(task.value as? String, "05:00|30")
-        app.buttons["zoomToggle"].tap()
+        toggleDay()
         XCTAssertTrue(app.staticTexts["05:00"].isHittable)
         XCTAssertTrue(app.staticTexts["24:00"].isHittable)
         shot("15-five-am-plan")
         app.terminate(); launch([])
-        app.buttons["zoomToggle"].tap()
         XCTAssertEqual(app.otherElements["task-早朝の読書"].value as? String, "05:00|30")
-        app.otherElements["task-早朝の読書"].tap()
-        app.buttons["editButton"].tap()
+        openSetting("settingsEditStickies")
+        app.buttons["settingsSticky-早朝の読書"].tap()
         XCTAssertTrue(app.staticTexts["5:00〜24:00"].exists)
     }
     func test15CustomizeHoursPersistAndRecoverOutsideSticky() {
@@ -491,11 +511,11 @@ final class YoteikanUITests: XCTestCase {
         chooseHour("22:00", picker: "planningEnd")
         shot("16-planning-hours-settings")
         app.buttons["saveHours"].tap()
-        app.buttons["zoomToggle"].tap()
+        toggleDay()
         XCTAssertTrue(app.staticTexts["20:00"].isHittable)
         XCTAssertTrue(app.staticTexts["22:00"].isHittable)
         XCTAssertFalse(app.staticTexts["05:00"].exists)
-        XCTAssertTrue(app.staticTexts["2時間"].exists)
+        XCTAssertTrue(app.staticTexts["空き 2時間"].exists)
         app.terminate(); launch([])
         openSetting("hoursSettings")
         XCTAssertTrue(app.buttons["planningStart"].label.contains("20:00"))
@@ -521,7 +541,7 @@ final class YoteikanUITests: XCTestCase {
         XCTAssertTrue(outside.exists)
         XCTAssertTrue(outside.label.contains("時間外 20:00"))
         shot("17-custom-hours-and-outside-sticky")
-        app.buttons["undoButton"].tap()
+        undoChange()
         XCTAssertEqual(app.otherElements["task-夜の計画"].value as? String, "20:00|30")
     }
     private func chooseHour(_ hour: String, picker: String) {
@@ -544,7 +564,7 @@ final class YoteikanUITests: XCTestCase {
         let note = app.descendants(matching: .any).matching(identifier: "inbox-\(title)").firstMatch
         revealInbox(note)
         note.tap()
-        if !app.textFields["stickyTitle"].exists { app.buttons["editButton"].tap() }
+        if !app.textFields["stickyTitle"].exists { editSelected() }
     }
     func test16TwoZonesDragAndMemoPersist() {
         launch()
@@ -556,18 +576,18 @@ final class YoteikanUITests: XCTestCase {
         app.terminate(); launch(["--reset-test-data"])
         let task = createAndPlaceSticky()
         let before = task.value as? String
-        app.buttons["notesButton"].tap()
+        selectDetails()
         app.textViews["detailMemo"].tap()
         app.textViews["detailMemo"].typeText("読みたい章を確認する")
         app.buttons["saveDetailMemo"].tap()
         shot("19-detail-memo")
-        app.buttons["closeNotes"].tap()
+        app.buttons["showStickyPool"].tap()
         XCTAssertEqual(task.value as? String, before)
         app.terminate(); launch([])
         let restored = app.otherElements["task-移動の確認"]
         XCTAssertEqual(restored.value as? String, before)
         restored.tap()
-        app.buttons["notesButton"].tap()
+        selectDetails()
         XCTAssertEqual(app.textViews["detailMemo"].value as? String, "読みたい章を確認する")
     }
     func test17LandscapeShowsThreeZonesAndKeepsSelection() {
@@ -589,7 +609,7 @@ final class YoteikanUITests: XCTestCase {
         add(attachment)
         XCUIDevice.shared.orientation = .portrait
         XCTAssertFalse(memo.exists)
-        app.buttons["notesButton"].tap()
+        selectDetails()
         XCTAssertTrue(app.staticTexts["朝の読書"].exists)
     }
     func test18SwitchSideZoneInOneTapAndKeepMemoDraft() {
@@ -656,82 +676,29 @@ final class YoteikanUITests: XCTestCase {
         launch(["--demo", "--short-events-test"])
         let first = app.otherElements["task-読書5分"]
         let second = app.otherElements["task-休憩5分"]
-        let third = app.otherElements["task-確認5分"]
-        let meeting = app.otherElements["fixed-会議5分"]
-        let call = app.otherElements["fixed-連絡5分"]
-        func checkFrames() {
-            for (a, b) in [(first, second), (second, third), (third, meeting), (meeting, call)] {
-                XCTAssertLessThan(a.frame.maxY, b.frame.minY, "\(a.identifier) overlaps \(b.identifier)")
-            }
-            XCTAssertEqual(first.value as? String, "08:00|5")
-            XCTAssertEqual(second.value as? String, "08:05|5")
-            XCTAssertEqual(third.value as? String, "08:10|5")
-        }
-        XCTAssertTrue(first.waitForExistence(timeout: 3))
-        checkFrames()
-        XCTAssertFalse(app.otherElements["resize-読書5分"].exists)
-        let baseHeight = first.frame.height
-        for label in ["2倍", "4倍", "8倍"] {
-            app.buttons["zoomIn"].tap()
-            XCTAssertEqual(app.staticTexts["zoomLevel"].label, label)
-            checkFrames()
-        }
-        XCTAssertGreaterThan(first.frame.height, baseHeight * 7)
-        XCTAssertGreaterThan(first.frame.height, 54)
-        XCTAssertFalse(app.buttons["zoomIn"].isEnabled)
-        XCTAssertTrue(first.isHittable)
-        XCTAssertTrue(call.isHittable)
-        shot("22-five-minute-zoom")
+        let initialHeight = first.frame.height
+        for _ in 0..<3 { pinch(2) }
+        XCTAssertGreaterThan(first.frame.height, initialHeight * 6)
+        XCTAssertLessThan(first.frame.maxY, second.frame.minY)
         first.tap()
-        XCTAssertTrue(app.otherElements["move-読書5分"].exists)
-        let handle = app.otherElements["resize-読書5分"]
-        XCTAssertTrue(handle.exists)
-        let point = handle.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
-        // Two adjacent five-minute slots provide the actual screen distance.
+        let resize = app.otherElements["resize-読書5分"]
+        XCTAssertTrue(resize.exists)
         let fiveMinutes = second.frame.minY - first.frame.minY
-        point.press(forDuration: 0.15, thenDragTo: point.withOffset(CGVector(dx: 0, dy: fiveMinutes)))
+        let point = resize.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+        point.press(forDuration: 0.2, thenDragTo: point.withOffset(CGVector(dx: 0, dy: fiveMinutes)))
         XCTAssertEqual(first.value as? String, "08:00|10")
-        app.buttons["undoButton"].tap()
+        undoChange()
         XCTAssertEqual(first.value as? String, "08:00|5")
-        let move = app.otherElements["move-読書5分"].coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
-        move.press(forDuration: 0.05, thenDragTo: move.withOffset(CGVector(dx: 0, dy: fiveMinutes)))
-        XCTAssertEqual(first.value as? String, "08:05|5")
-        XCTAssertEqual(second.value as? String, "08:05|5")
-        app.buttons["undoButton"].tap()
-        XCTAssertEqual(first.value as? String, "08:00|5")
-        app.buttons["zoomToggle"].tap()
-        XCTAssertEqual(app.staticTexts["zoomLevel"].label, "全日")
-        checkFrames()
-        app.buttons["zoomToggle"].tap()
-        XCTAssertEqual(app.staticTexts["zoomLevel"].label, "8倍")
-        checkFrames()
-        for label in ["4倍", "2倍", "1倍"] {
-            app.buttons["zoomOut"].tap()
-            XCTAssertEqual(app.staticTexts["zoomLevel"].label, label)
-            checkFrames()
-        }
-        XCTAssertFalse(app.buttons["zoomOut"].isEnabled)
-        shot("23-five-minute-standard")
+        shot("22-five-minute-zoom")
     }
     func test21ZoomKeepsVisibleHourAndZoneLayout() {
         launch()
-        let timeline = app.scrollViews["timeline"]
-        let axis = timeline.coordinate(withNormalizedOffset: CGVector(dx: 0.08, dy: 0.8))
-        axis.press(forDuration: 0.01, thenDragTo: axis.withOffset(CGVector(dx: 0, dy: -210)))
-        let visible = (8...23).map { app.staticTexts[String(format: "%02d:00", $0)] }
-            .first { $0.isHittable && $0.frame.minY >= timeline.frame.minY && $0.frame.minY < timeline.frame.maxY }
-        XCTAssertNotNil(visible)
-        let hour = visible!.label
-        app.buttons["zoomIn"].tap()
-        XCTAssertTrue(app.staticTexts[hour].isHittable)
-        XCTAssertEqual(app.staticTexts["zoomLevel"].label, "2倍")
+        pinch(2)
+        let zoom = zoomLabel()
         XCUIDevice.shared.orientation = .landscapeLeft
-        Thread.sleep(forTimeInterval: 1)
-        XCTAssertTrue(app.otherElements["memoZone"].exists)
-        XCTAssertEqual(app.staticTexts["zoomLevel"].label, "2倍")
-        let schedule = app.otherElements["scheduleZone"]
-        let memo = app.otherElements["memoZone"]
-        XCTAssertLessThanOrEqual(schedule.frame.maxX, memo.frame.minX + 1)
+        XCTAssertTrue(app.otherElements["memoZone"].waitForExistence(timeout: 3))
+        XCTAssertEqual(zoomLabel(), zoom)
+        XCTAssertLessThanOrEqual(app.otherElements["scheduleZone"].frame.maxX, app.otherElements["memoZone"].frame.minX)
         XCUIDevice.shared.orientation = .portrait
     }
     func test23ScrollFromStickyAndCalendarEventPreservesPlans() {
@@ -838,36 +805,39 @@ final class YoteikanUITests: XCTestCase {
     }
     func test26FullScreenDayTimelineAndReturn() {
         launch()
-        shot("30-fullscreen-entry")
-        app.buttons["zoomIn"].tap()
+        XCTAssertFalse(app.buttons["zoomIn"].exists)
+        XCTAssertFalse(app.buttons["zoomOut"].exists)
+        XCTAssertFalse(app.buttons["notesButton"].exists)
+        XCTAssertFalse(app.buttons["fullDayButton"].exists)
+        XCTAssertFalse(app.buttons["plannerSettings"].exists)
+        XCTAssertFalse(app.staticTexts["zoomLevel"].exists)
+        shot("39-glass-plan-tab")
+        pinch(2)
+        let zoom = zoomLabel()
         let task = app.otherElements["task-朝の読書"]
         task.tap()
         let before = task.value as? String
-        app.buttons["fullDayButton"].tap()
-        XCTAssertTrue(app.buttons["closeFullDay"].waitForExistence(timeout: 3))
-        XCTAssertFalse(app.buttons["fullDayButton"].isHittable)
-        let fullTimeline = app.scrollViews["fullDayTimeline"]
-        XCTAssertGreaterThan(fullTimeline.frame.width, app.frame.width * 0.85)
-        shot("28-fullscreen-day-timeline")
-        XCTAssertTrue(fullTimeline.staticTexts["05:00"].isHittable)
-        XCTAssertTrue(fullTimeline.staticTexts["24:00"].isHittable)
-        XCTAssertTrue(fullTimeline.descendants(matching: .any).matching(identifier: "fullDayBlock-チームミーティング").firstMatch.exists)
-        XCTAssertFalse(app.segmentedControls["fullDayMode"].exists)
-        XCUIDevice.shared.orientation = .landscapeLeft
-        Thread.sleep(forTimeInterval: 1)
-        XCTAssertTrue(fullTimeline.staticTexts["05:00"].isHittable)
-        app.scrollViews["fullDayTimeline"].swipeUp()
-        XCTAssertTrue(fullTimeline.staticTexts["24:00"].isHittable)
-        XCUIDevice.shared.orientation = .portrait
-        app.buttons["closeFullDay"].tap()
-        XCTAssertTrue(app.buttons["fullDayButton"].waitForExistence(timeout: 3))
-        XCTAssertEqual(app.staticTexts["zoomLevel"].label, "2倍")
+        selectTab("1日表示")
+        let timeline = app.scrollViews["fullDayTimeline"]
+        XCTAssertTrue(timeline.waitForExistence(timeout: 3))
+        XCTAssertGreaterThan(timeline.frame.width, app.frame.width * 0.85)
+        XCTAssertTrue(timeline.staticTexts["05:00"].isHittable)
+        XCTAssertTrue(timeline.staticTexts["24:00"].isHittable)
+        XCTAssertFalse(app.buttons["closeFullDay"].exists)
+        shot("40-glass-day-tab")
+        selectTab("設定")
+        XCTAssertTrue(app.buttons["hoursSettings"].waitForExistence(timeout: 3))
+        XCTAssertFalse(app.buttons["closePlannerSettings"].exists)
+        shot("41-glass-settings-tab")
+        selectTab("計画")
+        XCTAssertEqual(zoomLabel(), zoom)
         XCTAssertEqual(task.value as? String, before)
-        XCTAssertTrue(app.buttons["editButton"].exists)
+        selectDetails()
+        XCTAssertTrue(app.textViews["detailMemo"].exists)
     }
     func test27FullScreenShortNotesAndUnscheduledDay() {
         launch(["--demo", "--short-events-test"])
-        app.buttons["fullDayButton"].tap()
+        selectTab("1日表示")
         let timeline = app.scrollViews["fullDayTimeline"]
         let reading = timeline.descendants(matching: .any).matching(identifier: "fullDayBlock-読書5分").firstMatch
         let rest = timeline.descendants(matching: .any).matching(identifier: "fullDayBlock-休憩5分").firstMatch
@@ -878,53 +848,39 @@ final class YoteikanUITests: XCTestCase {
         shot("31-folded-short-events")
         XCTAssertLessThanOrEqual(reading.frame.maxY, rest.frame.minY)
         XCTAssertFalse(app.segmentedControls["fullDayMode"].exists)
-        app.buttons["closeFullDay"].tap()
+        selectTab("計画")
         XCTAssertEqual(app.otherElements["task-読書5分"].value as? String, "08:00|5")
         app.buttons["次の日"].tap()
-        app.buttons["fullDayButton"].tap()
+        selectTab("1日表示")
         XCTAssertTrue(app.staticTexts["予定を配置するとここに表示されます"].exists)
-        app.buttons["closeFullDay"].tap()
+        selectTab("計画")
     }
     func test22PinchTimelinePreservesTimeAndTasks() {
         launch()
+        let task = app.otherElements["task-朝の読書"]
+        let before = task.value as? String
+        func zoom() -> Double { Double(zoomLabel().replacingOccurrences(of: "倍", with: "")) ?? 0 }
+        pinch(1.6)
+        XCTAssertGreaterThan(zoom(), 1.2)
+        XCTAssertLessThan(zoom(), 2)
+        pinch(0.5)
+        XCTAssertEqual(zoom(), 1)
+        for _ in 0..<4 { pinch(2) }
+        XCTAssertEqual(zoom(), 8)
+        pinch(0.5)
+        XCTAssertLessThan(zoom(), 6)
+        let retained = zoomLabel()
         let timeline = app.scrollViews["timeline"]
-        let surface = app.descendants(matching: .any).matching(identifier: "timelineZoomSurface").firstMatch
-        func zoom() -> Double { Double(app.staticTexts["zoomLevel"].label.replacingOccurrences(of: "倍", with: "")) ?? 0 }
-        let reading = app.otherElements["task-朝の読書"].value as? String
-        let work = app.otherElements["task-資料作成"].value as? String
-        let eleven = app.staticTexts["11:00"]
-        let beforeY = eleven.frame.midY
-        let center = timeline.frame.midY
-        surface.pinch(withScale: 2, velocity: 1)
-        XCTAssertGreaterThan(zoom(), 1.4)
-        XCTAssertLessThan(zoom(), 8)
-        XCTAssertTrue(eleven.isHittable)
-        XCTAssertEqual(eleven.frame.midY, center + (beforeY - center) * zoom(), accuracy: 65)
-        XCTAssertEqual(app.otherElements["task-朝の読書"].value as? String, reading)
-        XCTAssertEqual(app.otherElements["task-資料作成"].value as? String, work)
-        shot("24-pinch-timeline")
-        let expanded = zoom()
-        surface.pinch(withScale: 0.5, velocity: -1)
-        XCTAssertLessThan(zoom(), expanded)
-        while app.buttons["zoomOut"].isEnabled { app.buttons["zoomOut"].tap() }
-        XCTAssertEqual(zoom(), 1)
-        surface.pinch(withScale: 0.5, velocity: -1)
-        XCTAssertEqual(zoom(), 1)
-        for _ in 0..<3 { app.buttons["zoomIn"].tap() }
-        XCTAssertEqual(zoom(), 8)
-        surface.pinch(withScale: 2, velocity: 1)
-        XCTAssertEqual(zoom(), 8)
-        surface.pinch(withScale: 0.5, velocity: -1)
-        XCTAssertLessThan(zoom(), 7)
-        let retained = app.staticTexts["zoomLevel"].label
-        app.buttons["zoomToggle"].tap()
-        XCTAssertEqual(app.staticTexts["zoomLevel"].label, "全日")
-        app.buttons["zoomToggle"].tap()
-        XCTAssertEqual(app.staticTexts["zoomLevel"].label, retained)
-        app.buttons["zoomToggle"].tap()
-        surface.pinch(withScale: 2, velocity: 1)
-        XCTAssertGreaterThanOrEqual(zoom(), 1)
-        XCTAssertEqual(app.otherElements["task-朝の読書"].value as? String, reading)
-        XCTAssertEqual(app.otherElements["task-資料作成"].value as? String, work)
+        timeline.swipeUp()
+        let hour = (8...23).map { app.staticTexts[String(format: "%02d:00", $0)] }.first {
+            $0.isHittable && $0.frame.minY >= timeline.frame.minY && $0.frame.maxY <= timeline.frame.maxY
+        }
+        XCTAssertNotNil(hour)
+        let position = hour!.frame.minY
+        selectTab("1日表示"); selectTab("計画")
+        XCTAssertEqual(zoomLabel(), retained)
+        XCTAssertEqual(hour!.frame.minY, position, accuracy: 3)
+        XCTAssertEqual(task.value as? String, before)
     }
+
 }

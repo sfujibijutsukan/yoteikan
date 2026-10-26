@@ -4,7 +4,16 @@
 
 Issue #18・#19・#20を含め、ユニット23件・UI25件の全48件が成功しました（1件の再実行を含む）。スクリーンショット抽出・一覧作成ツールはGoで実装しています。Pythonへの依存はありません。
 
+## Liquid Glassの下部タブ（2026年10月27日）
+
+- 旧下部操作バー・上部の拡大率操作列・歯車を削除。「計画・1日表示・設定」を標準TabViewで表示。iOS 27シミュレーターでLiquid Glassの外観を目視確認。
+- ピンチの連続調整・最小／最大倍率、タブ往復後の倍率と選択、1日の時間割、設定経由の編集・保存を確認。
+- 移動・伸縮・未配置への戻し・設定からのUndo、左右配置・下書き、通知予約・取消も新しい導線で確認。関連UI6件成功。
+- 結果: artifacts/GlassTabs.xcresult / artifacts/glass-tabs.log、artifacts/GlassTabsInteractions.xcresult / artifacts/glass-tabs-interactions.log。スクロール位置の保持は artifacts/GlassTabsPosition.xcresult / artifacts/glass-tabs-position.log で追加確認。
+- [計画](screenshots/39-glass-plan-tab.png) / [1日表示](screenshots/40-glass-day-tab.png) / [設定](screenshots/41-glass-settings-tab.png)。iOS 17〜25の外観と実機は未確認。
+
 ## 設定入口の統合（2026年10月27日）
+
 
 - 上部は歯車だけにし、設定から時間帯・カレンダー・付箋編集／作成・プリセット・色と名前・サイドバー位置・通知へアクセス。
 - 表示日の付箋一覧から編集し、保存後の時刻・所要時間と計画画面への復帰を確認。時間帯・色・カレンダー・プリセットの各画面の往復も確認。
