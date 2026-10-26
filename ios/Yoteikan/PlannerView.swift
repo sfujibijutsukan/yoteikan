@@ -211,8 +211,6 @@ struct PlannerView: View {
     @Environment(\.scenePhase) private var phase
     @State private var showPresets = false
     @State private var showCalendar = false
-    @State private var showColors = false
-    @State private var showHours = false
     @State private var showNew = false
     @State private var editing: Sticky?
     @State private var selected: UUID?
@@ -300,14 +298,12 @@ struct PlannerView: View {
         }
         .background(paper).foregroundStyle(ink)
         .safeAreaInset(edge: .bottom, spacing: 0) { bottomBar }
-        .sheet(isPresented: $showSettings) { PlannerSettingsView() }
+        .sheet(isPresented: $showSettings) { PlannerSettingsFlow() }
         .sheet(isPresented: $showPresets) { PresetsView() }
         .fullScreenCover(isPresented: $showFullDay) {
             FullDayOverview(date: plans.date, hours: plans.hours, stickies: plans.today, fixed: fixed, colors: plans.plan.colors)
         }
         .sheet(isPresented: $showCalendar) { CalendarSettingsView() }
-        .sheet(isPresented: $showColors) { ColorNamesEditor(colors: plans.plan.colors) }
-        .sheet(isPresented: $showHours) { PlanningHoursEditor(hours: plans.hours) }
         .sheet(isPresented: $showDetails) {
             NavigationStack {
                 memoPane.navigationTitle("詳細メモ").navigationBarTitleDisplayMode(.inline)
@@ -398,17 +394,8 @@ struct PlannerView: View {
     private var header: some View {
         HStack(spacing: 0) {
             Button { showSettings = true } label: {
-                Image(systemName: "gearshape").font(.system(size: 17)).frame(width: 36, height: 44)
+                Image(systemName: "gearshape").font(.system(size: 17)).frame(width: 44, height: 44)
             }.accessibilityLabel("アプリ設定").accessibilityIdentifier("plannerSettings")
-            Button { showHours = true } label: {
-                Image(systemName: "clock").font(.system(size: 17)).frame(width: 44, height: 44)
-            }.accessibilityLabel("計画の時間帯").accessibilityIdentifier("hoursSettings")
-            Button { showColors = true } label: {
-                Image(systemName: "paintpalette").font(.system(size: 17)).frame(width: 44, height: 44)
-            }.accessibilityLabel("付箋の色を設定").accessibilityIdentifier("colorSettings")
-            Button { showCalendar = true } label: {
-                Image(systemName: "calendar.badge.clock").font(.system(size: 17)).frame(width: 44, height: 44)
-            }.accessibilityLabel("カレンダー設定").accessibilityIdentifier("calendarSettings")
         }
     }
     private var dateBar: some View {

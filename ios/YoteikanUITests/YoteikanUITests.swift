@@ -5,6 +5,50 @@ final class YoteikanUITests: XCTestCase {
     override func setUpWithError() throws { continueAfterFailure = false; XCUIDevice.shared.orientation = .portrait }
     func launch(_ args: [String] = ["--demo"]) { app = XCUIApplication(); app.launchArguments = args; app.launch(); XCTAssertTrue(app.buttons["presetsButton"].waitForExistence(timeout: 10)) }
     func shot(_ name: String) { let attachment = XCTAttachment(screenshot: app.screenshot()); attachment.name = name; attachment.lifetime = .keepAlways; add(attachment) }
+    private func openSetting(_ identifier: String) {
+        app.buttons["plannerSettings"].tap()
+        let action = app.buttons[identifier]
+        for _ in 0..<3 {
+            if action.isHittable { break }
+            app.swipeUp()
+        }
+        action.tap()
+    }
+    func test30UnifiedSettingsAndStickyEditing() {
+        launch(["--reset-test-data", "--demo"])
+        XCTAssertFalse(app.buttons["hoursSettings"].exists)
+        XCTAssertFalse(app.buttons["colorSettings"].exists)
+        XCTAssertFalse(app.buttons["calendarSettings"].exists)
+        app.buttons["plannerSettings"].tap()
+        XCTAssertTrue(app.buttons["hoursSettings"].exists)
+        XCTAssertTrue(app.buttons["calendarSettings"].exists)
+        XCTAssertTrue(app.buttons["colorSettings"].exists)
+        shot("37-unified-settings")
+        app.buttons["settingsEditStickies"].tap()
+        app.buttons["settingsSticky-朝の読書"].tap()
+        XCTAssertTrue(app.textFields["stickyTitle"].waitForExistence(timeout: 3))
+        XCTAssertEqual(app.textFields["stickyTitle"].value as? String, "朝の読書")
+        app.buttons["duration-45"].tap()
+        app.buttons["saveSticky"].tap()
+        XCTAssertTrue(app.buttons["plannerSettings"].waitForExistence(timeout: 3))
+        openSetting("settingsEditStickies")
+        XCTAssertTrue(app.buttons["settingsSticky-朝の読書"].waitForExistence(timeout: 3))
+        shot("38-settings-sticky-list")
+        app.buttons["closeSettingsStickies"].tap()
+        XCTAssertEqual(app.otherElements["task-朝の読書"].value as? String, "08:00|45")
+        openSetting("settingsPresets")
+        XCTAssertTrue(app.buttons["newPreset"].waitForExistence(timeout: 3))
+        app.buttons["closePresets"].tap()
+        openSetting("hoursSettings")
+        XCTAssertTrue(app.buttons["saveHours"].waitForExistence(timeout: 3))
+        app.buttons["cancelHours"].tap()
+        openSetting("colorSettings")
+        XCTAssertTrue(app.buttons["saveColorNames"].waitForExistence(timeout: 3))
+        app.buttons["キャンセル"].tap()
+        openSetting("calendarSettings")
+        XCTAssertTrue(app.buttons["closeCalendar"].waitForExistence(timeout: 3))
+        app.buttons["closeCalendar"].tap()
+    }
     func test29SidebarPositionPersistsAndSupportsDragAndDetails() {
         launch(["--reset-test-data", "--demo"])
         let schedule = app.otherElements["scheduleZone"]
@@ -57,6 +101,12 @@ final class YoteikanUITests: XCTestCase {
         app.buttons["closePlannerSettings"].tap()
         XCTAssertLessThanOrEqual(schedule.frame.maxX, side.frame.minX)
     }
+    private func revealReminderSettings() {
+        for _ in 0..<4 {
+            if app.buttons["enableReminders"].isHittable || app.staticTexts["scheduledReminders"].isHittable { return }
+            app.swipeUp()
+        }
+    }
     func test28ReminderSettingsPersistAndSchedule() {
         launch(["--reset-test-data"])
         app.buttons["次の日"].tap()
@@ -77,6 +127,7 @@ final class YoteikanUITests: XCTestCase {
         note.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).press(forDuration: 0.7, thenDragTo: app.scrollViews["timeline"].coordinate(withNormalizedOffset: CGVector(dx: 0.55, dy: 0.2)))
         XCTAssertTrue(app.otherElements["task-通知確認"].waitForExistence(timeout: 3))
         app.buttons["plannerSettings"].tap()
+        revealReminderSettings()
         if app.buttons["enableReminders"].exists {
             app.buttons["enableReminders"].tap()
             let alert = XCUIApplication(bundleIdentifier: "com.apple.springboard").alerts.firstMatch
@@ -104,6 +155,7 @@ final class YoteikanUITests: XCTestCase {
         XCTAssertFalse(app.steppers["reminderMinutes"].exists)
         app.buttons["saveSticky"].tap()
         app.buttons["plannerSettings"].tap()
+        revealReminderSettings()
         XCTAssertTrue(NSPredicate(format: "label CONTAINS '0件'").evaluate(with: app.staticTexts["scheduledReminders"]))
     }
     func test01DemoAndPresets() {
@@ -171,7 +223,7 @@ final class YoteikanUITests: XCTestCase {
     }
     func test05CalendarAccessAndRealEventKitRead() {
         launch(["--calendar-test"])
-        app.buttons["calendarSettings"].tap()
+        openSetting("calendarSettings")
         if app.buttons["requestCalendar"].exists {
             app.buttons["requestCalendar"].tap()
             let springboard = XCUIApplication(bundleIdentifier: "com.apple.springboard")
@@ -201,7 +253,7 @@ final class YoteikanUITests: XCTestCase {
     }
     func test07CalendarSelectionChangesVisibleEvents() {
         launch(["--calendar-test"])
-        app.buttons["calendarSettings"].tap()
+        openSetting("calendarSettings")
         let toggle = app.switches["calendar-予定館・動作確認用"].firstMatch
         XCTAssertTrue(toggle.waitForExistence(timeout: 3))
         XCTAssertEqual(toggle.value as? String, "1")
@@ -209,7 +261,7 @@ final class YoteikanUITests: XCTestCase {
         XCTAssertEqual(toggle.value as? String, "0")
         app.buttons["closeCalendar"].tap()
         XCTAssertFalse(app.descendants(matching: .any).matching(identifier: "fixed-チームミーティング").firstMatch.exists)
-        app.buttons["calendarSettings"].tap(); toggle.coordinate(withNormalizedOffset: CGVector(dx: 0.9, dy: 0.5)).tap(); app.buttons["closeCalendar"].tap()
+        openSetting("calendarSettings"); toggle.coordinate(withNormalizedOffset: CGVector(dx: 0.9, dy: 0.5)).tap(); app.buttons["closeCalendar"].tap()
         XCTAssertTrue(app.descendants(matching: .any).matching(identifier: "fixed-チームミーティング").firstMatch.waitForExistence(timeout: 3))
     }
 
@@ -317,13 +369,13 @@ final class YoteikanUITests: XCTestCase {
         app.textFields["stickyTitle"].typeText("色の確認")
         app.buttons["color-1"].tap()
         app.buttons["saveSticky"].tap()
-        app.buttons["colorSettings"].tap()
+        openSetting("colorSettings")
         let name = app.textFields["color-name-1"]
         XCTAssertEqual(name.value as? String, "仕事")
         name.tap()
         name.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: 2) + "集中")
         app.buttons["saveColorNames"].tap()
-        app.buttons["colorSettings"].tap()
+        openSetting("colorSettings")
         XCTAssertEqual(app.textFields["color-name-1"].value as? String, "集中")
         shot("11-color-settings")
         app.buttons["キャンセル"].tap()
@@ -349,7 +401,7 @@ final class YoteikanUITests: XCTestCase {
     }
     func test13AddEditAndDeleteColorWithReplacement() {
         launch(["--reset-test-data"])
-        app.buttons["colorSettings"].tap()
+        openSetting("colorSettings")
         app.buttons["addColor"].tap()
         let name = app.textFields["color-name-4"]
         if !name.isHittable { app.swipeUp() }
@@ -359,7 +411,7 @@ final class YoteikanUITests: XCTestCase {
         hex.tap()
         hex.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: 6) + "C3D5F2")
         app.buttons["saveColorNames"].tap()
-        app.buttons["colorSettings"].tap()
+        openSetting("colorSettings")
         XCTAssertEqual(app.textFields["color-name-4"].value as? String, "趣味")
         XCTAssertEqual(app.textFields["color-hex-4"].value as? String, "C3D5F2")
         shot("13-custom-colors")
@@ -380,7 +432,7 @@ final class YoteikanUITests: XCTestCase {
         app.buttons["color-4"].tap()
         app.buttons["savePreset"].tap()
         app.buttons["closePresets"].tap()
-        app.buttons["colorSettings"].tap()
+        openSetting("colorSettings")
         let remove = app.buttons["delete-color-4"]
         if !remove.isHittable { app.swipeUp() }
         remove.tap()
@@ -434,7 +486,7 @@ final class YoteikanUITests: XCTestCase {
         app.textFields["stickyTitle"].tap()
         app.textFields["stickyTitle"].typeText("夜の計画")
         app.buttons["saveSticky"].tap()
-        app.buttons["hoursSettings"].tap()
+        openSetting("hoursSettings")
         chooseHour("20:00", picker: "planningStart")
         chooseHour("22:00", picker: "planningEnd")
         shot("16-planning-hours-settings")
@@ -445,12 +497,12 @@ final class YoteikanUITests: XCTestCase {
         XCTAssertFalse(app.staticTexts["05:00"].exists)
         XCTAssertTrue(app.staticTexts["2時間"].exists)
         app.terminate(); launch([])
-        app.buttons["hoursSettings"].tap()
+        openSetting("hoursSettings")
         XCTAssertTrue(app.buttons["planningStart"].label.contains("20:00"))
         XCTAssertTrue(app.buttons["planningEnd"].label.contains("22:00"))
         chooseHour("19:00", picker: "planningStart")
         app.buttons["cancelHours"].tap()
-        app.buttons["hoursSettings"].tap()
+        openSetting("hoursSettings")
         XCTAssertTrue(app.buttons["planningStart"].label.contains("20:00"))
         app.buttons["cancelHours"].tap()
         let timeline = app.scrollViews["timeline"]
@@ -461,7 +513,7 @@ final class YoteikanUITests: XCTestCase {
         revealInbox(evening)
         evening.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).press(forDuration: 0.7, thenDragTo: target)
         XCTAssertEqual(app.otherElements["task-夜の計画"].value as? String, "20:00|30")
-        app.buttons["hoursSettings"].tap()
+        openSetting("hoursSettings")
         chooseHour("21:00", picker: "planningStart")
         app.buttons["saveHours"].tap()
         XCTAssertFalse(app.otherElements["task-夜の計画"].exists)
