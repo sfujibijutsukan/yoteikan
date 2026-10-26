@@ -278,7 +278,31 @@ struct CalendarSettingsView: View {
     }
 }
 
+enum PlannerSetting { case hours, colors, calendar, presets, stickies, newSticky }
+
+struct PlannerSettingsFlow: View {
+    @EnvironmentObject private var plans: PlanStore
+    @State private var destination: PlannerSetting?
+    @State private var editing: Sticky?
+    var body: some View {
+        Group {
+            if let task = editing { StickyEditor(task: task, isNew: false) }
+            else if let destination {
+                switch destination {
+                case .hours: PlanningHoursEditor(hours: plans.hours)
+                case .calendar: CalendarSettingsView()
+                case .colors: ColorNamesEditor(colors: plans.plan.colors)
+                case .presets: PresetsView()
+                case .newSticky: StickyEditor(task: Sticky(title: "", minutes: 30, day: dayKey(plans.date)), isNew: true)
+                case .stickies: SettingsStickyList { editing = $0 }
+                }
+            } else { PlannerSettingsView { destination = $0 } }
+        }
+    }
+}
+
 struct PlannerSettingsView: View {
+    let open: (PlannerSetting) -> Void
     @AppStorage("planner.sidebarLeading") private var sidebarLeading = false
     @EnvironmentObject private var reminders: ReminderStore
     @Environment(\.dismiss) private var dismiss
@@ -286,6 +310,16 @@ struct PlannerSettingsView: View {
     var body: some View {
         NavigationStack {
             Form {
+                Section("時間・カレンダー") {
+                    Button { open(.hours) } label: { Label("計画の時間帯", systemImage: "clock") }.accessibilityIdentifier("hoursSettings")
+                    Button { open(.calendar) } label: { Label("カレンダー", systemImage: "calendar") }.accessibilityIdentifier("calendarSettings")
+                }
+                Section("付箋") {
+                    Button { open(.stickies) } label: { Label("付箋を編集", systemImage: "square.and.pencil") }.accessibilityIdentifier("settingsEditStickies")
+                    Button { open(.newSticky) } label: { Label("付箋をつくる", systemImage: "plus") }.accessibilityIdentifier("settingsNewSticky")
+                    Button { open(.presets) } label: { Label("プリセット", systemImage: "square.stack") }.accessibilityIdentifier("settingsPresets")
+                    Button { open(.colors) } label: { Label("付箋の色・名前", systemImage: "paintpalette") }.accessibilityIdentifier("colorSettings")
+                }
                 Section("サイドバーの位置") {
                     Picker("付箋・詳細", selection: $sidebarLeading) {
                         Text("左").tag(true)
@@ -310,6 +344,37 @@ struct PlannerSettingsView: View {
             }.scrollContentBackground(.hidden).background(paper)
                 .navigationTitle("アプリ設定").navigationBarTitleDisplayMode(.inline)
                 .toolbar { ToolbarItem(placement: .confirmationAction) { Button("閉じる") { dismiss() }.accessibilityIdentifier("closePlannerSettings") } }
+        }
+    }
+}
+
+struct SettingsStickyList: View {
+    let select: (Sticky) -> Void
+    @EnvironmentObject private var plans: PlanStore
+    @Environment(\.dismiss) private var dismiss
+    var body: some View {
+        NavigationStack {
+            List {
+                Section(plans.date.formatted(.dateTime.month().day().weekday(.wide))) {
+                    if plans.today.isEmpty { Text("この日の付箋はありません").foregroundStyle(.secondary) }
+                    ForEach(plans.today.sorted { ($0.start ?? 1441) < ($1.start ?? 1441) }) { task in
+                        Button { select(task) } label: {
+                            HStack {
+                                RoundedRectangle(cornerRadius: 3).fill(plans.paletteColor(for: task.tone).color).frame(width: 6)
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text(task.title).foregroundStyle(ink)
+                                    Text(task.start.map { "\(clockText($0))〜\(clockText($0 + task.minutes))" } ?? "未配置・\(durationText(task.minutes))")
+                                        .font(.caption).foregroundStyle(.secondary)
+                                }
+                                Spacer()
+                                Image(systemName: "chevron.right").font(.caption).foregroundStyle(.secondary)
+                            }.contentShape(Rectangle())
+                        }.buttonStyle(.plain).accessibilityIdentifier("settingsSticky-\(task.title)")
+                    }
+                }
+            }.scrollContentBackground(.hidden).background(paper)
+                .navigationTitle("付箋を編集").navigationBarTitleDisplayMode(.inline)
+                .toolbar { ToolbarItem(placement: .confirmationAction) { Button("閉じる") { dismiss() }.accessibilityIdentifier("closeSettingsStickies") } }
         }
     }
 }

@@ -4,7 +4,16 @@
 
 Issue #18・#19・#20を含め、ユニット23件・UI25件の全48件が成功しました（1件の再実行を含む）。スクリーンショット抽出・一覧作成ツールはGoで実装しています。Pythonへの依存はありません。
 
+## 設定入口の統合（2026年10月27日）
+
+- 上部は歯車だけにし、設定から時間帯・カレンダー・付箋編集／作成・プリセット・色と名前・サイドバー位置・通知へアクセス。
+- 表示日の付箋一覧から編集し、保存後の時刻・所要時間と計画画面への復帰を確認。時間帯・色・カレンダー・プリセットの各画面の往復も確認。
+- 左右位置・メモ下書きの保持と、通知設定の保存・実際のOS予約／取消を含むUI3件が成功。
+- 結果: artifacts/SettingsFlowRegression.xcresult / artifacts/settings-flow-regression.log（通知・左右位置のUI成功）、artifacts/SettingsFlowVerified.xcresult / artifacts/settings-flow-verified.log（設定統合UI成功）。設定から編集画面への遷移を同じシート内で切り替える構成に調整して再実行。
+- [設定画面](screenshots/37-unified-settings.png) / [編集する付箋の選択](screenshots/38-settings-sticky-list.png)。実機は未確認。
+
 ## Issue #23：サイドバーの左右選択
+
 
 - 左右の選択・保存・再起動後の保持、詳細への切り替え、左からの配置と戻し、横画面の3ゾーン、左右を切り替えてもメモ下書きが残ることを確認。
 - 従来の右サイドバーの基本画面と横画面も再確認。UI3件成功。
