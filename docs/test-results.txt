@@ -57,3 +57,12 @@ Test Case '-[YoteikanUITests.YoteikanUITests test22PinchTimelinePreservesTimeAnd
 Test Case '-[YoteikanUITests.YoteikanUITests test23ScrollFromStickyAndCalendarEventPreservesPlans]' passed (10.844 seconds).
 Test Case '-[YoteikanUITests.YoteikanUITests test25DailyPresetCountEditCancelAndDisable]' passed (25.676 seconds).
 Test Case '-[YoteikanUITests.YoteikanUITests test24DailyPresetCountsPersistWithoutRecreatingDeletedNotes]' passed (36.163 seconds).
+
+全画面の1日一覧 追加検証 (2026-10-26)
+Test Case '-[YoteikanUITests.YoteikanUITests test26FullScreenDayTimelineListAndReturn]' passed (17.566 seconds).
+Test Case '-[YoteikanUITests.YoteikanUITests test27FullScreenShortNotesAndUnscheduledDay]' passed (13.939 seconds).
+	 Executed 2 tests, with 0 failures (0 unexpected) in 31.505 (31.508) seconds
+	 Executed 2 tests, with 0 failures (0 unexpected) in 31.505 (31.509) seconds
+	 Executed 2 tests, with 0 failures (0 unexpected) in 31.505 (31.509) seconds
+** TEST SUCCEEDED **
+Test Case '-[YoteikanUITests.YoteikanUITests test20ZoomShortEventsWithoutVisualOverlap]' passed (24.369 seconds).

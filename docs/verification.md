@@ -4,6 +4,15 @@
 
 Issue #18・#19・#20を含め、ユニット23件・UI25件の全48件が成功しました（1件の再実行を含む）。スクリーンショット抽出・一覧作成ツールはGoで実装しています。Pythonへの依存はありません。
 
+## 1日一覧の全画面表示
+
+- 下部の「1日一覧」で開き、時間割が画面幅の85%以上を使い、開始・終了時刻が同時に見えることを確認。
+- 「時間割／一覧」の切り替え、縦横画面、閉じた後の倍率・選択・予定の保持を確認。
+- 5分予定の一覧行が重ならないこと、予定のない日・未配置付箋の表示を確認。
+- 新規UIテスト2件が成功。既存の5分予定の拡大・移動・伸縮テストも成功。
+- 結果: artifacts/FullDayVerified.xcresult / artifacts/full-day-verified.log。既存テストは artifacts/full-day-overview.log。テストの要素検索を全画面内に絞る調整を行って再実行。実機は未確認。
+- [ボタン](screenshots/30-fullscreen-entry.png) / [時間割](screenshots/28-fullscreen-day-timeline.png) / [一覧](screenshots/29-fullscreen-day-list.png)。
+
 ## Issue #18・#19・#20
 
 - 未配置時間の数値・横棒を削除し、空き時間と付箋一覧を維持。
