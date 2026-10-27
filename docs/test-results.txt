@@ -154,3 +154,11 @@ Test Case '-[YoteikanUITests.YoteikanUITests test32LongPressCalendarMemoIsReadOn
 ** TEST SUCCEEDED **
 Test Case '-[YoteikanUITests.YoteikanUITests test31LongPressMemoFromBothPagesPersistsAndKeepsDraft]' passed (19.795 seconds).
 ** TEST SUCCEEDED **
+
+Issue #32 紙らしい付箋（2026-10-27）
+Test Case '-[YoteikanUITests.YoteikanUITests test03DragResizeAndUnplace]' passed (23.743 seconds).
+Test Case '-[YoteikanUITests.YoteikanUITests test27FullScreenShortNotesAndUnscheduledDay]' passed (15.065 seconds).
+Test Case '-[YoteikanUITests.YoteikanUITests test33StickyPaperAppearance]' passed (8.468 seconds).
+** TEST SUCCEEDED **
+Test Case '-[YoteikanUITests.YoteikanUITests test31LongPressMemoFromBothPagesPersistsAndKeepsDraft]' passed (19.811 seconds).
+** TEST SUCCEEDED **
