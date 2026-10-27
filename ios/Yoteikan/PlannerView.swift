@@ -9,6 +9,7 @@ private struct FullDayOverview: View {
     let stickies: [Sticky]
     let fixed: [FixedEvent]
     let colors: [StickyColor]
+    var showsClose = true
     private struct Item: Identifiable {
         let id: String
         let title: String
@@ -56,9 +57,9 @@ private struct FullDayOverview: View {
             }.background(paper).foregroundStyle(ink)
                 .navigationTitle(date.formatted(.dateTime.month().day().weekday(.wide)))
                 .navigationBarTitleDisplayMode(.inline)
-                .toolbar { ToolbarItem(placement: .confirmationAction) {
+                .toolbar { if showsClose { ToolbarItem(placement: .confirmationAction) {
                     Button("閉じる") { dismiss() }.accessibilityIdentifier("closeFullDay")
-                } }
+                } } }
                 .accessibilityElement(children: .contain).accessibilityIdentifier("fullDayOverview")
         }.tint(accent)
     }
@@ -221,6 +222,7 @@ struct PlannerView: View {
     @State private var pinchAnchor = UnitPoint.center
     @State private var minuteAtTop: CGFloat = 480
     @State private var visibleHour: Int?
+    @State private var positionedTimeline = false
     @State private var zoomAnchor = 8
     @State private var viewportTop: CGFloat = 0
     @State private var viewportFrame = CGRect.zero
@@ -233,12 +235,10 @@ struct PlannerView: View {
     @State private var viewportHeight: CGFloat = 350
     @State private var inboxFrame = CGRect.zero
     @State private var returningToInbox = false
-    @State private var showDetails = false
-    @State private var showFullDay = false
-    @State private var showSettings = false
     @AppStorage("planner.sidebarLeading") private var sidebarLeading = false
     @State private var sideShowsDetails = false
     @State private var memoDrafts: [UUID: String] = [:]
+    @State private var tab = 0
     @FocusState private var memoFocused: Bool
     private var selectedTask: Sticky? { plans.today.first { $0.id == selected } }
     private var scale: CGFloat { overview ? max(0.15, (viewportHeight - 32) / CGFloat(plans.hours.totalMinutes)) : 1.55 * zoomFactor }
@@ -264,10 +264,24 @@ struct PlannerView: View {
         PlannerMath.layout(placed.map { TimelineItem(id: $0.id.uuidString, start: max(plans.hours.start, $0.start!), end: min(plans.hours.end, $0.start! + $0.minutes)) } + visibleFixed.map { TimelineItem(id: "fixed-" + $0.id, start: max(plans.hours.start, $0.start), end: min(plans.hours.end, $0.end)) })
     }
     var body: some View {
+        nativeTabs
+            .onChange(of: tab) { _, _ in memoFocused = false }
+        .sheet(isPresented: $showPresets) { PresetsView() }
+        .sheet(isPresented: $showCalendar) { CalendarSettingsView() }
+        .sheet(isPresented: $showNew) { StickyEditor(task: Sticky(title: "", minutes: 30, day: dayKey(plans.date)), isNew: true) }
+        .sheet(item: $editing) { StickyEditor(task: $0, isNew: false) }
+        .onChange(of: plans.date) { _, value in calendar.refresh(date: value); selected = nil }
+        .onChange(of: phase) { _, value in if value == .active { plans.refreshDay(); calendar.refresh(date: plans.date) } }
+        .onReceive(NotificationCenter.default.publisher(for: UIApplication.significantTimeChangeNotification)) { _ in plans.refreshDay(); calendar.refresh(date: plans.date) }
+        .alert("付箋を配置できません", isPresented: Binding(get: { plans.notice != nil }, set: { if !$0 { plans.notice = nil } })) {
+            Button("OK") { plans.notice = nil }
+        } message: { Text(plans.notice ?? "") }
+    }
+    private var plannerContent: some View {
         GeometryReader { geometry in
             let wide = geometry.size.width >= 700
         VStack(spacing: 0) {
-            HStack(spacing: 0) { dateBar; header }.padding(.horizontal, 6)
+            HStack(spacing: 0) { dateBar }.padding(.horizontal, 6)
             stats
             if !calendar.connected && !plans.demo {
                 Button { showCalendar = true } label: {
@@ -281,7 +295,7 @@ struct PlannerView: View {
             HStack(spacing: 0) {
                 ForEach(zones, id: \.self) { zone in
                     if zone == "schedule" {
-                        VStack(spacing: 0) { zoomControls; timeline }
+                        VStack(spacing: 0) { timeline }
                             .accessibilityElement(children: .contain).accessibilityIdentifier("scheduleZone")
                     } else if zone == "memo" {
                         VStack(spacing: 0) { zoneTitle("詳細メモ"); memoPane }
@@ -297,27 +311,18 @@ struct PlannerView: View {
         }
         }
         .background(paper).foregroundStyle(ink)
-        .safeAreaInset(edge: .bottom, spacing: 0) { bottomBar }
-        .sheet(isPresented: $showSettings) { PlannerSettingsFlow() }
-        .sheet(isPresented: $showPresets) { PresetsView() }
-        .fullScreenCover(isPresented: $showFullDay) {
-            FullDayOverview(date: plans.date, hours: plans.hours, stickies: plans.today, fixed: fixed, colors: plans.plan.colors)
-        }
-        .sheet(isPresented: $showCalendar) { CalendarSettingsView() }
-        .sheet(isPresented: $showDetails) {
-            NavigationStack {
-                memoPane.navigationTitle("詳細メモ").navigationBarTitleDisplayMode(.inline)
-                    .toolbar { ToolbarItem(placement: .confirmationAction) { Button("閉じる") { showDetails = false }.accessibilityIdentifier("closeNotes") } }
-            }
-        }
-        .sheet(isPresented: $showNew) { StickyEditor(task: Sticky(title: "", minutes: 30, day: dayKey(plans.date)), isNew: true) }
-        .sheet(item: $editing) { StickyEditor(task: $0, isNew: false) }
-        .onChange(of: plans.date) { _, value in calendar.refresh(date: value); selected = nil }
-        .onChange(of: phase) { _, value in if value == .active { plans.refreshDay(); calendar.refresh(date: plans.date) } }
-        .onReceive(NotificationCenter.default.publisher(for: UIApplication.significantTimeChangeNotification)) { _ in plans.refreshDay(); calendar.refresh(date: plans.date) }
-        .alert("付箋を配置できません", isPresented: Binding(get: { plans.notice != nil }, set: { if !$0 { plans.notice = nil } })) {
-            Button("OK") { plans.notice = nil }
-        } message: { Text(plans.notice ?? "") }
+    }
+    @ViewBuilder private var nativeTabs: some View {
+        if #available(iOS 26.0, *) { tabs.tabBarMinimizeBehavior(.never) }
+        else { tabs }
+    }
+    private var tabs: some View {
+        TabView(selection: $tab) {
+            plannerContent.tabItem { Label("計画", systemImage: "calendar.day.timeline.left") }.tag(0)
+            FullDayOverview(date: plans.date, hours: plans.hours, stickies: plans.today, fixed: fixed, colors: plans.plan.colors, showsClose: false)
+                .tabItem { Label("1日表示", systemImage: "rectangle.expand.vertical") }.tag(1)
+            PlannerSettingsTab(onFinished: { tab = 0 }).tabItem { Label("設定", systemImage: "gearshape") }.tag(2)
+        }.tint(accent)
     }
     private func zoneTitle(_ title: String) -> some View {
         Text(title).font(.system(size: 12, weight: .semibold)).frame(maxWidth: .infinity, alignment: .leading)
@@ -362,6 +367,8 @@ struct PlannerView: View {
                             Text(durationText(task.minutes)).font(.system(size: 11))
                             Button("予定を編集") { editing = task }.font(.system(size: 11))
                                 .accessibilityIdentifier("editSideDetail")
+                            Button("未配置に戻す") { plans.put(task.id, at: nil); sideShowsDetails = false }.font(.system(size: 11))
+                                .accessibilityIdentifier("unplaceButton")
                         }.frame(maxWidth: .infinity, alignment: .leading).padding(.horizontal, 12).padding(.top, 10)
                     }
                     memoPane
@@ -391,13 +398,6 @@ struct PlannerView: View {
         }.buttonStyle(.plain).accessibilityIdentifier(identifier)
             .accessibilityValue(sideShowsDetails == details ? "選択中" : "")
     }
-    private var header: some View {
-        HStack(spacing: 0) {
-            Button { showSettings = true } label: {
-                Image(systemName: "gearshape").font(.system(size: 17)).frame(width: 44, height: 44)
-            }.accessibilityLabel("アプリ設定").accessibilityIdentifier("plannerSettings")
-        }
-    }
     private var dateBar: some View {
         HStack(spacing: 0) {
             Button { changeDay(-1) } label: { Image(systemName: "chevron.left").frame(width: 28, height: 44) }.accessibilityLabel("前の日")
@@ -426,25 +426,6 @@ struct PlannerView: View {
             Text(durationText(minutes)).monospacedDigit().frame(width: 78, alignment: .trailing)
         }.font(.system(size: 10, weight: .medium)).foregroundStyle(ink.opacity(0.7))
             .accessibilityElement(children: .contain).accessibilityIdentifier(identifier).accessibilityValue(durationText(minutes))
-    }
-    private var zoomControls: some View {
-        HStack(spacing: 0) {
-            Text("時間割").font(.system(size: 11, weight: .semibold))
-            if plans.demo { Text("デモ").font(.system(size: 8)).padding(3).background(tones[1], in: Capsule()) }
-            Spacer(minLength: 0)
-            Button { setZoom(zoomSteps.last(where: { $0 < zoomFactor - 0.001 }) ?? 1) } label: {
-                Image(systemName: "minus.magnifyingglass").frame(width: 44, height: 44)
-            }.disabled(overview || zoomFactor <= 1).accessibilityLabel("時間割を縮小").accessibilityIdentifier("zoomOut")
-            Text(overview ? "全日" : "\(Double(zoomFactor).formatted(.number.precision(.fractionLength(0...1))))倍")
-                .font(.system(size: 10, weight: .medium)).frame(width: 32)
-                .accessibilityIdentifier("zoomLevel")
-            Button { if overview { pinchMinute = nil; overview = false } else { setZoom(zoomSteps.first(where: { $0 > zoomFactor + 0.001 }) ?? 8) } } label: {
-                Image(systemName: "plus.magnifyingglass").frame(width: 44, height: 44)
-            }.disabled(!overview && zoomFactor >= 8).accessibilityLabel("時間割を拡大").accessibilityIdentifier("zoomIn")
-            Button { pinchMinute = nil; overview.toggle() } label: {
-                Image(systemName: overview ? "plus.magnifyingglass" : "rectangle.expand.vertical").frame(width: 44, height: 44)
-            }.accessibilityLabel(overview ? "拡大する" : "1日を見る").accessibilityIdentifier("zoomToggle")
-        }.padding(.horizontal, 8)
     }
     private func cardHeight(_ minutes: Int) -> CGFloat {
         let slot = CGFloat(minutes) * scale
@@ -578,7 +559,11 @@ struct PlannerView: View {
                         minuteAtTop = CGFloat(hour * 60) + (viewportTop - y) / scale
                     }
                 }
-                .task { await Task.yield(); reader.scrollTo("hour-\(initialHour)", anchor: .top) }
+                .task {
+                    guard !positionedTimeline else { return }
+                    positionedTimeline = true
+                    await Task.yield(); reader.scrollTo("hour-\(initialHour)", anchor: .top)
+                }
                 .onChange(of: zoomFactor) { _, _ in
                     Task { @MainActor in
                         await Task.yield()
@@ -722,20 +707,6 @@ struct PlannerView: View {
         }
             .background(returningToInbox ? tones[0] : paper)
             .accessibilityElement(children: .contain).accessibilityIdentifier("inboxTray")
-    }
-    private var bottomBar: some View {
-        HStack {
-            Button { plans.restore() } label: { Label("元に戻す", systemImage: "arrow.uturn.backward").font(.system(size: 11, weight: .medium)).frame(height: 42) }.disabled(plans.undo == nil).accessibilityIdentifier("undoButton")
-            Spacer()
-            Button { memoFocused = false; showFullDay = true } label: {
-                Label("1日一覧", systemImage: "arrow.up.left.and.arrow.down.right").font(.system(size: 11)).frame(height: 42)
-            }.accessibilityIdentifier("fullDayButton")
-            Button { showDetails = true } label: { Label("詳細メモ", systemImage: "note.text").font(.system(size: 11)).frame(height: 42) }.accessibilityIdentifier("notesButton")
-            if let id = selected, let task = plans.today.first(where: { $0.id == id }) {
-                Button { plans.put(id, at: nil); selected = nil } label: { Image(systemName: "tray.and.arrow.down").frame(width: 38, height: 42) }.accessibilityLabel("未配置に戻す").accessibilityIdentifier("unplaceButton")
-                Button { editing = task } label: { Image(systemName: "slider.horizontal.3").frame(width: 38, height: 42) }.accessibilityLabel("付箋を編集").accessibilityIdentifier("editButton")
-            }
-        }.padding(.horizontal, 14).padding(.vertical, 1).background(paper)
     }
     private var daySwipeGesture: some Gesture {
         DragGesture(minimumDistance: 30).onEnded { value in

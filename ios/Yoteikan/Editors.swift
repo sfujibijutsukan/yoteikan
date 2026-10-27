@@ -278,12 +278,16 @@ struct CalendarSettingsView: View {
     }
 }
 
-enum PlannerSetting { case hours, colors, calendar, presets, stickies, newSticky }
+enum PlannerSetting: String, Identifiable {
+    case hours, colors, calendar, presets, stickies, newSticky
+    var id: String { rawValue }
+}
 
 struct PlannerSettingsFlow: View {
     @EnvironmentObject private var plans: PlanStore
     @State private var destination: PlannerSetting?
     @State private var editing: Sticky?
+    init(initial: PlannerSetting? = nil) { _destination = State(initialValue: initial) }
     var body: some View {
         Group {
             if let task = editing { StickyEditor(task: task, isNew: false) }
@@ -301,8 +305,19 @@ struct PlannerSettingsFlow: View {
     }
 }
 
+struct PlannerSettingsTab: View {
+    let onFinished: () -> Void
+    @State private var destination: PlannerSetting?
+    var body: some View {
+        PlannerSettingsView(open: { destination = $0 }, showsClose: false)
+            .sheet(item: $destination, onDismiss: onFinished) { PlannerSettingsFlow(initial: $0) }
+    }
+}
+
 struct PlannerSettingsView: View {
     let open: (PlannerSetting) -> Void
+    var showsClose = true
+    @EnvironmentObject private var plans: PlanStore
     @AppStorage("planner.sidebarLeading") private var sidebarLeading = false
     @EnvironmentObject private var reminders: ReminderStore
     @Environment(\.dismiss) private var dismiss
@@ -310,6 +325,9 @@ struct PlannerSettingsView: View {
     var body: some View {
         NavigationStack {
             Form {
+                Section("操作") {
+                    Button("直前の変更を元に戻す") { plans.restore() }.disabled(plans.undo == nil).accessibilityIdentifier("undoButton")
+                }
                 Section("時間・カレンダー") {
                     Button { open(.hours) } label: { Label("計画の時間帯", systemImage: "clock") }.accessibilityIdentifier("hoursSettings")
                     Button { open(.calendar) } label: { Label("カレンダー", systemImage: "calendar") }.accessibilityIdentifier("calendarSettings")
@@ -343,7 +361,7 @@ struct PlannerSettingsView: View {
                 }
             }.scrollContentBackground(.hidden).background(paper)
                 .navigationTitle("アプリ設定").navigationBarTitleDisplayMode(.inline)
-                .toolbar { ToolbarItem(placement: .confirmationAction) { Button("閉じる") { dismiss() }.accessibilityIdentifier("closePlannerSettings") } }
+                .toolbar { if showsClose { ToolbarItem(placement: .confirmationAction) { Button("閉じる") { dismiss() }.accessibilityIdentifier("closePlannerSettings") } } }
         }
     }
 }
