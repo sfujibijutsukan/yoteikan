@@ -94,3 +94,7 @@ xcrun simctl launch --terminate-running-process \
 アプリのソース・テスト・Xcodeプロジェクト、Goツール、ドキュメント、確認用スクリーンショットを管理する。artifacts/、DerivedData、Xcodeの個人設定、Goのビルド出力は管理しない。
 
 [動作確認結果](verification.md) / [READMEへ戻る](../README.md)
+
+## ブランチとPR
+
+新しい作業は最新の `origin/main` から `codex/` で始まるブランチを作成します。PRのマージ先は必ず `main` とし、機能ブランチ同士をマージ先にする運用は行いません。
