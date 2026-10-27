@@ -1,4 +1,6 @@
 import XCTest
+import UserNotifications
+
 @testable import Yoteikan
 
 @MainActor final class PlanTests: XCTestCase {
@@ -357,5 +359,85 @@ import XCTest
         store.date = Calendar.current.date(byAdding: .day, value: 1, to: store.date)!
         XCTAssertEqual(store.today.count, 1)
         XCTAssertEqual(store.today[0].memo, "次の章")
+    }
+}
+
+@MainActor private final class FakeReminderClient: ReminderClient {
+    var authorization: UNAuthorizationStatus = .authorized
+    var requests: [String: UNNotificationRequest] = [:]
+    var fail = false
+    func status() async -> UNAuthorizationStatus { authorization }
+    func authorize() async throws -> Bool { authorization = .authorized; return true }
+    func pending() async -> [UNNotificationRequest] { Array(requests.values) }
+    func remove(_ ids: [String]) { ids.forEach { requests.removeValue(forKey: $0) } }
+    func add(_ request: UNNotificationRequest) async throws {
+        await Task.yield()
+        if fail { throw NSError(domain: "test", code: 1) }
+        requests[request.identifier] = request
+    }
+}
+extension PlanTests {
+    func testReminderLegacyDefaultOffAndCustomPersistWithUndo() throws {
+        let original = Sticky(title: "通知", minutes: 30, day: "2030-01-02", start: 540)
+        var json = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(original)) as? [String: Any])
+        json.removeValue(forKey: "reminderMinutes")
+        XCTAssertEqual(try JSONDecoder().decode(Sticky.self, from: JSONSerialization.data(withJSONObject: json)).reminderMinutes, 5)
+        let store = PlanStore(defaults: defaults)
+        var off = original; off.reminderMinutes = nil
+        store.change { $0.stickies = [off] }
+        XCTAssertNil(PlanStore(defaults: defaults).plan.stickies.first?.reminderMinutes)
+        var custom = off; custom.reminderMinutes = 17
+        store.update(custom)
+        XCTAssertEqual(PlanStore(defaults: defaults).plan.stickies.first?.reminderMinutes, 17)
+        store.restore()
+        XCTAssertNil(store.plan.stickies.first?.reminderMinutes)
+    }
+    func testReminderDatesFilteringLimitAndSystemRequest() throws {
+        var calendar = Calendar(identifier: .gregorian); calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+        let now = calendar.date(from: DateComponents(year: 2030, month: 1, day: 1, hour: 23))!
+        var early = Sticky(title: "翌日の予定", minutes: 30, day: "2030-01-02", start: 3)
+        early.reminderMinutes = 10
+        var off = early; off.id = UUID(); off.reminderMinutes = nil
+        var unplaced = early; unplaced.id = UUID(); unplaced.start = nil
+        let past = Sticky(title: "過去", minutes: 30, day: "2030-01-01", start: 600)
+        let later = Sticky(title: "後の予定", minutes: 30, day: "2030-01-02", start: 600)
+        let results = PlannedReminder.upcoming([later, off, unplaced, past, early], now: now, calendar: calendar, limit: 1)
+        let reminder = try XCTUnwrap(results.first)
+        XCTAssertEqual(results.count, 1)
+        XCTAssertEqual(reminder.title, early.title)
+        XCTAssertEqual(calendar.component(.day, from: reminder.fire), 1)
+        XCTAssertEqual(calendar.component(.hour, from: reminder.fire), 23)
+        XCTAssertEqual(calendar.component(.minute, from: reminder.fire), 53)
+        let request = reminder.request(calendar: calendar)
+        XCTAssertEqual(request.identifier, PlannedReminder.prefix + early.id.uuidString)
+        XCTAssertEqual(request.content.title, early.title)
+        XCTAssertNotNil(request.content.sound)
+        XCTAssertEqual((request.trigger as? UNCalendarNotificationTrigger)?.nextTriggerDate(), reminder.fire)
+    }
+    func testReminderReconciliationMoveUnplaceDeleteDenyAndFailure() async throws {
+        let client = FakeReminderClient()
+        let store = ReminderStore(client: client, installDelegate: false)
+        let tomorrow = Calendar.current.date(byAdding: .day, value: 1, to: Date())!
+        var task = Sticky(title: "通知", minutes: 30, day: dayKey(tomorrow), start: 540)
+        store.update([task]); await store.waitUntilIdle()
+        XCTAssertEqual(store.scheduled, 1)
+        let old = try XCTUnwrap(client.requests.values.first?.trigger as? UNCalendarNotificationTrigger)
+        task.start = 600; task.reminderMinutes = 17; task.title = "変更後"
+        store.update([task]); await store.waitUntilIdle()
+        XCTAssertEqual(client.requests.count, 1)
+        XCTAssertNotEqual((client.requests.values.first?.trigger as? UNCalendarNotificationTrigger)?.dateComponents, old.dateComponents)
+        XCTAssertEqual(client.requests.values.first?.content.title, "変更後")
+        var unplaced = task; unplaced.start = nil
+        store.update([unplaced]); await store.waitUntilIdle(); XCTAssertEqual(store.scheduled, 0)
+        store.update([task]); store.update([]); await store.waitUntilIdle(); XCTAssertEqual(store.scheduled, 0)
+        store.update([task]); await store.waitUntilIdle()
+        client.authorization = .denied
+        store.update([task]); await store.waitUntilIdle(); XCTAssertEqual(store.scheduled, 0)
+        client.authorization = .authorized; client.fail = true
+        store.update([task]); await store.waitUntilIdle(); XCTAssertNotNil(store.message)
+        client.fail = false
+        store.update([task]); await store.waitUntilIdle(); XCTAssertEqual(store.scheduled, 1); XCTAssertNil(store.message)
+        task.reminderMinutes = nil
+        store.update([task]); await store.waitUntilIdle(); XCTAssertEqual(store.scheduled, 0)
     }
 }

@@ -3,6 +3,7 @@ import UIKit
 
 struct StickyEditor: View {
     @EnvironmentObject private var plans: PlanStore
+    @EnvironmentObject private var reminders: ReminderStore
     @Environment(\.dismiss) private var dismiss
     @State var task: Sticky
     let isNew: Bool
@@ -24,6 +25,20 @@ struct StickyEditor: View {
                 } footer: { Text(plans.hours.label) }
                 if placed && task.minutes > plans.hours.totalMinutes {
                     Section { Text("所要時間が計画の時間帯を超えています。").foregroundStyle(.orange) }
+                }
+                Section("通知") {
+                    Toggle("開始前に通知", isOn: Binding(get: { task.reminderMinutes != nil }, set: { task.reminderMinutes = $0 ? 5 : nil }))
+                        .accessibilityIdentifier("reminderToggle")
+                    if task.reminderMinutes != nil {
+                        Stepper(task.reminderMinutes == 0 ? "開始時刻に通知" : "\(task.reminderMinutes ?? 5)分前", value: Binding(get: { task.reminderMinutes ?? 5 }, set: { task.reminderMinutes = $0 }), in: 0...1440)
+                            .accessibilityIdentifier("reminderMinutes")
+                        if reminders.authorization == .notDetermined {
+                            Button("通知を許可する") { Task { await reminders.enable() } }
+                        } else if reminders.authorization == .denied {
+                            Text("通知は許可されていません。アプリ設定からiPhoneの通知設定を開けます。")
+                                .font(.caption).foregroundStyle(.secondary)
+                        }
+                    }
                 }
                 Section("メモ") { TextField("任意", text: $task.memo, axis: .vertical).lineLimit(3...5).accessibilityIdentifier("stickyMemo") }
                 if isNew { Section { Toggle("プリセットにも保存", isOn: $saveAsPreset) } }
@@ -259,6 +274,42 @@ struct CalendarSettingsView: View {
                 if let message = calendar.message { Section { Text(message).font(.subheadline).foregroundStyle(.orange) } }
             }.scrollContentBackground(.hidden).background(paper).navigationTitle("カレンダー").navigationBarTitleDisplayMode(.inline)
                 .toolbar { ToolbarItem(placement: .confirmationAction) { Button("完了") { dismiss() }.accessibilityIdentifier("closeCalendar") } }
+        }
+    }
+}
+
+struct PlannerSettingsView: View {
+    @AppStorage("planner.sidebarLeading") private var sidebarLeading = false
+    @EnvironmentObject private var reminders: ReminderStore
+    @Environment(\.dismiss) private var dismiss
+    @Environment(\.openURL) private var openURL
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section("サイドバーの位置") {
+                    Picker("付箋・詳細", selection: $sidebarLeading) {
+                        Text("左").tag(true)
+                        Text("右").tag(false)
+                    }.pickerStyle(.segmented).accessibilityIdentifier("sidebarPosition")
+                }
+                Section {
+                    switch reminders.authorization {
+                    case .notDetermined:
+                        Button("通知を許可する") { Task { await reminders.enable() } }.accessibilityIdentifier("enableReminders")
+                    case .denied:
+                        Text("通知は許可されていません")
+                        Button("iPhoneの通知設定を開く") { if let url = URL(string: UIApplication.openSettingsURLString) { openURL(url) } }
+                    default:
+                        Text("通知は許可されています")
+                        Text("予約済み \(reminders.scheduled)件").accessibilityIdentifier("scheduledReminders")
+                    }
+                    if let message = reminders.message { Text(message).foregroundStyle(.orange) }
+                } header: { Text("予定の通知") } footer: {
+                    Text("配置した付箋は初期値5分前に通知します。付箋の編集画面で0〜1440分前、または通知なしに変更できます。直近60件を予約し、アプリを開いたときに更新します。未配置・通知時刻を過ぎた予定は通知しません。カレンダーの固定予定はカレンダー側の通知設定を使用します。")
+                }
+            }.scrollContentBackground(.hidden).background(paper)
+                .navigationTitle("アプリ設定").navigationBarTitleDisplayMode(.inline)
+                .toolbar { ToolbarItem(placement: .confirmationAction) { Button("閉じる") { dismiss() }.accessibilityIdentifier("closePlannerSettings") } }
         }
     }
 }

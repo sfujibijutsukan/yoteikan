@@ -86,3 +86,42 @@ Test Case '-[YoteikanUITests.YoteikanUITests test27FullScreenShortNotesAndUnsche
 	 Executed 2 tests, with 0 failures (0 unexpected) in 23.044 (23.048) seconds
 	 Executed 2 tests, with 0 failures (0 unexpected) in 23.044 (23.049) seconds
 ** TEST SUCCEEDED **
+
+Issue #17 通知 (2026-10-26)
+Test Case '-[YoteikanTests.PlanTests testColorNamesNormalizeMissingBlankAndExtraEntries]' passed (0.004 seconds).
+Test Case '-[YoteikanTests.PlanTests testColorNamesPersistAndUndoWithoutChangingTasks]' passed (0.004 seconds).
+Test Case '-[YoteikanTests.PlanTests testCustomHoursConstrainPlacementAndRejectTooLongSticky]' passed (0.005 seconds).
+Test Case '-[YoteikanTests.PlanTests testCustomHoursPersistUndoAndPreserveAllPlans]' passed (0.005 seconds).
+Test Case '-[YoteikanTests.PlanTests testDailyCountChangesAddOnlyDeficitAndUndoTogether]' passed (0.005 seconds).
+Test Case '-[YoteikanTests.PlanTests testDailyPresetCountsAreIndependentAndPersistAcrossDates]' passed (0.005 seconds).
+Test Case '-[YoteikanTests.PlanTests testDailyPresetDoesNotRecreateMovedEditedDeletedOrManualCopies]' passed (0.005 seconds).
+Test Case '-[YoteikanTests.PlanTests testDailyRefreshFollowsTodayButKeepsBrowsedDate]' passed (0.004 seconds).
+Test Case '-[YoteikanTests.PlanTests testDateSeparationAndIndependentPresetCopies]' passed (0.003 seconds).
+Test Case '-[YoteikanTests.PlanTests testDeleteColorRemapsAllDaysAndPresetsAndUndoRestoresEverything]' passed (0.005 seconds).
+Test Case '-[YoteikanTests.PlanTests testFiveAMPlacementBoundsPersistenceAndUndo]' passed (0.005 seconds).
+Test Case '-[YoteikanTests.PlanTests testFoldedTimelineCompressesGapsAndKeepsShortOverlappingEventsReadable]' passed (0.002 seconds).
+Test Case '-[YoteikanTests.PlanTests testHoursMigrationAndInvalidSettingsKeepExistingData]' passed (0.003 seconds).
+Test Case '-[YoteikanTests.PlanTests testLegacyPlanKeepsStickiesAndPresetsWhenAddingColorNames]' passed (0.003 seconds).
+Test Case '-[YoteikanTests.PlanTests testLegacyPresetsDefaultToOneAndDoNotDuplicateAfterMigration]' passed (0.004 seconds).
+Test Case '-[YoteikanTests.PlanTests testMemoEditPreservesTimingAndOtherNotesAndSupportsUndo]' passed (0.005 seconds).
+Test Case '-[YoteikanTests.PlanTests testMovingOneStickyLeavesOthersAndPresetUnchanged]' passed (0.004 seconds).
+Test Case '-[YoteikanTests.PlanTests testOverlapColumnsCoverTransitiveGroupsAndReuseLanes]' passed (0.002 seconds).
+Test Case '-[YoteikanTests.PlanTests testPaletteRejectsEmptyInvalidOrDuplicateColorsAndSupportsOneColor]' passed (0.004 seconds).
+Test Case '-[YoteikanTests.PlanTests testPlanningRangeIncludesEarlyCalendarTimeAndEndsAtMidnight]' passed (0.002 seconds).
+Test Case '-[YoteikanTests.PlanTests testReminderDatesFilteringLimitAndSystemRequest]' passed (0.003 seconds).
+Test Case '-[YoteikanTests.PlanTests testReminderLegacyDefaultOffAndCustomPersistWithUndo]' passed (0.004 seconds).
+Test Case '-[YoteikanTests.PlanTests testReminderReconciliationMoveUnplaceDeleteDenyAndFailure]' passed (0.009 seconds).
+Test Case '-[YoteikanTests.PlanTests testSavingExistingStickyAsPresetCountsItForToday]' passed (0.004 seconds).
+Test Case '-[YoteikanTests.PlanTests testSnappingBoundsAndOverlapUnion]' passed (0.002 seconds).
+Test Case '-[YoteikanTests.PlanTests testThreeSimultaneousEventsHaveSeparateColumns]' passed (0.002 seconds).
+Test Case '-[YoteikanTests.PlanTests testUndoAndPersistenceAndUnplace]' passed (0.005 seconds).
+Test Case '-[YoteikanUITests.YoteikanUITests test02CreatePersistEditAndUndo]' passed (22.141 seconds).
+Test Case '-[YoteikanUITests.YoteikanUITests test03DragResizeAndUnplace]' passed (13.786 seconds).
+Test Case '-[YoteikanUITests.YoteikanUITests test28ReminderSettingsPersistAndSchedule]' passed (31.415 seconds).
+** TEST SUCCEEDED **
+
+Issue #23 サイドバー位置 (2026-10-26)
+Test Case '-[YoteikanUITests.YoteikanUITests test01DemoAndPresets]' passed (8.716 seconds).
+Test Case '-[YoteikanUITests.YoteikanUITests test17LandscapeShowsThreeZonesAndKeepsSelection]' passed (10.036 seconds).
+Test Case '-[YoteikanUITests.YoteikanUITests test29SidebarPositionPersistsAndSupportsDragAndDetails]' passed (37.347 seconds).
+** TEST SUCCEEDED **

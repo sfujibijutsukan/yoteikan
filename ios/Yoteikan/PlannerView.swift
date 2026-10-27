@@ -237,6 +237,8 @@ struct PlannerView: View {
     @State private var returningToInbox = false
     @State private var showDetails = false
     @State private var showFullDay = false
+    @State private var showSettings = false
+    @AppStorage("planner.sidebarLeading") private var sidebarLeading = false
     @State private var sideShowsDetails = false
     @State private var memoDrafts: [UUID: String] = [:]
     @FocusState private var memoFocused: Bool
@@ -277,22 +279,28 @@ struct PlannerView: View {
             if !fixed.filter(\.allDay).isEmpty {
                 ScrollView(.horizontal, showsIndicators: false) { HStack { ForEach(fixed.filter(\.allDay)) { event in Label(event.title, systemImage: "sun.max").font(.caption2).padding(7).background(.white.opacity(0.6), in: Capsule()) } }.padding(.horizontal, 20) }
             }
+            let zones = sidebarLeading ? (wide && !sideShowsDetails ? ["side", "memo", "schedule"] : ["side", "schedule"]) : (wide && !sideShowsDetails ? ["schedule", "memo", "side"] : ["schedule", "side"])
             HStack(spacing: 0) {
-                VStack(spacing: 0) { zoomControls; timeline }
-                    .accessibilityElement(children: .contain).accessibilityIdentifier("scheduleZone")
-                if wide && !sideShowsDetails {
-                    Divider()
-                    VStack(spacing: 0) { zoneTitle("詳細メモ"); memoPane }
-                        .frame(width: geometry.size.width * 0.28)
-                        .accessibilityElement(children: .contain).accessibilityIdentifier("memoZone")
+                ForEach(zones, id: \.self) { zone in
+                    if zone == "schedule" {
+                        VStack(spacing: 0) { zoomControls; timeline }
+                            .accessibilityElement(children: .contain).accessibilityIdentifier("scheduleZone")
+                    } else if zone == "memo" {
+                        VStack(spacing: 0) { zoneTitle("詳細メモ"); memoPane }
+                            .frame(width: geometry.size.width * 0.28)
+                            .accessibilityElement(children: .contain).accessibilityIdentifier("memoZone")
+                    } else {
+                        sideZone.frame(width: wide ? geometry.size.width * 0.25 : max(124, geometry.size.width * 0.34))
+                    }
+                    if zone != zones.last { Divider() }
                 }
-                Divider()
-                sideZone.frame(width: wide ? geometry.size.width * 0.25 : max(124, geometry.size.width * 0.34))
             }
+
         }
         }
         .background(paper).foregroundStyle(ink)
         .safeAreaInset(edge: .bottom, spacing: 0) { bottomBar }
+        .sheet(isPresented: $showSettings) { PlannerSettingsView() }
         .sheet(isPresented: $showPresets) { PresetsView() }
         .fullScreenCover(isPresented: $showFullDay) {
             FullDayOverview(date: plans.date, hours: plans.hours, stickies: plans.today, fixed: fixed, colors: plans.plan.colors)
@@ -389,6 +397,9 @@ struct PlannerView: View {
     }
     private var header: some View {
         HStack(spacing: 0) {
+            Button { showSettings = true } label: {
+                Image(systemName: "gearshape").font(.system(size: 17)).frame(width: 36, height: 44)
+            }.accessibilityLabel("アプリ設定").accessibilityIdentifier("plannerSettings")
             Button { showHours = true } label: {
                 Image(systemName: "clock").font(.system(size: 17)).frame(width: 44, height: 44)
             }.accessibilityLabel("計画の時間帯").accessibilityIdentifier("hoursSettings")

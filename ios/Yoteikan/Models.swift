@@ -1,5 +1,6 @@
 import Foundation
 import SwiftUI
+import UserNotifications
 
 struct Sticky: Identifiable, Codable, Equatable {
     var id = UUID()
@@ -9,6 +10,127 @@ struct Sticky: Identifiable, Codable, Equatable {
     var memo: String = ""
     var day: String
     var start: Int?
+    var reminderMinutes: Int? = 5
+}
+extension Sticky {
+    private enum CodingKeys: String, CodingKey { case id, title, minutes, tone, memo, day, start, reminderMinutes }
+    init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        id = try values.decode(UUID.self, forKey: .id)
+        title = try values.decode(String.self, forKey: .title)
+        minutes = try values.decode(Int.self, forKey: .minutes)
+        tone = try values.decodeIfPresent(Int.self, forKey: .tone) ?? 0
+        memo = try values.decodeIfPresent(String.self, forKey: .memo) ?? ""
+        day = try values.decode(String.self, forKey: .day)
+        start = try values.decodeIfPresent(Int.self, forKey: .start)
+        reminderMinutes = values.contains(.reminderMinutes) ? try values.decodeIfPresent(Int.self, forKey: .reminderMinutes).map { min(1440, max(0, $0)) } : 5
+    }
+    func encode(to encoder: Encoder) throws {
+        var values = encoder.container(keyedBy: CodingKeys.self)
+        try values.encode(id, forKey: .id); try values.encode(title, forKey: .title)
+        try values.encode(minutes, forKey: .minutes); try values.encode(tone, forKey: .tone)
+        try values.encode(memo, forKey: .memo); try values.encode(day, forKey: .day)
+        try values.encodeIfPresent(start, forKey: .start)
+        // Explicit null distinguishes an intentional off setting from legacy data.
+        try values.encode(reminderMinutes, forKey: .reminderMinutes)
+    }
+}
+
+struct PlannedReminder: Equatable {
+    let id: String
+    let title: String
+    let start: Date
+    let fire: Date
+    static let prefix = "yoteikan.sticky."
+    static func upcoming(_ stickies: [Sticky], now: Date = Date(), calendar: Calendar = .current, limit: Int = 60) -> [PlannedReminder] {
+        stickies.compactMap { task -> PlannedReminder? in
+            guard let minute = task.start, (0..<1440).contains(minute), let lead = task.reminderMinutes, (0...1440).contains(lead) else { return nil }
+            let parts = task.day.split(separator: "-").compactMap { Int($0) }
+            guard parts.count == 3, let day = calendar.date(from: DateComponents(year: parts[0], month: parts[1], day: parts[2])),
+                  let start = calendar.date(bySettingHour: minute / 60, minute: minute % 60, second: 0, of: day),
+                  let fire = calendar.date(byAdding: .minute, value: -lead, to: start), fire > now else { return nil }
+            return PlannedReminder(id: prefix + task.id.uuidString, title: task.title, start: start, fire: fire)
+        }.sorted { $0.fire == $1.fire ? $0.id < $1.id : $0.fire < $1.fire }.prefix(max(0, limit)).map { $0 }
+    }
+    func request(calendar: Calendar = .current) -> UNNotificationRequest {
+        let content = UNMutableNotificationContent()
+        content.title = title
+        content.body = "\(start.formatted(date: .omitted, time: .shortened))からの予定です"
+        content.sound = .default
+        var components = calendar.dateComponents([.year, .month, .day, .hour, .minute, .second], from: fire)
+        components.timeZone = calendar.timeZone
+        let trigger = UNCalendarNotificationTrigger(dateMatching: components, repeats: false)
+        return UNNotificationRequest(identifier: id, content: content, trigger: trigger)
+    }
+}
+
+@MainActor protocol ReminderClient {
+    func status() async -> UNAuthorizationStatus
+    func authorize() async throws -> Bool
+    func pending() async -> [UNNotificationRequest]
+    func remove(_ ids: [String])
+    func add(_ request: UNNotificationRequest) async throws
+}
+@MainActor final class SystemReminderClient: ReminderClient {
+    private let center = UNUserNotificationCenter.current()
+    func status() async -> UNAuthorizationStatus { await center.notificationSettings().authorizationStatus }
+    func authorize() async throws -> Bool { try await center.requestAuthorization(options: [.alert, .sound]) }
+    func pending() async -> [UNNotificationRequest] { await center.pendingNotificationRequests() }
+    func remove(_ ids: [String]) { center.removePendingNotificationRequests(withIdentifiers: ids) }
+    func add(_ request: UNNotificationRequest) async throws { try await center.add(request) }
+}
+@MainActor final class ReminderStore: NSObject, ObservableObject, UNUserNotificationCenterDelegate {
+    @Published private(set) var authorization: UNAuthorizationStatus = .notDetermined
+    @Published private(set) var scheduled = 0
+    @Published private(set) var message: String?
+    private let client: any ReminderClient
+    private var stickies: [Sticky] = []
+    private var revision = 0
+    private var worker: Task<Void, Never>?
+    init(client: (any ReminderClient)? = nil, installDelegate: Bool = true) {
+        self.client = client ?? SystemReminderClient()
+        super.init()
+        if installDelegate { UNUserNotificationCenter.current().delegate = self }
+    }
+    func update(_ stickies: [Sticky]) {
+        self.stickies = stickies; revision += 1
+        guard worker == nil else { return }
+        worker = Task { await synchronize() }
+    }
+    func waitUntilIdle() async { await worker?.value }
+    func enable() async {
+        do { _ = try await client.authorize() } catch { message = "通知を許可できませんでした。もう一度お試しください。" }
+        update(stickies)
+        await waitUntilIdle()
+    }
+    // A single worker serializes changes so a slower old edit cannot restore stale requests.
+    private func synchronize() async {
+        var processed = -1
+        while processed != revision {
+            processed = revision
+            let snapshot = stickies
+            authorization = await client.status()
+            let allowed = authorization == .authorized || authorization == .provisional || authorization == .ephemeral
+            let wanted = allowed ? PlannedReminder.upcoming(snapshot) : []
+            let requests = wanted.map { $0.request() }
+            let pending = await client.pending()
+            let owned = pending.filter { $0.identifier.hasPrefix(PlannedReminder.prefix) }
+            let ids = Set(requests.map(\.identifier))
+            client.remove(owned.filter { !ids.contains($0.identifier) }.map(\.identifier))
+            message = nil
+            for request in requests {
+                let existing = owned.first { $0.identifier == request.identifier }
+                if existing?.content.title == request.content.title,
+                   existing?.content.body == request.content.body,
+                   (existing?.trigger as? UNCalendarNotificationTrigger)?.dateComponents == (request.trigger as? UNCalendarNotificationTrigger)?.dateComponents { continue }
+                do { try await client.add(request) }
+                catch { message = "一部の通知を予約できませんでした。アプリを開き直してお試しください。" }
+            }
+            scheduled = await client.pending().filter { $0.identifier.hasPrefix(PlannedReminder.prefix) }.count
+        }
+        worker = nil
+    }
+    nonisolated func userNotificationCenter(_ center: UNUserNotificationCenter, willPresent notification: UNNotification) async -> UNNotificationPresentationOptions { [.banner, .sound, .list] }
 }
 struct Preset: Identifiable, Codable, Equatable {
     var id = UUID()
