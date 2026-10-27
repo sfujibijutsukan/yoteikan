@@ -207,3 +207,11 @@ iPhone 17eシミュレーター / iOS 27.0でXCTestを使って実際に操作�
 <img src="45-sticky-paper-plan.png" width="300" alt="未配置と時間割の付箋に紙の陰影と折り返しを追加">
 
 <img src="46-sticky-paper-day.png" width="300" alt="1日表示でも同じ紙の表現を使用">
+
+## 長押し中だけ表示するメモのプレビュー（10月27日）
+
+<img src="47-compact-plan-preview.png" width="300" alt="計画の付箋を押している間だけ小さなメモを表示">
+
+<img src="48-compact-day-preview.png" width="300" alt="1日表示でも予定の近くに小さくメモを表示">
+
+画面47・48はUIテストの長押し中にシミュレーターから直接撮影しました。指を離すとプレビューは消えます。画面42〜44は変更前の詳細シートです。
