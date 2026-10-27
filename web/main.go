@@ -3,16 +3,48 @@ package main
 import (
 	"embed"
 	"encoding/json"
+	"flag"
 	"io/fs"
 	"log"
 	"net/http"
 	"os"
+	"path/filepath"
 	"regexp"
 	"time"
 )
 
 //go:embed static
 var assets embed.FS
+
+// exportSite emits only public browser assets. Google tokens never pass through Go.
+func exportSite(directory, clientID string) error {
+	if err := os.MkdirAll(directory, 0755); err != nil {
+		return err
+	}
+	if err := fs.WalkDir(assets, "static", func(path string, entry fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if entry.IsDir() {
+			return nil
+		}
+		data, err := assets.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		return os.WriteFile(filepath.Join(directory, filepath.Base(path)), data, 0644)
+	}); err != nil {
+		return err
+	}
+	config, err := json.Marshal(map[string]string{"clientID": clientID})
+	if err != nil {
+		return err
+	}
+	if err := os.WriteFile(filepath.Join(directory, "config.json"), config, 0644); err != nil {
+		return err
+	}
+	return os.WriteFile(filepath.Join(directory, ".nojekyll"), nil, 0644)
+}
 
 func handler(clientID string) http.Handler {
 	files, _ := fs.Sub(assets, "static")
@@ -32,9 +64,18 @@ func handler(clientID string) http.Handler {
 	})
 }
 func main() {
+	exportDirectory := flag.String("export", "", "Export static files for GitHub Pages instead of starting a server")
+	flag.Parse()
 	clientID := os.Getenv("GOOGLE_WEB_CLIENT_ID")
 	if clientID != "" && !regexp.MustCompile(`^[0-9]+-[a-zA-Z0-9_-]+\.apps\.googleusercontent\.com$`).MatchString(clientID) {
 		log.Fatal("GOOGLE_WEB_CLIENT_ID must be a web OAuth client ID")
+	}
+	if *exportDirectory != "" {
+		if err := exportSite(*exportDirectory, clientID); err != nil {
+			log.Fatal(err)
+		}
+		log.Printf("Exported Yoteikan Web to %s", *exportDirectory)
+		return
 	}
 	address := os.Getenv("LISTEN_ADDR")
 	if address == "" {

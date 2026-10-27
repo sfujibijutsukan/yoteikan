@@ -1,10 +1,10 @@
 # Webから予定を閲覧・編集する
 
-公開予定URLは **https://yoteikan.sfuji.org** です。この変更はWeb版のソースと起動・公開環境を準備するものです。DNS・サーバーへの配置・Google CloudのWeb用ID設定を完了するまでは、このURLで利用できません。
+公開予定URLは **https://yoteikan.sfuji.org** です。この変更はWeb版のソースと起動・公開環境を準備するものです。DNS・GitHub Pages・Google CloudのWeb用ID設定を完了するまでは、このURLで利用できません。
 
 ## 構成
 
-Goの単一実行ファイルがHTML/CSS/JavaScriptと公開設定だけを配信します。外部Goパッケージ、Nodeの依存パッケージ、Pythonは不要です。Google Identity Servicesの公式ライブラリでブラウザー内に短命のアクセストークンを取得し、Google Driveへ直接アクセスします。サーバーに予定・Google認証情報・クライアントシークレットを保存しません。アクセストークンはメモリーだけに置き、再読み込みや有効期限切れ時はログインし直します。
+公開にはGitHub Pagesを使います。GoでHTML/CSS/JavaScriptと公開設定を静的出力し、GitHub Actionsから配信します。サーバーの契約は不要です。ローカル確認にはGoの単一実行ファイルも使えます。外部Goパッケージ、Nodeの依存パッケージ、Pythonは不要です。Google Identity Servicesの公式ライブラリでブラウザー内に短命のアクセストークンを取得し、Google Driveへ直接アクセスします。サーバーに予定・Google認証情報・クライアントシークレットを保存しません。アクセストークンはメモリーだけに置き、再読み込みや有効期限切れ時はログインし直します。
 
 ブラウザーのローカル保存にはアカウント別の変更履歴を保存します。共有パソコンではブラウザーのプロファイルを分けてください。ログアウトすると表示を閉じますが未送信変更を含むローカル履歴は残します。履歴を消す場合は必要な同期が完了したことを確認して、そのサイトのブラウザーデータを削除してください。
 
@@ -45,31 +45,39 @@ node --test test/*.test.mjs
 
 Swiftで生成した `web/test/swift-fixture.json` に対して、MutationのJSON正規化・Base64・SHA-256が一致することを確認します。再生成はリポジトリルートで `swift tools/web-sync-fixture.swift > web/test/swift-fixture.json` です。
 
-## 公開（Dockerを使えるサーバー）
+## GitHub Pagesで公開する
 
-1. サーバーのIPを用意します。ドメインのDNSで `yoteikan.sfuji.org` のAレコードをそのIPv4に向けます。IPv6のAAAAレコードは実際に利用できる場合だけ設定します。既存の `sfuji.org` のWebサイトを変更する必要はありません。
-2. サーバーの80/TCP・443/TCPを外部から到達可能にします。HTTP/3を使う場合は443/UDPも許可します。アプリの8080番は公開しません。
-3. このリポジトリを取得し、次を実行します。
+既存の `sfuji.org` のPages設定は変更せず、**`sfujibijutsukan/yoteikan` リポジトリのプロジェクトサイト**に `yoteikan.sfuji.org` を設定します。Web画面はすべて静的ファイルで、実行時のGoサーバー・DB・クライアントシークレットは不要です。
+
+1. Web用OAuthクライアントIDを前述の手順で発行します。
+2. `sfujibijutsukan/yoteikan` → Settings → Secrets and variables → Actions → **Variables** → New repository variable で、名前 `GOOGLE_WEB_CLIENT_ID`、値にWeb用IDを保存します。公開される識別子なのでSecretでなくVariableです。
+3. このPRをmainへ取り込みます。
+4. 同じリポジトリの Settings → Pages → Build and deployment → Source を **GitHub Actions** にします。
+5. 同じPages設定の Custom domain に **`yoteikan.sfuji.org`** を保存します。GitHubがドメイン所有権の確認を求める場合は、個人アカウントの Settings → Pages で指定されたTXTレコードをDNSへ登録します。設定対象は予定館のリポジトリです。既存の `sfuji.org` を設定しているリポジトリは変更しません。
+6. `sfuji.org` のDNS管理画面に次を追加します。
+
+|種類|名前 / ホスト|値 / 宛先|
+|---|---|---|
+|CNAME|`yoteikan`|`sfujibijutsukan.github.io`|
+
+DNS画面が完全な名前を求める場合は `yoteikan.sfuji.org` と入力します。CNAMEの値には `https://` や `/yoteikan` を付けません。既存のルートドメインのA・AAAA・CNAMEレコードは触りません。Cloudflareを利用している場合、最初はプロキシを無効（DNSのみ）にしてGitHubのDNS確認・証明書発行を行います。
+
+7. Actions → **Deploy Yoteikan Web to Pages** → Run workflow（main）を実行します。初回は手動実行し、以後はWeb関連のmainへの更新時に自動デプロイします。`GOOGLE_WEB_CLIENT_ID` が未設定ならデプロイはスキップします。
+8. DNSチェックと証明書発行の完了後、Settings → Pages の **Enforce HTTPS** を有効にします。反映には時間がかかることがあります。
+9. `https://yoteikan.sfuji.org` でGoogleログインして同期を確認します。
+
+GitHub Actionsで配信する場合、`CNAME` ファイルではなくPagesのCustom domain設定が必要です。この変更ではCNAMEファイルを生成しません。
+
+静的出力だけをローカルで確認する場合：
 
 ```sh
-cd deploy/web
-cp .env.example .env
-# .env の GOOGLE_WEB_CLIENT_ID を、取得したWeb用IDに変更
-# シークレットは記入しません。
-docker compose up -d --build
+cd web
+GOOGLE_WEB_CLIENT_ID='取得したWeb用ID.apps.googleusercontent.com' go run . -export dist
 ```
 
-Caddyが `yoteikan.sfuji.org` のHTTPS証明書を取得しGoアプリへ転送します。80/443を既に使うサーバーではこの構成をそのまま起動せず、既存リバースプロキシへ統合してください。証明書用のDockerボリュームは保持します。
+`dist/` には `index.html`・CSS・JavaScript・公開ID入り `config.json`・`.nojekyll` だけが出力されます。生成物はGit管理しません。アセットは相対パスなので、カスタムドメイン設定前のリポジトリ配下でもサンプルを開けます。ただしGoogleログインには、実際に開くURLの生成元をOAuthへ登録する必要があります。
 
-```sh
-# 更新
-cd deploy/web
-docker compose up -d --build
-# 停止（データ・証明書ボリュームは保持）
-docker compose down
-```
-
-実行ファイルは静的アセットを内包します。Dockerを使わず `cd web && go build -o yoteikan-web .` でビルドし、HTTPSリバースプロキシ配下に置く方法も使えます。`LISTEN_ADDR` の初期値は `127.0.0.1:8080` です。ルートパスへの配置を想定します。サーバーはDBを必要としません。
+公式資料：[GitHub Pages](https://docs.github.com/en/pages/getting-started-with-github-pages/what-is-github-pages) / [サブドメインの設定](https://docs.github.com/en/pages/configuring-a-custom-domain-for-your-github-pages-site/managing-a-custom-domain-for-your-github-pages-site) / [Actionsでの配信](https://docs.github.com/en/pages/getting-started-with-github-pages/using-custom-workflows-with-github-pages)
 
 ## 操作・同期範囲
 
@@ -99,9 +107,9 @@ Web用IDが未発行の段階ではサンプルと代替Driveで検証します�
 
 ## 今回の検証結果
 
-- Goの配信・設定・セキュリティヘッダー・ソース非公開のテスト2件成功、実行ファイルのビルド成功。
+- Goの配信・設定・静的出力・セキュリティヘッダー・ソース非公開のテスト3件成功、実行ファイルのビルド成功。
 - Nodeの同期テスト9件成功：Swiftとのハッシュ一致、日本語データ、オフライン統合、削除・編集競合、不正データ拒否、日次枚数の統合、送信失敗と再試行、取得済み履歴、Driveのページ送り・multipart・エラー分類。
-- Docker Composeの設定検証成功。コンテナーイメージのビルド・本番サーバーの起動は未実施。
-- ローカルの実ブラウザーでサンプルを開き、5分の予定への変更、時刻・メモ保存、付箋のドラッグ配置、詳細切り替えを確認。実Google接続ではありません。
+- GitHub Pages用の静的ファイル出力を検証。実際のGitHub Actions実行・DNS・HTTPS公開は設定待ちです。PagesにはGoサーバーのHTTPヘッダーを設定できないため、CSPとリファラー設定はHTMLのmetaにも指定しています。
+- ローカルの実ブラウザーでサンプルを開き、5分の予定への変更、時刻・メモ保存、付箋のドラッグ配置、詳細切り替え、再読み込み後の保持と時間帯変更を確認。さらにPagesと同じ静的配信でもプリセットから5分の付箋を作成・配置できることを確認。実Google接続ではありません。
 
 ![Web版のサンプル操作確認（狭い画面）](screenshots/55-web-planner.png)

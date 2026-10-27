@@ -2,10 +2,10 @@ name: Web checks
 on:
   pull_request:
     branches: [main]
-    paths: ['web/**', 'deploy/web/**', 'tools/web-sync-fixture.swift', '.github/workflows/web.yml']
+    paths: ['web/**', 'tools/web-sync-fixture.swift', '.github/workflows/web.yml']
   push:
     branches: [main]
-    paths: ['web/**', 'deploy/web/**', 'tools/web-sync-fixture.swift', '.github/workflows/web.yml']
+    paths: ['web/**', 'tools/web-sync-fixture.swift', '.github/workflows/web.yml']
 permissions:
   contents: read
 jobs:
@@ -29,7 +29,8 @@ jobs:
         run: |
           node --check web/static/app.mjs
           node --test web/test/*.test.mjs
-      - name: Deployment configuration
+      - name: Export static site
+        working-directory: web
         env:
           GOOGLE_WEB_CLIENT_ID: 123-test.apps.googleusercontent.com
-        run: docker compose -f deploy/web/compose.yaml config --quiet
+        run: go run . -export /tmp/yoteikan-pages

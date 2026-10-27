@@ -2,7 +2,10 @@ package main
 
 import (
 	"encoding/json"
+	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -37,5 +40,39 @@ func TestEmbeddedAppAndNoSourceExposure(t *testing.T) {
 		if strings.Contains(w.Body.String(), "package main") {
 			t.Fatal("server source exposed")
 		}
+	}
+}
+
+func TestExportForPages(t *testing.T) {
+	dir := t.TempDir()
+	if err := exportSite(dir, "123-web.apps.googleusercontent.com"); err != nil {
+		t.Fatal(err)
+	}
+	for _, path := range []string{"index.html", "app.mjs", "sync.mjs", "style.css", "config.json", ".nojekyll"} {
+		if _, err := os.Stat(filepath.Join(dir, path)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	h := http.FileServer(http.Dir(dir))
+	for _, path := range []string{"/index.html", "/app.mjs", "/config.json"} {
+		w := httptest.NewRecorder()
+		h.ServeHTTP(w, httptest.NewRequest("GET", path, nil))
+		if w.Code != 200 && w.Code != 301 {
+			t.Fatalf("static %s: %d", path, w.Code)
+		}
+	}
+	data, err := os.ReadFile(filepath.Join(dir, "index.html"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(data), `src="/app.mjs"`) || !strings.Contains(string(data), `src="app.mjs"`) {
+		t.Fatal("assets must also work under a repository subpath")
+	}
+	config, _ := os.ReadFile(filepath.Join(dir, "config.json"))
+	if !strings.Contains(string(config), "123-web.apps.googleusercontent.com") {
+		t.Fatal("missing web client ID")
+	}
+	if _, err := os.Stat(filepath.Join(dir, "main.go")); !os.IsNotExist(err) {
+		t.Fatal("server source should not be exported")
 	}
 }
