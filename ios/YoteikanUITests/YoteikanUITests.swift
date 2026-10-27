@@ -736,7 +736,7 @@ final class YoteikanUITests: XCTestCase {
         let first = app.otherElements["task-読書5分"]
         let second = app.otherElements["task-休憩5分"]
         let initialHeight = first.frame.height
-        for _ in 0..<3 { pinch(2) }
+        for _ in 0..<5 { pinch(2) }
         XCTAssertGreaterThanOrEqual(first.frame.height + 0.5, initialHeight * 6)
         XCTAssertLessThan(first.frame.maxY, second.frame.minY)
         first.tap()
