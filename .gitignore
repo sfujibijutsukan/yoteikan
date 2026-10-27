@@ -15,3 +15,6 @@
 
 # Developer-specific Google OAuth configuration
 /ios/Google.local.xcconfig
+
+# Web deployment configuration
+/deploy/web/.env

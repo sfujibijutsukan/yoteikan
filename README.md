@@ -68,6 +68,6 @@
 
 現在開発中です。App Store・TestFlightではまだ配信していません。対応はiOS 17以降です。
 
-[詳しい使い方](docs/usage.md) · [Google同期の設定](docs/google-sync.md) · [スクリーンショット](docs/screenshots/README.md) · [開発・起動手順](docs/development.md)
+[詳しい使い方](docs/usage.md) · [Google同期の設定](docs/google-sync.md) · [Web版の起動・公開手順](docs/web.md) · [スクリーンショット](docs/screenshots/README.md) · [開発・起動手順](docs/development.md)
 
 設計・検証の資料：[アプリ設計](docs/design.md) / [動作確認](docs/verification.md) / [テスト結果](docs/test-results.txt) / [通知の仕様](docs/issue-17.md) / [サイドバーの仕様](docs/issue-23.md) / [アプリアイコン](docs/app-icon.md) / [Issue #18〜#20](docs/issues-18-20.md)

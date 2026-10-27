@@ -1,0 +1,25 @@
+services:
+  app:
+    build:
+      context: ../..
+      dockerfile: deploy/web/Dockerfile
+    environment:
+      GOOGLE_WEB_CLIENT_ID: ${GOOGLE_WEB_CLIENT_ID:?Set the web OAuth client ID in .env}
+    restart: unless-stopped
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+  caddy:
+    image: caddy:2-alpine
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    restart: unless-stopped
+volumes:
+  caddy_data:
+  caddy_config:
