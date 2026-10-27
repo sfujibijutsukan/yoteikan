@@ -13,6 +13,15 @@ import UserNotifications
         defaults.set(try! JSONEncoder().encode(manual), forKey: "yoteikan.plan.v1")
     }
     override func tearDown() { defaults.removePersistentDomain(forName: suite); super.tearDown() }
+    func testFoldedTimelineInverseMapsDropsAcrossGapsAndEvents() {
+        let folded = FoldedTimeline(items: [TimelineItem(id: "short", start: 480, end: 485),
+                                           TimelineItem(id: "long", start: 600, end: 660)], start: 300, end: 1440)
+        for minute in stride(from: 300, through: 1440, by: 5) {
+            XCTAssertEqual(folded.minute(at: folded.position(minute)), CGFloat(minute), accuracy: 0.001)
+        }
+        XCTAssertEqual(folded.minute(at: -10), 300)
+        XCTAssertEqual(folded.minute(at: folded.height + 10), 1440)
+    }
     func testFoldedTimelineCompressesGapsAndKeepsShortOverlappingEventsReadable() {
         let events = [TimelineItem(id: "a", start: 480, end: 485), TimelineItem(id: "b", start: 485, end: 490), TimelineItem(id: "c", start: 482, end: 488)]
         let folded = FoldedTimeline(items: events, start: 300, end: 1440)
