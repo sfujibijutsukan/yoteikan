@@ -1,0 +1,5 @@
+// Public iOS OAuth client identifiers for org.sfuji.yoteikan.
+// A developer-specific override can be generated with tools/google-config.
+GOOGLE_CLIENT_ID = 874279899295-uunqabomo284j501d88r114vs9h16bsj.apps.googleusercontent.com
+GOOGLE_REVERSED_CLIENT_ID = com.googleusercontent.apps.874279899295-uunqabomo284j501d88r114vs9h16bsj
+#include? "Google.local.xcconfig"

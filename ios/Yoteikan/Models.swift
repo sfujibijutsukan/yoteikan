@@ -245,8 +245,11 @@ struct SavedPlan: Codable, Equatable {
             let target = min(Preset.maximumDailyCount, max(0, preset.dailyCount))
             let generated = max(0, counts[preset.id.uuidString] ?? 0)
             guard target > generated else { continue }
-            for _ in generated..<target {
-                stickies.append(Sticky(title: preset.title, minutes: preset.minutes, tone: preset.tone, memo: preset.memo, day: day))
+            for index in generated..<target {
+                let id = SyncCodec.dailyStickyID(preset: preset.id, day: day, index: index)
+                if !stickies.contains(where: { $0.id == id }) {
+                    stickies.append(Sticky(id: id, title: preset.title, minutes: preset.minutes, tone: preset.tone, memo: preset.memo, day: day))
+                }
             }
             counts[preset.id.uuidString] = target
             changed = true
@@ -400,6 +403,12 @@ let tones: [Color] = [Color(red: 0.88, green: 0.93, blue: 0.80), Color(red: 0.97
     func setHours(_ hours: PlanningHours) {
         guard hours.isValid, hours != plan.hours else { return }
         change { $0.hours = hours }
+    }
+    func acceptSyncedPlan(_ incoming: SavedPlan) {
+        guard incoming != plan else { return }
+        undo = nil; plan = incoming
+        plan.populateDailyPresets(for: dayKey(date))
+        save()
     }
     func save() { if !demo, let data = try? JSONEncoder().encode(plan) { defaults.set(data, forKey: key) } }
     func prepareDay() { if plan.populateDailyPresets(for: dayKey(date)) { save() } }

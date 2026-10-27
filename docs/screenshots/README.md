@@ -221,3 +221,15 @@ iPhone 17eシミュレーター / iOS 27.0でXCTestを使って実際に操作�
 <img src="49-folded-planning.png" width="300" alt="付箋置き場を残したまま、計画の空き時間を折りたたむ">
 
 <img src="50-folded-planning-short-notes.png" width="300" alt="5分の予定も文字が読める高さで重ならずに表示">
+
+## Googleアカウント・同期（Issue #42）
+
+<img src="51-google-sync-setup.png" width="300" alt="Googleログインの接続設定が未完了の場合の表示">
+
+<img src="52-google-sync-first-choice.png" width="300" alt="初回ログイン後に同期するデータを選択">
+
+<img src="53-google-sync-connected.png" width="300" alt="最終同期時刻と手動同期・ログアウト">
+
+<img src="54-google-sync-retry.png" width="300" alt="通信できない場合の未送信件数と再試行">
+
+画面52〜54はシミュレーター専用の動作確認用アカウントです。実際のGoogleログイン・実Driveへの接続は、クライアントID設定後の確認が必要です。
