@@ -61,13 +61,13 @@
 - 横画面では、時間割・詳細メモ・付箋を並べて表示。
 - 直前の変更を元に戻して、気軽に組み直し。
 
-計画データは端末内に保存。アカウント登録は不要です。
+計画データは端末内に保存。基本機能はアカウント登録不要です。Google同期を使う場合は、設定の「アカウント・同期」からログインしてDriveのアプリ専用領域へ同期できます。
 カレンダーの読み込みと通知は、使いたいときにアクセスを許可して利用できます。
 
 ---
 
 現在開発中です。App Store・TestFlightではまだ配信していません。対応はiOS 17以降です。
 
-[詳しい使い方](docs/usage.md) · [スクリーンショット](docs/screenshots/README.md) · [開発・起動手順](docs/development.md)
+[詳しい使い方](docs/usage.md) · [Google同期の設定](docs/google-sync.md) · [スクリーンショット](docs/screenshots/README.md) · [開発・起動手順](docs/development.md)
 
 設計・検証の資料：[アプリ設計](docs/design.md) / [動作確認](docs/verification.md) / [テスト結果](docs/test-results.txt) / [通知の仕様](docs/issue-17.md) / [サイドバーの仕様](docs/issue-23.md) / [アプリアイコン](docs/app-icon.md) / [Issue #18〜#20](docs/issues-18-20.md)

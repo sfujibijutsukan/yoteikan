@@ -5,7 +5,7 @@
 - macOS、iOS 17以降をビルドできるXcode、インストール済みのiPhoneシミュレーター。
 - Go：スクリーンショット出力ツールを使う場合のみ。標準ライブラリ以外の依存なし。
 
-アプリ本体に外部パッケージやバックエンドは不要。プロジェクトはios/Yoteikan.xcodeproj、共有スキームはYoteikan。
+Googleログインには公式GoogleSignInのSwift Packageを使用します。データ保存用の独自バックエンドは不要です。プロジェクトはios/Yoteikan.xcodeproj、共有スキームはYoteikan。
 
 ## ビルド・実行
 
@@ -30,7 +30,7 @@ xcodebuild -project ios/Yoteikan.xcodeproj -scheme Yoteikan \
 
 xcrun simctl install "$device_id" \
   artifacts/build/Build/Products/Debug-iphonesimulator/Yoteikan.app
-xcrun simctl launch "$device_id" com.sota.yoteikan
+xcrun simctl launch "$device_id" org.sfuji.yoteikan
 ```
 
 ## テスト
@@ -84,7 +84,7 @@ index.htmlはローカルのブラウザーで開く。GitHubでの閲覧には[
 
 ```sh
 xcrun simctl launch --terminate-running-process \
-  "$device_id" com.sota.yoteikan --demo
+  "$device_id" org.sfuji.yoteikan --demo
 ```
 
 --calendar-testは「予定館・動作確認用」カレンダーに10:00と14:00の予定および終日予定を用意し、表示対象へ追加する。すでに当日の予定がある場合は重複作成しない。カレンダーへの書き込み処理は実機とReleaseビルドではコンパイル対象外。
@@ -98,3 +98,7 @@ xcrun simctl launch --terminate-running-process \
 ## ブランチとPR
 
 新しい作業は最新の `origin/main` から `codex/` で始まるブランチを作成します。PRのマージ先は必ず `main` とし、機能ブランチ同士をマージ先にする運用は行いません。
+
+## Googleログインと同期
+
+バンドルIDは `org.sfuji.yoteikan` です。[Google同期の設定手順](google-sync.md)に従い、iOS用OAuthクライアントを設定してください。ローカルの `ios/Google.local.xcconfig` はGoの補助ツールで作成でき、Git管理対象外です。クライアントID未設定でも端末内の計画機能は使用できます。

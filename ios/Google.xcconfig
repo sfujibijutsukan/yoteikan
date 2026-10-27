@@ -1,0 +1,4 @@
+// Public OAuth client identifiers. Generate the local override with tools/google-config.
+GOOGLE_CLIENT_ID =
+GOOGLE_REVERSED_CLIENT_ID =
+#include? "Google.local.xcconfig"

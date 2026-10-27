@@ -279,7 +279,7 @@ struct CalendarSettingsView: View {
 }
 
 enum PlannerSetting: String, Identifiable {
-    case hours, colors, calendar, presets, stickies, newSticky
+    case hours, colors, calendar, presets, stickies, newSticky, googleSync
     var id: String { rawValue }
 }
 
@@ -293,6 +293,7 @@ struct PlannerSettingsFlow: View {
             if let task = editing { StickyEditor(task: task, isNew: false) }
             else if let destination {
                 switch destination {
+                case .googleSync: GoogleSyncView()
                 case .hours: PlanningHoursEditor(hours: plans.hours)
                 case .calendar: CalendarSettingsView()
                 case .colors: ColorNamesEditor(colors: plans.plan.colors)
@@ -328,6 +329,7 @@ struct PlannerSettingsView: View {
                 Section("操作") {
                     Button("直前の変更を元に戻す") { plans.restore() }.disabled(plans.undo == nil).accessibilityIdentifier("undoButton")
                 }
+                Section { Button { open(.googleSync) } label: { Label("アカウント・同期", systemImage: "arrow.triangle.2.circlepath") }.accessibilityIdentifier("googleSyncSettings") }
                 Section("時間・カレンダー") {
                     Button { open(.hours) } label: { Label("計画の時間帯", systemImage: "clock") }.accessibilityIdentifier("hoursSettings")
                     Button { open(.calendar) } label: { Label("カレンダー", systemImage: "calendar") }.accessibilityIdentifier("calendarSettings")

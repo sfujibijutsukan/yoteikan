@@ -3,7 +3,7 @@ import XCTest
 final class YoteikanUITests: XCTestCase {
     var app: XCUIApplication!
     override func setUpWithError() throws { continueAfterFailure = false; XCUIDevice.shared.orientation = .portrait }
-    func launch(_ args: [String] = ["--demo"]) { app = XCUIApplication(); app.launchArguments = args; app.launch(); XCTAssertTrue(app.buttons["presetsButton"].waitForExistence(timeout: 10)) }
+    func launch(_ args: [String] = ["--demo"]) { app = XCUIApplication(); app.launchArguments = args; app.launchEnvironment["YOTEIKAN_UI_TEST"] = "1"; app.launch(); XCTAssertTrue(app.buttons["presetsButton"].waitForExistence(timeout: 10)) }
     func shot(_ name: String) { let attachment = XCTAttachment(screenshot: app.screenshot()); attachment.name = name; attachment.lifetime = .keepAlways; add(attachment) }
     func test31LongPressPreviewAutomaticallyDisappearsOnBothPages() {
         launch()
@@ -35,6 +35,48 @@ final class YoteikanUITests: XCTestCase {
         XCTAssertFalse(app.otherElements["memoPreview"].exists)
         XCTAssertFalse(app.textViews["scheduleMemo"].exists)
         XCTAssertTrue(app.tabBars.buttons["1日表示"].isSelected)
+    }
+    private func screenShot(_ name: String) { let attachment = XCTAttachment(screenshot: XCUIScreen.main.screenshot()); attachment.name = name; attachment.lifetime = .keepAlways; add(attachment) }
+    func test38GoogleSyncNeedsConfigurationWithoutChangingPlans() {
+        launch()
+        let before = app.otherElements["task-朝の読書"].value as? String
+        openSetting("googleSyncSettings")
+        XCTAssertTrue(app.staticTexts["googleNotConfigured"].waitForExistence(timeout: 3))
+        app.buttons["googleLogin"].tap()
+        XCTAssertTrue(app.staticTexts["googleSyncMessage"].waitForExistence(timeout: 3))
+        XCTAssertFalse(app.buttons["googleUseLocal"].exists)
+        screenShot("51-google-sync-setup")
+        app.buttons["閉じる"].tap()
+        XCTAssertEqual(app.otherElements["task-朝の読書"].value as? String, before)
+    }
+    func test39GoogleSyncInitialChoiceSyncAndLogout() {
+        launch(["--demo", "--sync-test"])
+        let before = app.otherElements["task-朝の読書"].value as? String
+        openSetting("googleSyncSettings")
+        app.buttons["googleLogin"].tap()
+        XCTAssertTrue(app.buttons["googleUseLocal"].waitForExistence(timeout: 3))
+        XCTAssertFalse(app.staticTexts["googleLastSync"].exists)
+        screenShot("52-google-sync-first-choice")
+        app.buttons["googleUseLocal"].tap()
+        XCTAssertTrue(app.staticTexts["googleLastSync"].waitForExistence(timeout: 3))
+        screenShot("53-google-sync-connected")
+        app.buttons["googleLogout"].tap()
+        app.buttons.matching(identifier: "ログアウト").allElementsBoundByIndex.last!.tap()
+        XCTAssertTrue(app.buttons["googleLogin"].waitForExistence(timeout: 3))
+        app.buttons["閉じる"].tap()
+        XCTAssertEqual(app.otherElements["task-朝の読書"].value as? String, before)
+    }
+    func test40GoogleSyncFailureCanRetryWithoutLosingPlans() {
+        launch(["--demo", "--sync-test", "--sync-error-test"])
+        openSetting("googleSyncSettings")
+        app.buttons["googleLogin"].tap()
+        app.buttons["googleUseLocal"].tap()
+        XCTAssertTrue(app.staticTexts["googleSyncMessage"].waitForExistence(timeout: 3))
+        screenShot("54-google-sync-retry")
+        app.buttons["googleSyncNow"].tap()
+        XCTAssertTrue(app.staticTexts["googleLastSync"].waitForExistence(timeout: 3))
+        app.buttons["閉じる"].tap()
+        XCTAssertEqual(app.otherElements["task-朝の読書"].value as? String, "08:00|30")
     }
     private func selectTab(_ name: String) { app.tabBars.buttons[name].tap() }
     private func selectDetails() { app.buttons["showScheduleDetails"].tap() }

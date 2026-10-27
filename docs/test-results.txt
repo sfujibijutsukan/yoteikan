@@ -218,3 +218,109 @@ Test Case '-[YoteikanUITests.YoteikanUITests test35FoldedPlanningKeepsTasksEdita
 Test Case '-[YoteikanUITests.YoteikanUITests test36FoldedPlanningKeepsFiveMinuteNotesReadable]' passed (13.485 seconds).
 ** TEST SUCCEEDED **
 初回の36は付箋の余白からドラッグできず失敗。操作領域修正後、通常・折りたたみのドロップと新規作成後の配置が成功。
+
+Issue #42 Googleログイン・同期（2026-10-27）
+記録: artifacts/google-sync-checked.log
+Test Case '-[YoteikanTests.DriveTransportTests testListsAllPagesAndSkipsAlreadyDownloadedFiles]' passed (0.048 seconds).
+Test Case '-[YoteikanTests.DriveTransportTests testMalformedRemoteBatchFailsWithoutReturningPartialChanges]' passed (0.002 seconds).
+Test Case '-[YoteikanTests.DriveTransportTests testRevokedTokenProducesReauthenticationMessage]' passed (0.001 seconds).
+Test Case '-[YoteikanTests.DriveTransportTests testWritesImmutableBatchOnlyToAppDataFolder]' passed (0.001 seconds).
+Test Case '-[YoteikanTests.PlanTests testColorNamesNormalizeMissingBlankAndExtraEntries]' passed (0.003 seconds).
+Test Case '-[YoteikanTests.PlanTests testColorNamesPersistAndUndoWithoutChangingTasks]' passed (0.005 seconds).
+Test Case '-[YoteikanTests.PlanTests testCustomHoursConstrainPlacementAndRejectTooLongSticky]' passed (0.005 seconds).
+Test Case '-[YoteikanTests.PlanTests testCustomHoursPersistUndoAndPreserveAllPlans]' passed (0.004 seconds).
+Test Case '-[YoteikanTests.PlanTests testDailyCountChangesAddOnlyDeficitAndUndoTogether]' passed (0.005 seconds).
+Test Case '-[YoteikanTests.PlanTests testDailyPresetCountsAreIndependentAndPersistAcrossDates]' passed (0.006 seconds).
+Test Case '-[YoteikanTests.PlanTests testDailyPresetDoesNotRecreateMovedEditedDeletedOrManualCopies]' passed (0.005 seconds).
+Test Case '-[YoteikanTests.PlanTests testDailyRefreshFollowsTodayButKeepsBrowsedDate]' passed (0.004 seconds).
+Test Case '-[YoteikanTests.PlanTests testDateSeparationAndIndependentPresetCopies]' passed (0.004 seconds).
+Test Case '-[YoteikanTests.PlanTests testDeleteColorRemapsAllDaysAndPresetsAndUndoRestoresEverything]' passed (0.004 seconds).
+Test Case '-[YoteikanTests.PlanTests testFiveAMPlacementBoundsPersistenceAndUndo]' passed (0.004 seconds).
+Test Case '-[YoteikanTests.PlanTests testFoldedTimelineCompressesGapsAndKeepsShortOverlappingEventsReadable]' passed (0.002 seconds).
+Test Case '-[YoteikanTests.PlanTests testFoldedTimelineInverseMapsDropsAcrossGapsAndEvents]' passed (0.002 seconds).
+Test Case '-[YoteikanTests.PlanTests testHoursMigrationAndInvalidSettingsKeepExistingData]' passed (0.003 seconds).
+Test Case '-[YoteikanTests.PlanTests testLegacyPlanKeepsStickiesAndPresetsWhenAddingColorNames]' passed (0.002 seconds).
+Test Case '-[YoteikanTests.PlanTests testLegacyPresetsDefaultToOneAndDoNotDuplicateAfterMigration]' passed (0.003 seconds).
+Test Case '-[YoteikanTests.PlanTests testMemoEditPreservesTimingAndOtherNotesAndSupportsUndo]' passed (0.004 seconds).
+Test Case '-[YoteikanTests.PlanTests testMovingOneStickyLeavesOthersAndPresetUnchanged]' passed (0.004 seconds).
+Test Case '-[YoteikanTests.PlanTests testOverlapColumnsCoverTransitiveGroupsAndReuseLanes]' passed (0.002 seconds).
+Test Case '-[YoteikanTests.PlanTests testPaletteRejectsEmptyInvalidOrDuplicateColorsAndSupportsOneColor]' passed (0.003 seconds).
+Test Case '-[YoteikanTests.PlanTests testPlanningRangeIncludesEarlyCalendarTimeAndEndsAtMidnight]' passed (0.002 seconds).
+Test Case '-[YoteikanTests.PlanTests testReminderDatesFilteringLimitAndSystemRequest]' passed (0.003 seconds).
+Test Case '-[YoteikanTests.PlanTests testReminderLegacyDefaultOffAndCustomPersistWithUndo]' passed (0.004 seconds).
+Test Case '-[YoteikanTests.PlanTests testReminderReconciliationMoveUnplaceDeleteDenyAndFailure]' passed (0.003 seconds).
+Test Case '-[YoteikanTests.PlanTests testSavingExistingStickyAsPresetCountsItForToday]' passed (0.003 seconds).
+Test Case '-[YoteikanTests.PlanTests testSnappingBoundsAndOverlapUnion]' passed (0.002 seconds).
+Test Case '-[YoteikanTests.PlanTests testThreeSimultaneousEventsHaveSeparateColumns]' passed (0.002 seconds).
+Test Case '-[YoteikanTests.PlanTests testUndoAndPersistenceAndUnplace]' passed (0.004 seconds).
+Test Case '-[YoteikanTests.SyncTests testAccountSwitchDoesNotUploadPreviousAccountData]' passed (0.007 seconds).
+Test Case '-[YoteikanTests.SyncTests testCloudAdoptionPreservesRecoverableLocalBackup]' passed (0.006 seconds).
+Test Case '-[YoteikanTests.SyncTests testConcurrentEditAndDeletionRequireExplicitResolution]' passed (0.004 seconds).
+Test Case '-[YoteikanTests.SyncTests testDuplicateUploadsAreIdempotentAndIdenticalGenesisDoesNotConflict]' passed (0.002 seconds).
+Test Case '-[YoteikanTests.SyncTests testEditsDuringUploadRemainPendingAndReachNextSync]' passed (0.012 seconds).
+Test Case '-[YoteikanTests.SyncTests testEditsMadeWhileLoggedOutUploadOnReturningToSameAccount]' passed (0.008 seconds).
+Test Case '-[YoteikanTests.SyncTests testIndependentOfflineChangesAndDeletesConvergeWithoutResurrection]' passed (0.004 seconds).
+Test Case '-[YoteikanTests.SyncTests testInitialLoginDoesNotUploadBeforeExplicitChoice]' passed (0.006 seconds).
+Test Case '-[YoteikanTests.SyncTests testMalformedOrUnknownSchemaCannotReplaceLocalData]' passed (0.001 seconds).
+Test Case '-[YoteikanTests.SyncTests testNetworkAndUploadFailuresKeepPendingChangesForRetry]' passed (0.010 seconds).
+Test Case '-[YoteikanTests.SyncTests testNewDailyPresetIDsMatchAcrossOfflineDevices]' passed (0.009 seconds).
+Test Case '-[YoteikanUITests.YoteikanUITests test03DragResizeAndUnplace]' passed (23.952 seconds).
+Test Case '-[YoteikanUITests.YoteikanUITests test30UnifiedSettingsAndStickyEditing]' passed (44.488 seconds).
+Test Case '-[YoteikanUITests.YoteikanUITests test35FoldedPlanningKeepsTasksEditable]' passed (9.935 seconds).
+Test Case '-[YoteikanUITests.YoteikanUITests test38GoogleSyncNeedsConfigurationWithoutChangingPlans]' passed (13.690 seconds).
+Test Case '-[YoteikanUITests.YoteikanUITests test39GoogleSyncInitialChoiceSyncAndLogout]' passed (17.230 seconds).
+Test Case '-[YoteikanUITests.YoteikanUITests test40GoogleSyncFailureCanRetryWithoutLosingPlans]' passed (15.201 seconds).
+** TEST SUCCEEDED **
+記録: artifacts/google-sync-acceptance.log
+Test Case '-[YoteikanTests.DriveTransportTests testListsAllPagesAndSkipsAlreadyDownloadedFiles]' passed (0.029 seconds).
+Test Case '-[YoteikanTests.DriveTransportTests testMalformedRemoteBatchFailsWithoutReturningPartialChanges]' passed (0.013 seconds).
+Test Case '-[YoteikanTests.DriveTransportTests testQuotaFailureDoesNotAskForUnnecessaryLogin]' passed (0.001 seconds).
+Test Case '-[YoteikanTests.DriveTransportTests testRevokedTokenProducesReauthenticationMessage]' passed (0.001 seconds).
+Test Case '-[YoteikanTests.DriveTransportTests testWritesImmutableBatchOnlyToAppDataFolder]' passed (0.001 seconds).
+Test Case '-[YoteikanTests.PlanTests testColorNamesNormalizeMissingBlankAndExtraEntries]' passed (0.002 seconds).
+Test Case '-[YoteikanTests.PlanTests testColorNamesPersistAndUndoWithoutChangingTasks]' passed (0.004 seconds).
+Test Case '-[YoteikanTests.PlanTests testCustomHoursConstrainPlacementAndRejectTooLongSticky]' passed (0.004 seconds).
+Test Case '-[YoteikanTests.PlanTests testCustomHoursPersistUndoAndPreserveAllPlans]' passed (0.005 seconds).
+Test Case '-[YoteikanTests.PlanTests testDailyCountChangesAddOnlyDeficitAndUndoTogether]' passed (0.005 seconds).
+Test Case '-[YoteikanTests.PlanTests testDailyPresetCountsAreIndependentAndPersistAcrossDates]' passed (0.005 seconds).
+Test Case '-[YoteikanTests.PlanTests testDailyPresetDoesNotRecreateMovedEditedDeletedOrManualCopies]' passed (0.006 seconds).
+Test Case '-[YoteikanTests.PlanTests testDailyRefreshFollowsTodayButKeepsBrowsedDate]' passed (0.004 seconds).
+Test Case '-[YoteikanTests.PlanTests testDateSeparationAndIndependentPresetCopies]' passed (0.003 seconds).
+Test Case '-[YoteikanTests.PlanTests testDeleteColorRemapsAllDaysAndPresetsAndUndoRestoresEverything]' passed (0.004 seconds).
+Test Case '-[YoteikanTests.PlanTests testFiveAMPlacementBoundsPersistenceAndUndo]' passed (0.005 seconds).
+Test Case '-[YoteikanTests.PlanTests testFoldedTimelineCompressesGapsAndKeepsShortOverlappingEventsReadable]' passed (0.002 seconds).
+Test Case '-[YoteikanTests.PlanTests testFoldedTimelineInverseMapsDropsAcrossGapsAndEvents]' passed (0.002 seconds).
+Test Case '-[YoteikanTests.PlanTests testHoursMigrationAndInvalidSettingsKeepExistingData]' passed (0.003 seconds).
+Test Case '-[YoteikanTests.PlanTests testLegacyPlanKeepsStickiesAndPresetsWhenAddingColorNames]' passed (0.003 seconds).
+Test Case '-[YoteikanTests.PlanTests testLegacyPresetsDefaultToOneAndDoNotDuplicateAfterMigration]' passed (0.004 seconds).
+Test Case '-[YoteikanTests.PlanTests testMemoEditPreservesTimingAndOtherNotesAndSupportsUndo]' passed (0.004 seconds).
+Test Case '-[YoteikanTests.PlanTests testMovingOneStickyLeavesOthersAndPresetUnchanged]' passed (0.004 seconds).
+Test Case '-[YoteikanTests.PlanTests testOverlapColumnsCoverTransitiveGroupsAndReuseLanes]' passed (0.002 seconds).
+Test Case '-[YoteikanTests.PlanTests testPaletteRejectsEmptyInvalidOrDuplicateColorsAndSupportsOneColor]' passed (0.003 seconds).
+Test Case '-[YoteikanTests.PlanTests testPlanningRangeIncludesEarlyCalendarTimeAndEndsAtMidnight]' passed (0.002 seconds).
+Test Case '-[YoteikanTests.PlanTests testReminderDatesFilteringLimitAndSystemRequest]' passed (0.003 seconds).
+Test Case '-[YoteikanTests.PlanTests testReminderLegacyDefaultOffAndCustomPersistWithUndo]' passed (0.004 seconds).
+Test Case '-[YoteikanTests.PlanTests testReminderReconciliationMoveUnplaceDeleteDenyAndFailure]' passed (0.003 seconds).
+Test Case '-[YoteikanTests.PlanTests testSavingExistingStickyAsPresetCountsItForToday]' passed (0.003 seconds).
+Test Case '-[YoteikanTests.PlanTests testSnappingBoundsAndOverlapUnion]' passed (0.002 seconds).
+Test Case '-[YoteikanTests.PlanTests testThreeSimultaneousEventsHaveSeparateColumns]' passed (0.002 seconds).
+Test Case '-[YoteikanTests.PlanTests testUndoAndPersistenceAndUnplace]' passed (0.004 seconds).
+Test Case '-[YoteikanTests.SyncTests testAccountSwitchDoesNotUploadPreviousAccountData]' passed (0.007 seconds).
+Test Case '-[YoteikanTests.SyncTests testAdoptingCloudCreatesTodaysDailyNotesOnce]' passed (0.014 seconds).
+Test Case '-[YoteikanTests.SyncTests testCloudAdoptionPreservesRecoverableLocalBackup]' passed (0.007 seconds).
+Test Case '-[YoteikanTests.SyncTests testConcurrentEditAndDeletionRequireExplicitResolution]' passed (0.004 seconds).
+Test Case '-[YoteikanTests.SyncTests testDuplicateUploadsAreIdempotentAndIdenticalGenesisDoesNotConflict]' passed (0.001 seconds).
+Test Case '-[YoteikanTests.SyncTests testEditsDuringUploadRemainPendingAndReachNextSync]' passed (0.011 seconds).
+Test Case '-[YoteikanTests.SyncTests testEditsMadeWhileLoggedOutUploadOnReturningToSameAccount]' passed (0.008 seconds).
+Test Case '-[YoteikanTests.SyncTests testIndependentOfflineChangesAndDeletesConvergeWithoutResurrection]' passed (0.004 seconds).
+Test Case '-[YoteikanTests.SyncTests testInitialLoginDoesNotUploadBeforeExplicitChoice]' passed (0.006 seconds).
+Test Case '-[YoteikanTests.SyncTests testMalformedOrUnknownSchemaCannotReplaceLocalData]' passed (0.001 seconds).
+Test Case '-[YoteikanTests.SyncTests testNetworkAndUploadFailuresKeepPendingChangesForRetry]' passed (0.010 seconds).
+Test Case '-[YoteikanTests.SyncTests testNewDailyPresetIDsMatchAcrossOfflineDevices]' passed (0.009 seconds).
+	 Executed 45 tests, with 0 failures (0 unexpected) in 0.225 (0.236) seconds
+	 Executed 45 tests, with 0 failures (0 unexpected) in 0.225 (0.237) seconds
+Test Case '-[YoteikanUITests.YoteikanUITests test38GoogleSyncNeedsConfigurationWithoutChangingPlans]' passed (13.005 seconds).
+Test Case '-[YoteikanUITests.YoteikanUITests test39GoogleSyncInitialChoiceSyncAndLogout]' passed (16.915 seconds).
+Test Case '-[YoteikanUITests.YoteikanUITests test40GoogleSyncFailureCanRetryWithoutLosingPlans]' passed (15.111 seconds).
+** TEST SUCCEEDED **
+実Googleアカウント・実Driveへの接続は未確認。画面はシミュレーター専用の代替クライアントで検証。
