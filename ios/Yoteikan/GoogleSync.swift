@@ -146,7 +146,7 @@ struct CloudChanges { let mutations: [SyncMutation]; let fileIDs: Set<String>; l
         guard self.plans == nil else { return }
         self.plans = plans
         if plans.demo {
-            #if DEBUG && targetEnvironment(simulator)
+            #if DEBUG && (targetEnvironment(simulator) || targetEnvironment(macCatalyst))
             guard ProcessInfo.processInfo.arguments.contains("--sync-test") else { return }
             #else
             return
@@ -304,9 +304,9 @@ struct GoogleSyncView: View {
                     Section {
                         if sync.cloudHasData {
                             Button("クラウドの予定を使う") { Task { await sync.start(useCloud: true) } }.accessibilityIdentifier("googleUseCloud")
-                            Button("このiPhoneの予定も追加する") { Task { await sync.start(useCloud: false) } }.accessibilityIdentifier("googleUseLocal")
+                            Button("この\(PlatformSettings.deviceName)の予定も追加する") { Task { await sync.start(useCloud: false) } }.accessibilityIdentifier("googleUseLocal")
                         } else {
-                            Button("このiPhoneの予定で同期を開始") { Task { await sync.start(useCloud: false) } }.accessibilityIdentifier("googleUseLocal")
+                            Button("この\(PlatformSettings.deviceName)の予定で同期を開始") { Task { await sync.start(useCloud: false) } }.accessibilityIdentifier("googleUseLocal")
                         }
                     } header: { Text("同期するデータを選ぶ") } footer: {
                         Text("選ぶまでは端末の予定をアップロードしません。同期開始前の端末データは復元用に保存します。")
@@ -343,7 +343,7 @@ struct GoogleSyncView: View {
 
 extension GoogleSyncStore {
     static func forLaunch() -> GoogleSyncStore {
-        #if DEBUG && targetEnvironment(simulator)
+        #if DEBUG && (targetEnvironment(simulator) || targetEnvironment(macCatalyst))
         if ProcessInfo.processInfo.arguments.contains("--sync-test") {
             let defaults = UserDefaults(suiteName: "yoteikan.sync.ui-fixture")!
             defaults.removePersistentDomain(forName: "yoteikan.sync.ui-fixture")
@@ -358,7 +358,7 @@ extension GoogleSyncStore {
         return GoogleSyncStore()
     }
 }
-#if DEBUG && targetEnvironment(simulator)
+#if DEBUG && (targetEnvironment(simulator) || targetEnvironment(macCatalyst))
 private final class UnconfiguredTestDriveClient: DriveClient {
     let configured = false
     func restore() async throws -> SyncAccount? { nil }

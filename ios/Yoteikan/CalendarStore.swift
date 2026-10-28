@@ -29,7 +29,7 @@ import EventKit
                 if ProcessInfo.processInfo.arguments.contains("--calendar-test") { try seedCalendar() }
                 #endif
                 reload()
-            } else { message = "カレンダーへのアクセスが許可されていません。iPhoneの設定から変更できます。" }
+            } else { message = "カレンダーへのアクセスが許可されていません。設定画面から変更できます。" }
         } catch { message = "カレンダーを読み込めませんでした：\(error.localizedDescription)" }
     }
     func refresh(date: Date) { self.date = date; reload() }

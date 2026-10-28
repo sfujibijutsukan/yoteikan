@@ -32,7 +32,7 @@ import XCTest
     override func tearDown() { defaults.removePersistentDomain(forName: domain); super.tearDown() }
     func plan(_ title: String = "読書") -> SavedPlan {
         var plan = SavedPlan(); plan.presets = []
-        plan.stickies = [Sticky(title: title, minutes: 30, memo: "元のメモ", day: "2026-10-27", start: 480)]
+        plan.stickies = [Sticky(title: title, minutes: 30, memo: "元のメモ", day: dayKey(Date()), start: 480)]
         return plan
     }
     func store(_ plan: SavedPlan, defaults: UserDefaults? = nil) -> PlanStore {
