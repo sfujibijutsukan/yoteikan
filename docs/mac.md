@@ -61,9 +61,16 @@ xcodebuild -project ios/Yoteikan.xcodeproj -scheme Yoteikan \
 - Mac CatalystのDebug / Releaseビルド成功。ReleaseはApple Silicon（arm64）・Intel（x86_64）の両アーキテクチャを確認。Mac上のユニットテスト45件成功。
 - iPhoneシミュレーターでユニットテスト45件と、ドラッグ・伸縮・未配置へ戻す操作テスト1件成功。
 - Macのサンプルで、⌘Nからの付箋作成、マウスでの開始時刻変更、伸縮つまみによる長さ変更、日本語メモの編集・保存、⌘2の1日表示、⌘,の設定画面、アカウント・同期画面の表示を実操作で確認。
-- Mac用のUIテストコードを追加し、コンパイルまで確認。署名付きUIテストの実行にはMac Catalystの開発プロファイルが必要です。手元には未取得で、Appleアカウント上のプロファイル自動作成・更新は承認待ちです。UIテスト成功とは扱っていません。
+- ユーザー承認後、XcodeからMac Catalyst開発プロファイルを取得し、Apple Developmentによる署名を確認。署名付きMacビルドでもユニットテスト45件成功。署名の整合性とKeychainグループ・ネットワーク・カレンダー権限も確認済みです。
+- Mac UIテストは署名付きランナーの起動まで進みましたが、`Timed out while enabling automation mode` で自動操作モードを開始できませんでした。`DevToolsSecurity -status` は無効を返しています。UIテスト本体は実行されておらず、成功とは扱っていません。Mac本体の開発ツール認可が必要です。
 - 実Googleログイン・Drive送受信・Macの実カレンダー接続・通知の配信は未確認です。サンプル画面や代替Driveのテストと区別してください。
 
 ![Mac版・サンプルの編集確認](screenshots/56-mac-planner.png)
 
 ![Mac版・Googleログイン画面](screenshots/57-mac-sync.png)
+
+### Mac UIテストが自動操作開始前に止まる場合
+
+`Timed out while enabling automation mode` はアプリのテスト項目を実行する前の初期化エラーです。XcodeからUIテストを実行し、Mac上に開発ツールの認可が表示された場合は管理者が内容を確認します。状態の確認は `/usr/sbin/DevToolsSecurity -status` です。
+
+必要に応じて管理者が `sudo /usr/sbin/DevToolsSecurity -enable` で開発ツール用の認可設定を有効にできます。これはApple署名のデバッガー等を使う際、admin / _developerグループの利用者の追加パスワード認証を省略するMac本体の設定変更です。Apple開発プロファイルの取得とは別の操作なので、管理者の明示的な承認なしには実行しません。元に戻すには `sudo /usr/sbin/DevToolsSecurity -disable` を使います。
