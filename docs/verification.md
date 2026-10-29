@@ -4,15 +4,14 @@
 
 Issue #18・#19・#20を含め、ユニット23件・UI25件の全48件が成功しました（1件の再実行を含む）。スクリーンショット抽出・一覧作成ツールはGoで実装しています。Pythonへの依存はありません。
 
-## Googleログイン・Drive同期（Issue #42、2026年10月27日）
 
-- バンドルIDを `org.sfuji.yoteikan` に変更し、テスト用IDと起動手順も更新。ビルドしたアプリのInfo.plistでIDを確認。
-- Google公式ログインSDK、Driveアプリ専用領域への変更履歴の追加、起動・復帰・編集後と手動の同期、初回データ選択、アカウントの切り替え、競合解決、再試行を実装。
-- ユニット45件、関連UIは6件（03・30・35・38・39・40）の成功を確認。前半の既存操作とUIは artifacts/GoogleSyncChecked.xcresult、最終の同期モデル・通信・画面は artifacts/GoogleSyncAcceptance.xcresult。Debugのテストに加え、Release構成のシミュレーター向けビルドも確認。
-- データモデル検証では、独立編集の統合、削除と編集の衝突、重複再送、通信中の追加編集、ログアウト中の変更、別アカウントへの無断送信防止、毎日の二重生成防止、クラウドから取り込んだ当日分の自動追加を確認。
-- HTTPレスポンスの代替で、全ページ取得・取得済みファイルの省略・アプリ専用領域への追加・期限切れ認証と利用上限のエラー・未知形式の中断を確認。UIテストでは開発時のGoogleアカウントへ接続せず、シミュレーター専用の代替クライアントを使用。
-- [未設定](screenshots/51-google-sync-setup.png) / [初回選択](screenshots/52-google-sync-first-choice.png) / [接続画面](screenshots/53-google-sync-connected.png) / [再試行](screenshots/54-google-sync-retry.png) を目視確認。
-- **実際のGoogleログイン・実Driveへの送信・複数実機での同期は未確認**。OAuthクライアントIDを設定後、[設定・実接続の確認手順](google-sync.md)で検証する。Web版は今回含めない。
+## Googleログイン・同期の削除（2026年10月29日）
+
+- アカウント・同期画面、認証コールバック、起動・復帰・編集時のDrive通信、Google SDK・OAuth設定・同期モデル・設定補助ツールを削除。
+- 端末内の保存キー・データ形式と、毎日の付箋ID生成を維持。保存済みの予定・メモ・プリセットを継続使用します。外部のGoogleアカウントやDrive上のデータは変更しません。
+- Web版はmainへ未統合だったため、Web版PR #46を閉じました。公開環境の設定は行いません。
+- Debugテスト30件（単体28件、設定画面・付箋ドラッグ/伸縮/未配置への移動のUI各1件）成功。Releaseのシミュレーター用ビルド成功。記録は `artifacts/LocalOnly.xcresult` と `artifacts/local-only-release.log`。
+- [設定画面](screenshots/58-local-settings.png)でアカウント項目がないことを確認。カレンダー読み込みと通知は継続します。
 
 ## ピンチ拡大と計画の折りたたみ（Issue #33・#34、2026年10月27日）
 

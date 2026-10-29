@@ -5,7 +5,7 @@
 - macOS、iOS 17以降をビルドできるXcode、インストール済みのiPhoneシミュレーター。
 - Go：スクリーンショット出力ツールを使う場合のみ。標準ライブラリ以外の依存なし。
 
-Googleログインには公式GoogleSignInのSwift Packageを使用します。データ保存用の独自バックエンドは不要です。プロジェクトはios/Yoteikan.xcodeproj、共有スキームはYoteikan。
+外部パッケージ・アカウント設定・サーバーは不要です。プロジェクトはios/Yoteikan.xcodeproj、共有スキームはYoteikan。
 
 ## ビルド・実行
 
@@ -99,6 +99,6 @@ xcrun simctl launch --terminate-running-process \
 
 新しい作業は最新の `origin/main` から `codex/` で始まるブランチを作成します。PRのマージ先は必ず `main` とし、機能ブランチ同士をマージ先にする運用は行いません。
 
-## Googleログインと同期
+## 保存先
 
-バンドルIDは `org.sfuji.yoteikan` です。[Google同期の設定手順](google-sync.md)に従い、iOS用OAuthクライアントを設定してください。ローカルの `ios/Google.local.xcconfig` はGoの補助ツールで作成でき、Git管理対象外です。クライアントID未設定でも端末内の計画機能は使用できます。
+バンドルIDは `org.sfuji.yoteikan` です。計画データは端末内に保存します。Googleログイン・Drive同期・Webからの参照や編集機能はありません。既存の端末内データは同じ保存形式・キーで引き続き読み込みます。
