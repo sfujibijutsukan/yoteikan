@@ -102,6 +102,23 @@ func test45OverviewDateNavigationSharesPlanningDate() {
         shot("65-copy-sticky")
     }
 
+    func test48PlanUndoRestoresPreviousStateOnce() {
+        launch()
+        XCTAssertFalse(app.buttons["undoPlan"].isEnabled)
+        let reading = app.otherElements["task-朝の読書"]
+        let before = reading.value as? String
+        reading.press(forDuration: 1)
+        app.buttons.matching(identifier: "copyStickyAction").firstMatch.tap()
+        XCTAssertTrue(app.descendants(matching: .any).matching(identifier: "inbox-朝の読書").firstMatch.waitForExistence(timeout: 3))
+        let enabled = expectation(for: NSPredicate(format: "enabled == true"), evaluatedWith: app.buttons["undoPlan"])
+        wait(for: [enabled], timeout: 3)
+        shot("66-undo-plan")
+        app.buttons["undoPlan"].tap()
+        XCTAssertFalse(app.descendants(matching: .any).matching(identifier: "inbox-朝の読書").firstMatch.exists)
+        XCTAssertEqual(reading.value as? String, before)
+        XCTAssertFalse(app.buttons["undoPlan"].isEnabled)
+    }
+
     private func selectTab(_ name: String) {
         #if os(macOS) || targetEnvironment(macCatalyst)
         app.radioButtons[name].click()
