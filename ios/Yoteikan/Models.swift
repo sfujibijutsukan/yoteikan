@@ -294,14 +294,14 @@ struct FoldedTimeline {
     }
     let bands: [Band]
     var height: CGFloat { bands.last.map { $0.y + $0.height } ?? 0 }
-    init(items: [TimelineItem], start: Int, end: Int) {
+    init(items: [TimelineItem], start: Int, end: Int, minimumEventHeight: CGFloat = 48) {
         let clipped = items.filter { $0.start < end && $0.end > start && $0.end > $0.start }
         let boundaries = Set([start, end] + clipped.flatMap { [max(start, $0.start), min(end, $0.end)] }).sorted()
         var result: [Band] = []
         var y: CGFloat = 0
         for (a, b) in zip(boundaries, boundaries.dropFirst()) {
             let occupied = clipped.contains { $0.start < b && $0.end > a }
-            let height: CGFloat = occupied ? max(48, min(100, CGFloat(b - a))) : 32
+            let height: CGFloat = occupied ? max(minimumEventHeight, min(100, CGFloat(b - a))) : 32
             result.append(Band(start: a, end: b, occupied: occupied, y: y, height: height))
             y += height
         }

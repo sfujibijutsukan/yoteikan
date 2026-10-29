@@ -48,6 +48,18 @@ import UserNotifications
         XCTAssertNil(store.undo)
         XCTAssertEqual(PlanStore(defaults: defaults).plan, before)
     }
+    func testFontScaleLimitsAndLargerFoldedLayoutKeepTimeMapping() {
+        XCTAssertEqual(PlannerTypography.clamp(.nan), 1)
+        XCTAssertEqual(PlannerTypography.clamp(.infinity), 1)
+        XCTAssertEqual(PlannerTypography.clamp(0.1), 0.9, accuracy: 0.001)
+        XCTAssertEqual(PlannerTypography.clamp(10), 1.5)
+        XCTAssertEqual(PlannerTypography.percent(1.5), "150%")
+        let layout = FoldedTimeline(items: [TimelineItem(id: "short", start: 480, end: 485)], start: 300, end: 1440, minimumEventHeight: 72)
+        XCTAssertGreaterThanOrEqual(layout.position(485) - layout.position(480), 72)
+        for minute in stride(from: 300, through: 1440, by: 5) {
+            XCTAssertEqual(layout.minute(at: layout.position(minute)), CGFloat(minute), accuracy: 0.001)
+        }
+    }
     func testFoldedTimelineInverseMapsDropsAcrossGapsAndEvents() {
         let folded = FoldedTimeline(items: [TimelineItem(id: "short", start: 480, end: 485),
                                            TimelineItem(id: "long", start: 600, end: 660)], start: 300, end: 1440)
