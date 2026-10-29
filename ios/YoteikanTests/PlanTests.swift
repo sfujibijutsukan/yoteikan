@@ -13,6 +13,53 @@ import UserNotifications
         defaults.set(try! JSONEncoder().encode(manual), forKey: "yoteikan.plan.v1")
     }
     override func tearDown() { defaults.removePersistentDomain(forName: suite); super.tearDown() }
+    func testCopyMakesIndependentUnplacedStickyAndPreservesOriginalAndUndo() throws {
+        let store = PlanStore(defaults: defaults)
+        store.add(Preset(title: "コピー元", minutes: 30, memo: "大切なメモ", dailyCount: 0))
+        let id = try XCTUnwrap(store.today.first?.id)
+        store.put(id, at: 600)
+        let original = store.plan
+        let copyID = try XCTUnwrap(store.duplicate(id))
+        let copy = try XCTUnwrap(store.today.first { $0.id == copyID })
+        XCTAssertNotEqual(copyID, id)
+        XCTAssertNil(copy.start)
+        XCTAssertEqual(copy.title, "コピー元")
+        XCTAssertEqual(copy.memo, "大切なメモ")
+        XCTAssertEqual(copy.minutes, 30)
+        XCTAssertEqual(copy.reminderMinutes, original.stickies[0].reminderMinutes)
+        XCTAssertEqual(store.today.first { $0.id == id }, original.stickies[0])
+        XCTAssertEqual(PlanStore(defaults: defaults).plan, store.plan)
+        store.restore()
+        XCTAssertEqual(store.plan, original)
+        store.put(id, at: nil)
+        XCTAssertNotNil(store.duplicate(id))
+        XCTAssertEqual(store.today.count, 2)
+        XCTAssertTrue(store.today.allSatisfy { $0.start == nil })
+    }
+    func testNoOpKeepsUndoOfLastRealEdit() {
+        let store = PlanStore(defaults: defaults)
+        let before = store.plan
+        store.add(Preset(title: "戻す", minutes: 30, dailyCount: 0))
+        store.change { _ in }
+        store.put(store.today[0].id, at: nil)
+        XCTAssertEqual(store.undo, before)
+        store.restore()
+        XCTAssertEqual(store.plan, before)
+        XCTAssertNil(store.undo)
+        XCTAssertEqual(PlanStore(defaults: defaults).plan, before)
+    }
+    func testFontScaleLimitsAndLargerFoldedLayoutKeepTimeMapping() {
+        XCTAssertEqual(PlannerTypography.clamp(.nan), 1)
+        XCTAssertEqual(PlannerTypography.clamp(.infinity), 1)
+        XCTAssertEqual(PlannerTypography.clamp(0.1), 0.9, accuracy: 0.001)
+        XCTAssertEqual(PlannerTypography.clamp(10), 1.5)
+        XCTAssertEqual(PlannerTypography.percent(1.5), "150%")
+        let layout = FoldedTimeline(items: [TimelineItem(id: "short", start: 480, end: 485)], start: 300, end: 1440, minimumEventHeight: 72)
+        XCTAssertGreaterThanOrEqual(layout.position(485) - layout.position(480), 72)
+        for minute in stride(from: 300, through: 1440, by: 5) {
+            XCTAssertEqual(layout.minute(at: layout.position(minute)), CGFloat(minute), accuracy: 0.001)
+        }
+    }
     func testFoldedTimelineInverseMapsDropsAcrossGapsAndEvents() {
         let folded = FoldedTimeline(items: [TimelineItem(id: "short", start: 480, end: 485),
                                            TimelineItem(id: "long", start: 600, end: 660)], start: 300, end: 1440)

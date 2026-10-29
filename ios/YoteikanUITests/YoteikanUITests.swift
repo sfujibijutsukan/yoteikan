@@ -34,6 +34,7 @@ final class YoteikanUITests: XCTestCase {
         XCTAssertFalse(app.textViews["scheduleMemo"].exists)
         XCTAssertFalse(app.buttons["closeScheduleMemo"].exists)
         XCTAssertEqual(task.value as? String, timing)
+        if app.buttons.matching(identifier: "copyStickyAction").firstMatch.exists { app.coordinate(withNormalizedOffset: CGVector(dx: 0.95, dy: 0.12)).tap() }
         selectTab("1日表示")
         let block = app.descendants(matching: .any).matching(identifier: "fullDayBlock-朝の読書").firstMatch
         block.press(forDuration: 8)
@@ -118,6 +119,83 @@ final class YoteikanUITests: XCTestCase {
     }
 
     #endif
+
+
+func test45OverviewDateNavigationSharesPlanningDate() {
+    launch()
+    selectTab("1日表示")
+    let before = app.staticTexts["overviewDate"].label
+    app.buttons["overviewNextDay"].tap()
+    let next = app.staticTexts["overviewDate"].label
+    XCTAssertNotEqual(next, before)
+    selectTab("計画")
+    XCTAssertEqual(app.staticTexts["selectedDate"].label, next)
+    selectTab("1日表示")
+    app.buttons["overviewPreviousDay"].tap()
+    XCTAssertEqual(app.staticTexts["overviewDate"].label, before)
+    app.buttons["overviewPreviousDay"].tap()
+    app.buttons["overviewToday"].tap()
+    XCTAssertEqual(app.staticTexts["overviewDate"].label, before)
+    XCTAssertTrue(app.descendants(matching: .any).matching(identifier: "fullDayBlock-朝の読書").firstMatch.exists)
+    shot("64-overview-date-navigation")
+}
+
+    func test46CopyPlacedAndInboxStickiesFromHoldMenu() {
+        launch()
+        let placed = app.otherElements["task-朝の読書"]
+        let before = placed.value as? String
+        placed.press(forDuration: 1)
+        XCTAssertTrue(app.buttons.matching(identifier: "copyStickyAction").firstMatch.waitForExistence(timeout: 3), app.debugDescription)
+        app.buttons.matching(identifier: "copyStickyAction").firstMatch.tap()
+        XCTAssertEqual(placed.value as? String, before)
+        let inboxCopy = app.descendants(matching: .any).matching(identifier: "inbox-朝の読書").firstMatch
+        XCTAssertTrue(inboxCopy.waitForExistence(timeout: 3))
+        inboxCopy.press(forDuration: 1)
+        XCTAssertTrue(app.buttons.matching(identifier: "copyStickyAction").firstMatch.waitForExistence(timeout: 3))
+        app.buttons.matching(identifier: "copyStickyAction").firstMatch.tap()
+        XCTAssertEqual(app.descendants(matching: .any).matching(identifier: "inbox-朝の読書").count, 2)
+        shot("65-copy-sticky")
+    }
+
+    func test48PlanUndoRestoresPreviousStateOnce() {
+        launch()
+        XCTAssertFalse(app.buttons["undoPlan"].isEnabled)
+        let reading = app.otherElements["task-朝の読書"]
+        let before = reading.value as? String
+        reading.press(forDuration: 1)
+        app.buttons.matching(identifier: "copyStickyAction").firstMatch.tap()
+        XCTAssertTrue(app.descendants(matching: .any).matching(identifier: "inbox-朝の読書").firstMatch.waitForExistence(timeout: 3))
+        let enabled = expectation(for: NSPredicate(format: "enabled == true"), evaluatedWith: app.buttons["undoPlan"])
+        wait(for: [enabled], timeout: 3)
+        shot("66-undo-plan")
+        app.buttons["undoPlan"].tap()
+        XCTAssertFalse(app.descendants(matching: .any).matching(identifier: "inbox-朝の読書").firstMatch.exists)
+        XCTAssertEqual(reading.value as? String, before)
+        XCTAssertFalse(app.buttons["undoPlan"].isEnabled)
+    }
+
+    func test49FontSizePersistsAndGrowsFoldedCards() {
+        launch(["--demo", "--reset-test-data"])
+        app.buttons["foldPlanner"].tap()
+        let normalHeight = app.otherElements["task-朝の読書"].frame.height
+        selectTab("設定")
+        XCTAssertEqual(app.staticTexts["fontScaleValue"].label, "100%")
+        app.sliders["fontSizeSlider"].adjust(toNormalizedSliderPosition: 1)
+        XCTAssertEqual(app.staticTexts["fontScaleValue"].label, "150%")
+        shot("67-font-settings")
+        selectTab("計画")
+        XCTAssertGreaterThan(app.otherElements["task-朝の読書"].frame.height, normalHeight)
+        shot("68-large-font-plan")
+        selectTab("1日表示")
+        XCTAssertTrue(app.descendants(matching: .any).matching(identifier: "fullDayBlock-朝の読書").firstMatch.exists)
+        shot("69-large-font-day")
+        app.terminate(); app.launchArguments = ["--demo"]; app.launch()
+        XCTAssertTrue(app.buttons["presetsButton"].waitForExistence(timeout: 5))
+        selectTab("設定")
+        XCTAssertEqual(app.staticTexts["fontScaleValue"].label, "150%")
+        app.buttons["resetFontSize"].tap()
+        XCTAssertEqual(app.staticTexts["fontScaleValue"].label, "100%")
+    }
 
     private func selectTab(_ name: String) {
         #if os(macOS) || targetEnvironment(macCatalyst)
@@ -999,6 +1077,7 @@ final class YoteikanUITests: XCTestCase {
         XCTAssertEqual(work.value as? String, "09:20|80")
         XCTAssertEqual(reading.value as? String, "08:00|30")
         work.press(forDuration: 1)
+        if app.buttons.matching(identifier: "copyStickyAction").firstMatch.exists { app.coordinate(withNormalizedOffset: CGVector(dx: 0.95, dy: 0.12)).tap() }
         XCTAssertFalse(app.otherElements["memoPreview"].exists)
         XCTAssertFalse(app.buttons["closeScheduleMemo"].exists)
         app.buttons["foldPlanner"].tap()

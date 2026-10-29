@@ -234,4 +234,13 @@ iPhone 17eシミュレーター / iOS 27.0でXCTestを使って実際に操作�
 <img src="63-widget-home.png" width="260" alt="iPhoneシミュレーターのホーム画面に表示した予定館ウィジェット">
 
 アプリの時刻線はテスト用の13:17、ホーム画面のウィジェットは実際のシミュレーター時刻に合わせたサンプルデータです。
+[ウィジェットから今日の計画へ戻った画面](63-widget-open-today.png)。59〜62・64・66〜69はmain統合後に再撮影。
 [小・中サイズの表示部品の検証画面](62-widget-layouts.png)は、拡張機能と共通のViewをアプリ内に表示したものです。実際のホーム画面とは区別しています。
+
+## Issue #52〜#57
+
+[1日表示の日付移動](64-overview-date-navigation.png) / [付箋のコピー](65-copy-sticky.png) / [計画上部のUndo](66-undo-plan.png)
+
+<img src="67-font-settings.png" width="260" alt="文字サイズ150%の設定">
+<img src="68-large-font-plan.png" width="260" alt="文字サイズに合わせて予定高さと時刻欄も広がった計画画面">
+<img src="69-large-font-day.png" width="260" alt="文字サイズ150%の1日表示">

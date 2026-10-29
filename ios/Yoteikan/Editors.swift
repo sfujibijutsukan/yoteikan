@@ -15,7 +15,7 @@ struct StickyEditor: View {
             Form {
                 Section("やること") { TextField("例：読書", text: $task.title).accessibilityIdentifier("stickyTitle") }
                 Section("所要時間") {
-                    HStack { ForEach([15, 30, 45, 60], id: \.self) { minutes in Button { task.minutes = minutes } label: { Text("\(minutes)分").font(.system(size: 13, weight: .semibold)).frame(maxWidth: .infinity).padding(.vertical, 10).background(task.minutes == minutes ? accent : paper, in: RoundedRectangle(cornerRadius: 8)).foregroundStyle(task.minutes == minutes ? .white : ink) }.buttonStyle(.plain).accessibilityIdentifier("duration-\(minutes)") } }
+                    HStack { ForEach([15, 30, 45, 60], id: \.self) { minutes in Button { task.minutes = minutes } label: { Text("\(minutes)分").plannerFont(size: 13, weight: .semibold).frame(maxWidth: .infinity).padding(.vertical, 10).background(task.minutes == minutes ? accent : paper, in: RoundedRectangle(cornerRadius: 8)).foregroundStyle(task.minutes == minutes ? .white : ink) }.buttonStyle(.plain).accessibilityIdentifier("duration-\(minutes)") } }
                     Stepper("\(task.minutes)分", value: $task.minutes, in: 5...720, step: 5).accessibilityIdentifier("durationStepper")
                 }
                 Section("色") { NamedColorPicker(selection: $task.tone) }
@@ -36,7 +36,7 @@ struct StickyEditor: View {
                             Button("通知を許可する") { Task { await reminders.enable() } }
                         } else if reminders.authorization == .denied {
                             Text("通知は許可されていません。設定画面から通知設定を開けます。")
-                                .font(.caption).foregroundStyle(.secondary)
+                                .plannerFont(.caption).foregroundStyle(.secondary)
                         }
                     }
                 }
@@ -120,8 +120,8 @@ struct PresetsView: View {
                     ForEach(plans.plan.presets) { preset in
                         HStack(spacing: 12) {
                             RoundedRectangle(cornerRadius: 4).fill(plans.paletteColor(for: preset.tone).color).frame(width: 7, height: 42)
-                            Button { plans.add(preset); added[preset.id, default: 0] += 1 } label: { HStack { VStack(alignment: .leading, spacing: 5) { Text(preset.title).font(.system(size: 16, weight: .medium)).foregroundStyle(ink); Text(durationText(preset.minutes)).font(.caption).foregroundStyle(.secondary) }; Spacer(); if let count = added[preset.id] { Text("\(count)").font(.system(size: 12, weight: .semibold, design: .rounded)).foregroundStyle(accent).accessibilityHidden(true) }; Image(systemName: "plus.circle.fill").font(.title3).foregroundStyle(accent) }.contentShape(Rectangle()) }.buttonStyle(.plain).accessibilityIdentifier("preset-\(preset.title)").accessibilityValue(added[preset.id].map { "\($0)枚追加済み" } ?? "")
-                            Text(preset.dailyCount == 0 ? "自動なし" : "毎日\(preset.dailyCount)枚").font(.caption2).foregroundStyle(.secondary)
+                            Button { plans.add(preset); added[preset.id, default: 0] += 1 } label: { HStack { VStack(alignment: .leading, spacing: 5) { Text(preset.title).plannerFont(size: 16, weight: .medium).foregroundStyle(ink); Text(durationText(preset.minutes)).plannerFont(.caption).foregroundStyle(.secondary) }; Spacer(); if let count = added[preset.id] { Text("\(count)").plannerFont(size: 12, weight: .semibold, design: .rounded).foregroundStyle(accent).accessibilityHidden(true) }; Image(systemName: "plus.circle.fill").plannerFont(.title3).foregroundStyle(accent) }.contentShape(Rectangle()) }.buttonStyle(.plain).accessibilityIdentifier("preset-\(preset.title)").accessibilityValue(added[preset.id].map { "\($0)枚追加済み" } ?? "")
+                            Text(preset.dailyCount == 0 ? "自動なし" : "毎日\(preset.dailyCount)枚").plannerFont(.caption2).foregroundStyle(.secondary)
                             Button { editing = preset } label: { Image(systemName: "ellipsis").frame(width: 34, height: 44).foregroundStyle(.secondary) }.buttonStyle(.plain).accessibilityLabel("\(preset.title)のプリセットを編集").accessibilityIdentifier("edit-preset-\(preset.title)")
                         }.listRowBackground(Color.white)
                     }.onDelete { index in plans.change { $0.presets.remove(atOffsets: index) } }
@@ -174,7 +174,7 @@ struct NamedColorPicker: View {
                     VStack(spacing: 7) {
                         Circle().fill(color.color).frame(width: 36, height: 36)
                             .overlay { if selection == color.id { Image(systemName: "checkmark").foregroundStyle(ink).padding(3).background(.white.opacity(0.8), in: Circle()) } }
-                        Text(color.name).font(.system(size: 12))
+                        Text(color.name).plannerFont(size: 12)
                             .lineLimit(1).minimumScaleFactor(0.7).foregroundStyle(ink)
                     }.frame(maxWidth: .infinity).padding(.vertical, 4).contentShape(Rectangle())
                 }.buttonStyle(.plain).accessibilityIdentifier("color-\(color.id)")
@@ -262,7 +262,7 @@ struct CalendarSettingsView: View {
             List {
                 if calendar.connected {
                     Section {
-                        if calendar.calendars.isEmpty { Text("カレンダーがありません").font(.subheadline) }
+                        if calendar.calendars.isEmpty { Text("カレンダーがありません").plannerFont(.subheadline) }
                         ForEach(calendar.calendars, id: \.calendarIdentifier) { item in
                             Toggle(isOn: Binding(get: { calendar.enabled.contains(item.calendarIdentifier) }, set: { _ in calendar.toggle(item) })) { HStack { Circle().fill(Color(cgColor: item.cgColor)).frame(width: 10, height: 10); Text(item.title) } }.accessibilityIdentifier("calendar-\(item.title)")
                         }
@@ -271,7 +271,7 @@ struct CalendarSettingsView: View {
                     Section { Button("カレンダーに接続") { Task { await calendar.connect() } }.accessibilityIdentifier("requestCalendar") } footer: { Text("読み込み専用です。iOSの許可画面ではフルアクセスが必要です。") }
                     Section { Button(PlatformSettings.calendarTitle) { if let url = PlatformSettings.calendarURL { UIApplication.shared.open(url) } } }
                 }
-                if let message = calendar.message { Section { Text(message).font(.subheadline).foregroundStyle(.orange) } }
+                if let message = calendar.message { Section { Text(message).plannerFont(.subheadline).foregroundStyle(.orange) } }
             }.scrollContentBackground(.hidden).background(paper).navigationTitle("カレンダー").navigationBarTitleDisplayMode(.inline)
                 .toolbar { ToolbarItem(placement: .confirmationAction) { Button("完了") { dismiss() }.accessibilityIdentifier("closeCalendar") } }
         }
@@ -317,6 +317,7 @@ struct PlannerSettingsTab: View {
 struct PlannerSettingsView: View {
     let open: (PlannerSetting) -> Void
     var showsClose = true
+    @AppStorage(PlannerTypography.key) private var requestedFontScale = 1.0
     @AppStorage("planner.sidebarLeading") private var sidebarLeading = false
     @EnvironmentObject private var reminders: ReminderStore
     @Environment(\.dismiss) private var dismiss
@@ -324,6 +325,17 @@ struct PlannerSettingsView: View {
     var body: some View {
         NavigationStack {
             Form {
+                Section("表示") {
+                    HStack {
+                        Text("文字の大きさ")
+                        Spacer()
+                        Text(PlannerTypography.percent(requestedFontScale)).monospacedDigit().accessibilityIdentifier("fontScaleValue")
+                    }
+                    Slider(value: Binding(get: { Double(PlannerTypography.clamp(requestedFontScale)) }, set: { requestedFontScale = $0 }), in: 0.9...1.5, step: 0.1) {
+                        Text("文字の大きさ")
+                    }.accessibilityIdentifier("fontSizeSlider").accessibilityValue(PlannerTypography.percent(requestedFontScale))
+                    Button("標準に戻す") { requestedFontScale = 1 }.accessibilityIdentifier("resetFontSize")
+                }
                 Section("時間・カレンダー") {
                     Button { open(.hours) } label: { Label("計画の時間帯", systemImage: "clock") }.accessibilityIdentifier("hoursSettings")
                     Button { open(.calendar) } label: { Label("カレンダー", systemImage: "calendar") }.accessibilityIdentifier("calendarSettings")
@@ -378,10 +390,10 @@ struct SettingsStickyList: View {
                                 VStack(alignment: .leading, spacing: 4) {
                                     Text(task.title).foregroundStyle(ink)
                                     Text(task.start.map { "\(clockText($0))〜\(clockText($0 + task.minutes))" } ?? "未配置・\(durationText(task.minutes))")
-                                        .font(.caption).foregroundStyle(.secondary)
+                                        .plannerFont(.caption).foregroundStyle(.secondary)
                                 }
                                 Spacer()
-                                Image(systemName: "chevron.right").font(.caption).foregroundStyle(.secondary)
+                                Image(systemName: "chevron.right").plannerFont(.caption).foregroundStyle(.secondary)
                             }.contentShape(Rectangle())
                         }.buttonStyle(.plain).accessibilityIdentifier("settingsSticky-\(task.title)")
                     }
