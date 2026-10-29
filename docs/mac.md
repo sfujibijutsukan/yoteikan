@@ -56,7 +56,7 @@ Mac App Storeへの配信やDeveloper IDによる公証・インストーラー�
 ## 確認状況
 
 - 同期削除前はMac Debug / Release（arm64 / x86_64）ビルド、署名付きMacユニットテスト45件が成功。Macサンプルで付箋作成・マウス移動・伸縮・日本語メモ保存・画面切替を実操作で確認しました。
-- Google同期削除後のiPhoneシミュレーターでは単体28件・UI2件とReleaseビルドが成功。Mac側も同期処理・画面と、不要になったKeychain・外向き通信の権限を削除しました。
+- Google同期削除後のMac Catalyst Debugビルドと単体28件が成功（`artifacts/MacLocalOnly.xcresult`）。iPhoneシミュレーターでは単体28件・UI2件とReleaseビルドが成功。Mac側も同期処理・画面と、不要になったKeychain・外向き通信の権限を削除しました。
 - Macの自動UIテストは、前回 `Timed out while enabling automation mode` で初期化に失敗しています。ユーザーの待機指示後、認証待ちの処理を取り消し、DevToolsSecurityが無効のままであることを確認しました。今回、OSの認可設定は変更しません。
 - Macの実カレンダー接続・通知配信は未確認です。
 
