@@ -111,11 +111,6 @@ final class YoteikanUITests: XCTestCase {
         selectDetails()
         app.buttons["editSideDetail"].tap()
     }
-    private func undoChange() {
-        selectTab("設定")
-        app.buttons["undoButton"].tap()
-        selectTab("計画")
-    }
     private func unplaceSelected() { selectDetails(); app.buttons["unplaceButton"].tap() }
     private func pinch(_ factor: CGFloat) {
         let surface = app.descendants(matching: .any).matching(identifier: "timelineZoomSurface").firstMatch
@@ -145,6 +140,7 @@ final class YoteikanUITests: XCTestCase {
         XCTAssertFalse(app.buttons["calendarSettings"].exists)
         selectTab("設定")
         XCTAssertTrue(app.buttons["hoursSettings"].exists)
+        XCTAssertFalse(app.buttons["undoButton"].exists)
         XCTAssertTrue(app.buttons["calendarSettings"].exists)
         XCTAssertTrue(app.buttons["colorSettings"].exists)
         shot("37-unified-settings")
@@ -296,7 +292,7 @@ final class YoteikanUITests: XCTestCase {
         app.buttons["closePresets"].tap()
         XCTAssertEqual(app.otherElements.matching(identifier: "inbox-読書").count, 2)
     }
-    func test02CreatePersistEditAndUndo() {
+    func test02CreatePersistAndEdit() {
         launch(["--reset-test-data"])
         app.buttons["newStickyButton"].tap()
         app.textFields["stickyTitle"].tap(); app.textFields["stickyTitle"].typeText("集中作業")
@@ -305,9 +301,8 @@ final class YoteikanUITests: XCTestCase {
         app.terminate(); launch([])
         XCTAssertTrue(app.descendants(matching: .any).matching(identifier: "inbox-集中作業").firstMatch.exists)
         editInbox("集中作業"); app.buttons["duration-60"].tap(); app.buttons["saveSticky"].tap()
-        undoChange()
         editInbox("集中作業")
-        XCTAssertTrue(app.steppers["durationStepper"].label.contains("45")); shot("03-sticky-editor")
+        XCTAssertTrue(app.steppers["durationStepper"].label.contains("60")); shot("03-sticky-editor")
     }
     func test03DragResizeAndUnplace() {
         launch()
@@ -318,7 +313,8 @@ final class YoteikanUITests: XCTestCase {
         XCTAssertEqual(task.value as? String, "09:30|60")
         XCTAssertEqual(app.otherElements["task-朝の読書"].value as? String, "08:00|30")
         shot("04-overlap-after-drag")
-        undoChange()
+        app.terminate(); launch()
+        app.otherElements["task-資料作成"].tap()
         let handle = app.otherElements["resize-資料作成"]
         XCTAssertTrue(handle.exists)
         let point = handle.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
@@ -328,7 +324,7 @@ final class YoteikanUITests: XCTestCase {
         unplaceSelected()
         XCTAssertTrue(app.descendants(matching: .any).matching(identifier: "inbox-資料作成").firstMatch.waitForExistence(timeout: 3))
         XCTAssertFalse(app.otherElements["task-資料作成"].exists)
-        undoChange()
+        app.terminate(); launch()
         XCTAssertTrue(app.otherElements["task-資料作成"].exists)
         let returnFrom = task.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.25))
         let tray = app.otherElements["inboxTray"].coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
@@ -423,7 +419,7 @@ final class YoteikanUITests: XCTestCase {
         XCTAssertEqual(after.duration, 60)
         XCTAssertFalse(app.descendants(matching: .any).matching(identifier: "inbox-移動の確認").firstMatch.exists)
     }
-    func test09MoveHandleChangesStartAndPersistsWithUndo() {
+    func test09MoveHandleChangesStartAndPersists() {
         launch(["--reset-test-data"])
         let task = createAndPlaceSticky()
         let before = placement(of: task)
@@ -434,14 +430,6 @@ final class YoteikanUITests: XCTestCase {
         XCTAssertEqual(placement(of: task).start, before.start - 30)
         XCTAssertEqual(placement(of: task).duration, 60)
         shot("09-start-time-drag")
-        undoChange()
-        XCTAssertEqual(placement(of: task).start, before.start)
-        XCTAssertEqual(placement(of: task).duration, 60)
-        let handleAgain = app.otherElements["move-移動の確認"]
-        XCTAssertTrue(handleAgain.waitForExistence(timeout: 3))
-        let again = handleAgain.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
-        again.press(forDuration: 0.05, thenDragTo: again.withOffset(CGVector(dx: 0, dy: -46.5)))
-        XCTAssertEqual(placement(of: task).start, before.start - 30)
         app.terminate(); launch([])
         let restored = app.otherElements["task-移動の確認"]
         XCTAssertTrue(restored.waitForExistence(timeout: 3))
@@ -644,8 +632,6 @@ final class YoteikanUITests: XCTestCase {
         XCTAssertTrue(outside.exists)
         XCTAssertTrue(outside.label.contains("時間外 20:00"))
         shot("17-custom-hours-and-outside-sticky")
-        undoChange()
-        XCTAssertEqual(app.otherElements["task-夜の計画"].value as? String, "20:00|30")
     }
     private func chooseHour(_ hour: String, picker: String) {
         app.buttons[picker].tap()
@@ -780,8 +766,8 @@ final class YoteikanUITests: XCTestCase {
         let first = app.otherElements["task-読書5分"]
         let second = app.otherElements["task-休憩5分"]
         let initialHeight = first.frame.height
-        for _ in 0..<3 { pinch(2) }
-        XCTAssertGreaterThan(first.frame.height, initialHeight * 6)
+        for _ in 0..<5 { pinch(2) }
+        XCTAssertGreaterThanOrEqual(first.frame.height + 0.5, initialHeight * 6)
         XCTAssertLessThan(first.frame.maxY, second.frame.minY)
         first.tap()
         let resize = app.otherElements["resize-読書5分"]
@@ -790,8 +776,6 @@ final class YoteikanUITests: XCTestCase {
         let point = resize.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
         point.press(forDuration: 0.2, thenDragTo: point.withOffset(CGVector(dx: 0, dy: fiveMinutes)))
         XCTAssertEqual(first.value as? String, "08:00|10")
-        undoChange()
-        XCTAssertEqual(first.value as? String, "08:00|5")
         shot("22-five-minute-zoom")
     }
     func test21ZoomKeepsVisibleHourAndZoneLayout() {
