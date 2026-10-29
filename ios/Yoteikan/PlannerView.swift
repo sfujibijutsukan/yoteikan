@@ -248,6 +248,9 @@ private struct MemoHold: UIViewRepresentable {
         let press = UILongPressGestureRecognizer(target: context.coordinator, action: #selector(Coordinator.press(_:)))
         press.minimumPressDuration = 0.5
         view.addGestureRecognizer(press)
+        #if targetEnvironment(macCatalyst)
+        view.addGestureRecognizer(UIHoverGestureRecognizer(target: context.coordinator, action: #selector(Coordinator.hover(_:))))
+        #endif
         view.isAccessibilityElement = false
         return view
     }
@@ -256,6 +259,12 @@ private struct MemoHold: UIViewRepresentable {
     final class Coordinator: NSObject {
         var content: (() -> MemoPreviewContent)?
         let presenter = MemoPreviewPresenter()
+        #if targetEnvironment(macCatalyst)
+        @objc func hover(_ gesture: UIHoverGestureRecognizer) {
+            if gesture.state == .began, let source = gesture.view, let content = content?() { presenter.show(content, from: source) }
+            else if gesture.state == .ended || gesture.state == .cancelled { presenter.hide() }
+        }
+        #endif
         @objc func press(_ gesture: UILongPressGestureRecognizer) {
             if gesture.state == .began, let source = gesture.view, let content = content?() {
                 presenter.show(content, from: source)
@@ -372,6 +381,11 @@ private struct StickyTouch: UIViewRepresentable {
     func makeCoordinator() -> Coordinator { Coordinator() }
     func makeUIView(context: Context) -> UIView {
         let view = UIView()
+        #if targetEnvironment(macCatalyst)
+        let pan = UIPanGestureRecognizer(target: context.coordinator, action: #selector(Coordinator.mouseDrag(_:)))
+        view.addGestureRecognizer(pan)
+        view.addGestureRecognizer(UIHoverGestureRecognizer(target: context.coordinator, action: #selector(Coordinator.hover(_:))))
+        #endif
         let press = UILongPressGestureRecognizer(target: context.coordinator, action: #selector(Coordinator.press(_:)))
         press.minimumPressDuration = 0.3
         press.allowableMovement = 10
@@ -395,6 +409,23 @@ private struct StickyTouch: UIViewRepresentable {
         var pending: DispatchWorkItem?
         func cancelPending() { pending?.cancel(); pending = nil; token = UUID() }
         @objc func tap() { actions?.tapped() }
+        #if targetEnvironment(macCatalyst)
+        @objc func hover(_ gesture: UIHoverGestureRecognizer) {
+            if gesture.state == .began, let source = gesture.view, let content = actions?.preview() { presenter.show(content, from: source) }
+            else if gesture.state == .ended || gesture.state == .cancelled { presenter.hide() }
+        }
+        @objc func mouseDrag(_ gesture: UIPanGestureRecognizer) {
+            let point = gesture.location(in: nil)
+            switch gesture.state {
+            case .began: cancelPending(); presenter.hide(); origin = CGPoint(x: point.x, y: point.y - gesture.translation(in: nil).y); actions?.changed(gesture.translation(in: nil).y, point)
+            case .changed: actions?.changed(point.y - origin.y, point)
+            case .ended: actions?.ended(point.y - origin.y, point)
+            case .cancelled, .failed: actions?.cancelled()
+            default: break
+            }
+        }
+        #endif
+
         @objc func press(_ gesture: UILongPressGestureRecognizer) {
             let point = gesture.location(in: nil)
             switch gesture.state {
@@ -496,6 +527,14 @@ struct PlannerView: View {
     }
     var body: some View {
         nativeTabs
+            #if targetEnvironment(macCatalyst)
+            .focusedSceneValue(\.macPlannerActions, MacPlannerActions(
+                create: { showNew = true }, selectTab: { tab = $0 },
+                changeDay: { changeDay($0) }, today: { plans.date = Date() },
+                zoom: { factor in setZoom(min(8, max(1, zoomFactor * factor))) }
+            ))
+            .background(MacWindowSetup())
+            #endif
             .onChange(of: tab) { _, _ in memoFocused = false }
         .sheet(isPresented: $showPresets) { PresetsView() }
         .sheet(isPresented: $showCalendar) { CalendarSettingsView() }
@@ -1040,3 +1079,12 @@ struct PlannerView: View {
         return placed.contains { $0.id != task.id && PlannerMath.overlaps(start, start + task.minutes, $0.start!, $0.start! + $0.minutes) } || fixed.contains { !$0.allDay && PlannerMath.overlaps(start, start + task.minutes, $0.start, $0.end) }
     }
 }
+
+#if targetEnvironment(macCatalyst)
+private struct MacWindowSetup: UIViewRepresentable {
+    func makeUIView(context: Context) -> UIView { let view = UIView(); view.isUserInteractionEnabled = false; return view }
+    func updateUIView(_ view: UIView, context: Context) {
+        DispatchQueue.main.async { view.window?.windowScene?.sizeRestrictions?.minimumSize = CGSize(width: 780, height: 560) }
+    }
+}
+#endif

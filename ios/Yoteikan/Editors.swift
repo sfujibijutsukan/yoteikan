@@ -35,7 +35,7 @@ struct StickyEditor: View {
                         if reminders.authorization == .notDetermined {
                             Button("通知を許可する") { Task { await reminders.enable() } }
                         } else if reminders.authorization == .denied {
-                            Text("通知は許可されていません。アプリ設定からiPhoneの通知設定を開けます。")
+                            Text("通知は許可されていません。設定画面から通知設定を開けます。")
                                 .font(.caption).foregroundStyle(.secondary)
                         }
                     }
@@ -269,7 +269,7 @@ struct CalendarSettingsView: View {
                     } header: { Text("表示するカレンダー") } footer: { Text("読み込み専用") }
                 } else {
                     Section { Button("カレンダーに接続") { Task { await calendar.connect() } }.accessibilityIdentifier("requestCalendar") } footer: { Text("読み込み専用です。iOSの許可画面ではフルアクセスが必要です。") }
-                    Section { Button("iPhoneの設定を開く") { if let url = URL(string: UIApplication.openSettingsURLString) { UIApplication.shared.open(url) } } }
+                    Section { Button(PlatformSettings.calendarTitle) { if let url = PlatformSettings.calendarURL { UIApplication.shared.open(url) } } }
                 }
                 if let message = calendar.message { Section { Text(message).font(.subheadline).foregroundStyle(.orange) } }
             }.scrollContentBackground(.hidden).background(paper).navigationTitle("カレンダー").navigationBarTitleDisplayMode(.inline)
@@ -346,7 +346,7 @@ struct PlannerSettingsView: View {
                         Button("通知を許可する") { Task { await reminders.enable() } }.accessibilityIdentifier("enableReminders")
                     case .denied:
                         Text("通知は許可されていません")
-                        Button("iPhoneの通知設定を開く") { if let url = URL(string: UIApplication.openSettingsURLString) { openURL(url) } }
+                        Button(PlatformSettings.notificationTitle) { if let url = PlatformSettings.notificationURL { openURL(url) } }
                     default:
                         Text("通知は許可されています")
                         Text("予約済み \(reminders.scheduled)件").accessibilityIdentifier("scheduledReminders")
@@ -391,4 +391,21 @@ struct SettingsStickyList: View {
                 .toolbar { ToolbarItem(placement: .confirmationAction) { Button("閉じる") { dismiss() }.accessibilityIdentifier("closeSettingsStickies") } }
         }
     }
+}
+
+// Keep platform-specific settings links out of the planner flows.
+enum PlatformSettings {
+    #if targetEnvironment(macCatalyst)
+    static let deviceName = "Mac"
+    static let calendarTitle = "Macのカレンダー設定を開く"
+    static let notificationTitle = "Macの通知設定を開く"
+    static let calendarURL = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Calendars")
+    static let notificationURL = URL(string: "x-apple.systempreferences:com.apple.Notifications-Settings.extension")
+    #else
+    static let deviceName = "iPhone"
+    static let calendarTitle = "iPhoneの設定を開く"
+    static let notificationTitle = "iPhoneの通知設定を開く"
+    static let calendarURL = URL(string: UIApplication.openSettingsURLString)
+    static let notificationURL = URL(string: UIApplication.openSettingsURLString)
+    #endif
 }

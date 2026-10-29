@@ -5,6 +5,26 @@ final class YoteikanUITests: XCTestCase {
     override func setUpWithError() throws { continueAfterFailure = false; XCUIDevice.shared.orientation = .portrait }
     func launch(_ args: [String] = ["--demo"]) { app = XCUIApplication(); app.launchArguments = args; app.launchEnvironment["YOTEIKAN_UI_TEST"] = "1"; app.launch(); XCTAssertTrue(app.buttons["presetsButton"].waitForExistence(timeout: 10)) }
     func shot(_ name: String) { let attachment = XCTAttachment(screenshot: app.screenshot()); attachment.name = name; attachment.lifetime = .keepAlways; add(attachment) }
+    #if os(macOS) || targetEnvironment(macCatalyst)
+    func test41MacKeyboardCreateAndNavigate() {
+        launch(["--demo"])
+        XCTAssertTrue(app.otherElements["memoZone"].exists)
+        XCTAssertGreaterThanOrEqual(app.windows.firstMatch.frame.width, 780)
+        app.typeKey("n", modifierFlags: .command)
+        let title = app.textFields["stickyTitle"]
+        XCTAssertTrue(title.waitForExistence(timeout: 4))
+        title.click(); title.typeText("Macから追加")
+        app.buttons["saveSticky"].click()
+        XCTAssertTrue(app.descendants(matching: .any).matching(identifier: "inbox-Macから追加").firstMatch.waitForExistence(timeout: 4))
+        shot("56-mac-planner")
+        app.typeKey("2", modifierFlags: .command)
+        XCTAssertTrue(app.otherElements["fullDayOverview"].waitForExistence(timeout: 4))
+        app.typeKey(",", modifierFlags: .command)
+        XCTAssertTrue(app.buttons["hoursSettings"].waitForExistence(timeout: 4))
+        XCTAssertFalse(app.buttons["googleSyncSettings"].exists)
+        shot("57-mac-settings")
+    }
+    #endif
     func test31LongPressPreviewAutomaticallyDisappearsOnBothPages() {
         launch()
         let task = app.otherElements["task-朝の読書"]
@@ -45,7 +65,14 @@ final class YoteikanUITests: XCTestCase {
         XCTAssertTrue(app.buttons["hoursSettings"].exists)
         shot("58-local-settings")
     }
-    private func selectTab(_ name: String) { app.tabBars.buttons[name].tap() }
+    private func selectTab(_ name: String) {
+        #if os(macOS) || targetEnvironment(macCatalyst)
+        app.radioButtons[name].click()
+        #else
+        app.tabBars.buttons[name].tap()
+        #endif
+    }
+
     private func selectDetails() { app.buttons["showScheduleDetails"].tap() }
     private func editSelected() {
         if app.textFields["stickyTitle"].exists { return }
@@ -55,7 +82,11 @@ final class YoteikanUITests: XCTestCase {
     private func unplaceSelected() { selectDetails(); app.buttons["unplaceButton"].tap() }
     private func pinch(_ factor: CGFloat) {
         let surface = app.descendants(matching: .any).matching(identifier: "timelineZoomSurface").firstMatch
+        #if os(macOS) || targetEnvironment(macCatalyst)
+        app.typeKey(factor > 1 ? "+" : "-", modifierFlags: .command)
+        #else
         surface.pinch(withScale: factor, velocity: factor > 1 ? 1 : -1)
+        #endif
     }
     private func zoomLabel() -> String {
         app.descendants(matching: .any).matching(identifier: "timelineZoomSurface").firstMatch.value as? String ?? ""
