@@ -13,6 +13,29 @@ import UserNotifications
         defaults.set(try! JSONEncoder().encode(manual), forKey: "yoteikan.plan.v1")
     }
     override func tearDown() { defaults.removePersistentDomain(forName: suite); super.tearDown() }
+    func testCopyMakesIndependentUnplacedStickyAndPreservesOriginalAndUndo() throws {
+        let store = PlanStore(defaults: defaults)
+        store.add(Preset(title: "コピー元", minutes: 30, memo: "大切なメモ", dailyCount: 0))
+        let id = try XCTUnwrap(store.today.first?.id)
+        store.put(id, at: 600)
+        let original = store.plan
+        let copyID = try XCTUnwrap(store.duplicate(id))
+        let copy = try XCTUnwrap(store.today.first { $0.id == copyID })
+        XCTAssertNotEqual(copyID, id)
+        XCTAssertNil(copy.start)
+        XCTAssertEqual(copy.title, "コピー元")
+        XCTAssertEqual(copy.memo, "大切なメモ")
+        XCTAssertEqual(copy.minutes, 30)
+        XCTAssertEqual(copy.reminderMinutes, original.stickies[0].reminderMinutes)
+        XCTAssertEqual(store.today.first { $0.id == id }, original.stickies[0])
+        XCTAssertEqual(PlanStore(defaults: defaults).plan, store.plan)
+        store.restore()
+        XCTAssertEqual(store.plan, original)
+        store.put(id, at: nil)
+        XCTAssertNotNil(store.duplicate(id))
+        XCTAssertEqual(store.today.count, 2)
+        XCTAssertTrue(store.today.allSatisfy { $0.start == nil })
+    }
     func testFoldedTimelineInverseMapsDropsAcrossGapsAndEvents() {
         let folded = FoldedTimeline(items: [TimelineItem(id: "short", start: 480, end: 485),
                                            TimelineItem(id: "long", start: 600, end: 660)], start: 300, end: 1440)

@@ -34,6 +34,7 @@ final class YoteikanUITests: XCTestCase {
         XCTAssertFalse(app.textViews["scheduleMemo"].exists)
         XCTAssertFalse(app.buttons["closeScheduleMemo"].exists)
         XCTAssertEqual(task.value as? String, timing)
+        if app.buttons.matching(identifier: "copyStickyAction").firstMatch.exists { app.coordinate(withNormalizedOffset: CGVector(dx: 0.95, dy: 0.12)).tap() }
         selectTab("1日表示")
         let block = app.descendants(matching: .any).matching(identifier: "fullDayBlock-朝の読書").firstMatch
         block.press(forDuration: 8)
@@ -83,6 +84,23 @@ func test45OverviewDateNavigationSharesPlanningDate() {
     XCTAssertTrue(app.descendants(matching: .any).matching(identifier: "fullDayBlock-朝の読書").firstMatch.exists)
     shot("64-overview-date-navigation")
 }
+
+    func test46CopyPlacedAndInboxStickiesFromHoldMenu() {
+        launch()
+        let placed = app.otherElements["task-朝の読書"]
+        let before = placed.value as? String
+        placed.press(forDuration: 1)
+        XCTAssertTrue(app.buttons.matching(identifier: "copyStickyAction").firstMatch.waitForExistence(timeout: 3), app.debugDescription)
+        app.buttons.matching(identifier: "copyStickyAction").firstMatch.tap()
+        XCTAssertEqual(placed.value as? String, before)
+        let inboxCopy = app.descendants(matching: .any).matching(identifier: "inbox-朝の読書").firstMatch
+        XCTAssertTrue(inboxCopy.waitForExistence(timeout: 3))
+        inboxCopy.press(forDuration: 1)
+        XCTAssertTrue(app.buttons.matching(identifier: "copyStickyAction").firstMatch.waitForExistence(timeout: 3))
+        app.buttons.matching(identifier: "copyStickyAction").firstMatch.tap()
+        XCTAssertEqual(app.descendants(matching: .any).matching(identifier: "inbox-朝の読書").count, 2)
+        shot("65-copy-sticky")
+    }
 
     private func selectTab(_ name: String) {
         #if os(macOS) || targetEnvironment(macCatalyst)

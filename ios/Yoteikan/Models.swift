@@ -451,6 +451,12 @@ let tones: [Color] = [Color(red: 0.88, green: 0.93, blue: 0.80), Color(red: 0.97
     func add(_ preset: Preset) {
         change { $0.stickies.append(Sticky(title: preset.title, minutes: preset.minutes, tone: preset.tone, memo: preset.memo, day: dayKey(date))) }
     }
+    @discardableResult func duplicate(_ id: UUID) -> UUID? {
+        guard var copy = plan.stickies.first(where: { $0.id == id }) else { return nil }
+        copy.id = UUID(); copy.start = nil; copy.day = dayKey(date)
+        change { $0.stickies.append(copy) }
+        return copy.id
+    }
     func put(_ id: UUID, at start: Int?) {
         guard let i = plan.stickies.firstIndex(where: { $0.id == id }) else { return }
         let duration = plan.stickies[i].minutes
