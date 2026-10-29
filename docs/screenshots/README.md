@@ -225,3 +225,13 @@ iPhone 17eシミュレーター / iOS 27.0でXCTestを使って実際に操作�
 ## 端末内保存の設定画面
 
 <img src="58-local-settings.png" width="300" alt="アカウント・同期を削除した設定画面">
+
+## 現在時刻とiPhoneウィジェット
+
+<img src="59-now-planner.png" width="260" alt="起動時に現在時刻13時17分を表示する計画画面">
+<img src="60-now-folded.png" width="260" alt="空き時間をたたんだ時間割の現在時刻線">
+<img src="61-now-day.png" width="260" alt="1日表示の現在時刻線">
+<img src="63-widget-home.png" width="260" alt="iPhoneシミュレーターのホーム画面に表示した予定館ウィジェット">
+
+アプリの時刻線はテスト用の13:17、ホーム画面のウィジェットは実際のシミュレーター時刻に合わせたサンプルデータです。
+[小・中サイズの表示部品の検証画面](62-widget-layouts.png)は、拡張機能と共通のViewをアプリ内に表示したものです。実際のホーム画面とは区別しています。

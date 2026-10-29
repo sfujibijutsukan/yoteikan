@@ -223,3 +223,9 @@ Googleログイン・同期削除（2026-10-29）
 記録: artifacts/LocalOnly.xcresult / artifacts/local-only.log
 単体28件・UI2件成功、失敗0件。
 Release: artifacts/local-only-release.log — BUILD SUCCEEDED
+
+現在時刻・iPhoneウィジェット（2026-10-29）
+TimeWidgetFinal.xcresult: 単体33件、UI03/42/43成功。
+WidgetLink.xcresult: UI22/43/44成功、スキップ0件。
+TimeWidgetMac.xcresult: Mac単体33件成功。
+time-widget-release.log: アプリ・拡張のRelease BUILD SUCCEEDED。
