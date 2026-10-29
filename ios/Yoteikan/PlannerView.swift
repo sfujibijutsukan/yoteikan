@@ -392,6 +392,7 @@ private struct StickyTouch: UIViewRepresentable {
     var changed: (CGFloat, CGPoint) -> Void
     var ended: (CGFloat, CGPoint) -> Void
     var cancelled: () -> Void
+    var menuRequested: (() -> Void)? = nil
     func makeCoordinator() -> Coordinator { Coordinator() }
     func makeUIView(context: Context) -> UIView {
         let view = UIView()
@@ -464,7 +465,7 @@ private struct StickyTouch: UIViewRepresentable {
                 if dragged { actions?.changed(point.y - origin.y, point) }
             case .ended:
                 cancelPending(); presenter.hide()
-                guard !consumed else { return }
+                guard !consumed else { actions?.menuRequested?(); return }
                 if dragged || hypot(point.x - origin.x, point.y - origin.y) > 8 { actions?.ended(point.y - origin.y, point) }
                 else { actions?.cancelled() }
             case .cancelled, .failed: cancelPending(); presenter.hide(); actions?.cancelled()
@@ -489,6 +490,8 @@ struct PlannerView: View {
     @State private var showNew = false
     @State private var editing: Sticky?
     @State private var selected: UUID?
+    @State private var copyID: UUID?
+    @State private var showCopyMenu = false
     @State private var folded = false
     @State private var overview = false
     @State private var zoomFactor: CGFloat = 1
@@ -557,6 +560,10 @@ struct PlannerView: View {
         .onChange(of: plans.date) { _, value in calendar.refresh(date: value); selected = nil }
         .onChange(of: phase) { _, value in if value == .active { plans.refreshDay(); calendar.refresh(date: plans.date) } }
         .onReceive(NotificationCenter.default.publisher(for: UIApplication.significantTimeChangeNotification)) { _ in plans.refreshDay(); calendar.refresh(date: plans.date) }
+        .confirmationDialog("付箋の操作", isPresented: $showCopyMenu, titleVisibility: .hidden) {
+            Button("コピー") { if let id = copyID { copySticky(id) } }.accessibilityIdentifier("copyStickyAction")
+            Button("キャンセル", role: .cancel) { }
+        }
         .alert("付箋を配置できません", isPresented: Binding(get: { plans.notice != nil }, set: { if !$0 { plans.notice = nil } })) {
             Button("OK") { plans.notice = nil }
         } message: { Text(plans.notice ?? "") }
@@ -809,7 +816,8 @@ struct PlannerView: View {
                 tapped: { if selected == task.id { editing = task } else { selected = task.id } },
                 changed: { delta, point in updateMove(task, delta: delta, location: point) },
                 ended: { delta, point in finishMove(task, delta: delta, location: point) },
-                cancelled: { moving = nil; shift = 0; returningToInbox = false }
+                cancelled: { moving = nil; shift = 0; returningToInbox = false },
+                menuRequested: { copyID = task.id; showCopyMenu = true }
             ))
             .overlay { if collision { RoundedRectangle(cornerRadius: 9).stroke(.orange, lineWidth: 1.5).allowsHitTesting(false) } }
             .overlay(alignment: .bottom) { if !overview && (height >= 54 || stretching == task.id) { resizeHandle(task) } }
@@ -834,6 +842,7 @@ struct PlannerView: View {
             .accessibilityElement(children: .contain)
             .accessibilityIdentifier("task-\(task.title)")
             .accessibilityValue("\(clockText(task.start!))|\(task.minutes)")
+            .accessibilityAction(named: "コピー") { copySticky(task.id) }
             .accessibilityHint(collision ? "ほかの予定と重なっています" : "")
     }
     private var timeline: some View {
@@ -1047,6 +1056,9 @@ struct PlannerView: View {
         if inboxFrame.contains(location) { plans.put(task.id, at: nil); selected = nil; sideShowsDetails = false }
         else { plans.move(task.id, start: movedStart(task, delta: delta)) }
     }
+    private func copySticky(_ id: UUID) {
+        if let copy = plans.duplicate(id) { selected = copy; sideShowsDetails = false }
+    }
     private var inboxView: some View {
         VStack(spacing: 0) {
             ScrollView(.vertical, showsIndicators: false) {
@@ -1067,6 +1079,8 @@ struct PlannerView: View {
                                 .contentShape(Rectangle())
                                 .onTapGesture { selected = task.id; sideShowsDetails = true }.draggable(task.id.uuidString)
                                 .accessibilityElement(children: .ignore).accessibilityLabel("\(task.title)、\(task.minutes)分、\(task.start.map { "時間外 \(clockText($0))" } ?? "未配置")")
+                                .contextMenu { Button("コピー") { copySticky(task.id) }.accessibilityIdentifier("copyStickyAction") }
+                                .accessibilityAction(named: "コピー") { copySticky(task.id) }
                                 .accessibilityIdentifier("inbox-\(task.title)")
                         }
                 }.padding(8).frame(maxWidth: .infinity, minHeight: 100, alignment: .top)
