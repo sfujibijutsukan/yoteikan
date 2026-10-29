@@ -728,6 +728,16 @@ struct PlannerView: View {
             Text(plans.date, format: .dateTime.month().day().weekday(.abbreviated)).font(.system(size: 12, weight: .semibold)).lineLimit(1).minimumScaleFactor(0.75).accessibilityIdentifier("selectedDate")
             Button { changeDay(1) } label: { Image(systemName: "chevron.right").frame(width: 28, height: 44) }.accessibilityLabel("次の日")
             Spacer(minLength: 0)
+            Button {
+                plans.restore(); selected = nil; memoFocused = false; memoDrafts.removeAll()
+                moving = nil; stretching = nil; shift = 0; stretch = 0
+            } label: {
+                Label("元に戻す", systemImage: "arrow.uturn.backward").font(.system(size: 11, weight: .semibold))
+                    .frame(minWidth: 44, minHeight: 44)
+            }
+            .disabled(plans.undo == nil)
+            .foregroundStyle(plans.undo == nil ? ink.opacity(0.3) : accent)
+            .accessibilityIdentifier("undoPlan")
             Button { plans.date = Date() } label: { Text("今日").font(.system(size: 10, weight: .semibold)).frame(width: 36, height: 44) }.accessibilityIdentifier("todayButton")
         }
             .contentShape(Rectangle())

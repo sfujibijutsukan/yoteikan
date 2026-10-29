@@ -418,7 +418,11 @@ let tones: [Color] = [Color(red: 0.88, green: 0.93, blue: 0.80), Color(red: 0.97
         lastRealDay = current
         if followsToday && dayKey(date) != current { date = now } else { prepareDay() }
     }
-    func change(_ body: (inout SavedPlan) -> Void) { undo = plan; body(&plan); plan.populateDailyPresets(for: dayKey(date)); save() }
+    func change(_ body: (inout SavedPlan) -> Void) {
+        var updated = plan; body(&updated); updated.populateDailyPresets(for: dayKey(date))
+        guard updated != plan else { return }
+        undo = plan; plan = updated; save()
+    }
     func restore() { guard let old = undo else { return }; plan = old; undo = nil; plan.populateDailyPresets(for: dayKey(date)); save() }
     func colorName(for tone: Int) -> String {
         paletteColor(for: tone).name

@@ -36,6 +36,18 @@ import UserNotifications
         XCTAssertEqual(store.today.count, 2)
         XCTAssertTrue(store.today.allSatisfy { $0.start == nil })
     }
+    func testNoOpKeepsUndoOfLastRealEdit() {
+        let store = PlanStore(defaults: defaults)
+        let before = store.plan
+        store.add(Preset(title: "戻す", minutes: 30, dailyCount: 0))
+        store.change { _ in }
+        store.put(store.today[0].id, at: nil)
+        XCTAssertEqual(store.undo, before)
+        store.restore()
+        XCTAssertEqual(store.plan, before)
+        XCTAssertNil(store.undo)
+        XCTAssertEqual(PlanStore(defaults: defaults).plan, before)
+    }
     func testFoldedTimelineInverseMapsDropsAcrossGapsAndEvents() {
         let folded = FoldedTimeline(items: [TimelineItem(id: "short", start: 480, end: 485),
                                            TimelineItem(id: "long", start: 600, end: 660)], start: 300, end: 1440)
