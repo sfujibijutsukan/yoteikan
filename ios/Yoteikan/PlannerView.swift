@@ -172,7 +172,68 @@ private struct ScheduleTimeText: View {
     }
 }
 
+/// A separate ruler avoids changing the timeline layout underneath the finger.
+private struct TimeAdjustmentLoupe: View {
+    let title: String
+    let start: Int
+    let duration: Int
+    let resizing: Bool
+    var compact = false
+    let color: Color
+    let textColor: Color
+    private var focus: Int { resizing ? start + duration : start }
+    private var steps: Int { compact ? 1 : 3 }
+    private var spanHeight: CGFloat { CGFloat(steps * 48) }
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text(resizing ? "終了時刻を調整" : "開始時刻を調整").plannerFont(size: 12, weight: .semibold)
+                Spacer(minLength: 4)
+                Text(title).plannerFont(size: 12).lineLimit(1)
+            }.foregroundStyle(ink.opacity(0.8))
+            HStack(alignment: .firstTextBaseline) {
+                Text("\(clockText(start)) – \(clockText(start + duration))")
+                    .plannerFont(size: compact ? 15 : 21, weight: .bold, design: .monospaced).lineLimit(1).minimumScaleFactor(0.65)
+                Spacer(minLength: 4)
+                Text(durationText(duration)).plannerFont(size: 11).lineLimit(1).minimumScaleFactor(0.7)
+            }
+            GeometryReader { geometry in
+                let top = max(0, min(spanHeight, CGFloat(start - focus + steps * 5) * 4.8))
+                let bottom = max(0, min(spanHeight, CGFloat(start + duration - focus + steps * 5) * 4.8))
+                ZStack(alignment: .topLeading) {
+                    RoundedRectangle(cornerRadius: 5).fill(color)
+                        .frame(width: max(0, geometry.size.width - 60), height: max(0, bottom - top))
+                        .overlay(alignment: .leading) { Rectangle().fill(textColor.opacity(0.3)).frame(width: 3) }
+                        .offset(x: 60, y: top + 8)
+                    ForEach(-steps...steps, id: \.self) { step in
+                        let minute = focus + step * 5
+                        if (0...1440).contains(minute) {
+                            HStack(spacing: 8) {
+                                Text(clockText(minute)).plannerFont(size: 11, weight: step == 0 ? .bold : .medium, design: .monospaced)
+                                    .lineLimit(1).minimumScaleFactor(0.65).frame(width: 52, alignment: .trailing)
+                                Rectangle().frame(height: step == 0 ? 2 : 0.5)
+                            }
+                            .foregroundStyle(step == 0 ? accent : ink.opacity(0.45))
+                            .frame(height: 16).offset(y: CGFloat(step + steps) * 24)
+                        }
+                    }
+                }
+            }.frame(height: spanHeight + 16)
+            if !compact { Text("5分刻み・指を離して確定").plannerFont(size: 10).foregroundStyle(ink.opacity(0.6)) }
+        }
+        .padding(14).foregroundStyle(ink)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 18))
+        .overlay { RoundedRectangle(cornerRadius: 18).strokeBorder(accent.opacity(0.2), lineWidth: 1) }
+        .shadow(color: .black.opacity(0.18), radius: 12, y: 5)
+        .allowsHitTesting(false)
+        .accessibilityElement(children: .ignore).accessibilityLabel(resizing ? "終了時刻の拡大表示" : "開始時刻の拡大表示")
+        .accessibilityValue("\(clockText(start))〜\(clockText(start + duration))、\(duration)分")
+        .accessibilityIdentifier("timeAdjustmentLoupe")
+    }
+}
+
 private struct FullDayOverview: View {
+
     @Environment(\.dismiss) private var dismiss
     @Binding var date: Date
     @AppStorage(PlannerTypography.key) private var requestedFontScale = 1.0
@@ -579,8 +640,12 @@ struct PlannerView: View {
     @State private var dropActive = false
     @State private var moving: UUID?
     @State private var shift: CGFloat = 0
+    @GestureState private var resizingGestureActive = false
     @State private var stretching: UUID?
     @State private var stretch: CGFloat = 0
+    @State private var dragScale = TimeDragScale(timelinePointsPerMinute: 1.55)
+    @State private var dragTranslation: CGFloat = 0
+    @State private var dragLocation = CGPoint.zero
     @State private var viewportHeight: CGFloat = 350
     @State private var inboxFrame = CGRect.zero
     @State private var returningToInbox = false
@@ -625,13 +690,14 @@ struct PlannerView: View {
             ))
             .background(MacWindowSetup())
             #endif
-            .onChange(of: tab) { _, _ in memoFocused = false }
+            .onChange(of: tab) { _, _ in memoFocused = false; cancelTimeAdjustment() }
+            .onChange(of: resizingGestureActive) { _, active in if !active { stretching = nil; stretch = 0 } }
         .sheet(isPresented: $showPresets) { PresetsView() }
         .sheet(isPresented: $showCalendar) { CalendarSettingsView() }
         .sheet(isPresented: $showNew) { StickyEditor(task: Sticky(title: "", minutes: 30, day: dayKey(plans.date)), isNew: true) }
         .sheet(item: $editing) { StickyEditor(task: $0, isNew: false) }
-        .onChange(of: plans.date) { _, value in calendar.refresh(date: value); selected = nil }
-        .onChange(of: phase) { _, value in if value == .active { now = PlannerClock.now; plans.refreshDay(); calendar.refresh(date: plans.date); focusRequest += 1 } }
+        .onChange(of: plans.date) { _, value in calendar.refresh(date: value); selected = nil; cancelTimeAdjustment() }
+        .onChange(of: phase) { _, value in if value == .active { now = PlannerClock.now; plans.refreshDay(); calendar.refresh(date: plans.date); focusRequest += 1 } else { cancelTimeAdjustment() } }
         .onReceive(NotificationCenter.default.publisher(for: UIApplication.significantTimeChangeNotification)) { _ in now = PlannerClock.now; plans.refreshDay(); calendar.refresh(date: plans.date) }
         .onReceive(Timer.publish(every: 30, on: .main, in: .common).autoconnect()) { _ in
             now = PlannerClock.now; plans.refreshDay()
@@ -698,6 +764,24 @@ struct PlannerView: View {
         }
         }
         .background(paper).foregroundStyle(ink)
+        .overlay {
+            if let task = plans.today.first(where: { $0.start != nil && $0.id == (stretching ?? moving) }), !returningToInbox {
+                GeometryReader { geometry in
+                    let resizing = stretching == task.id
+                    let start = resizing ? task.start! : movedStart(task, delta: dragTranslation)
+                    let duration = resizing ? resizedDuration(task, delta: dragTranslation) : task.minutes
+                    let fingerY = dragLocation.y - geometry.frame(in: .global).minY
+                    let compact = geometry.size.height < 360
+                    let panelHeight: CGFloat = compact ? 200 : 310
+                    let above = fingerY - panelHeight / 2 - 54
+                    let center = above >= panelHeight / 2 + 8 ? above : fingerY + panelHeight / 2 + 54
+                    TimeAdjustmentLoupe(title: task.title, start: start, duration: duration, resizing: resizing, compact: compact,
+                                        color: plans.paletteColor(for: task.tone).color, textColor: plans.paletteColor(for: task.tone).textColor)
+                        .frame(width: min(360, max(0, geometry.size.width - 24)))
+                        .position(x: geometry.size.width / 2, y: min(max(panelHeight / 2 + 8, center), max(panelHeight / 2 + 8, geometry.size.height - panelHeight / 2 - 8)))
+                }.allowsHitTesting(false)
+            }
+        }
     }
     @ViewBuilder private var nativeTabs: some View {
         if #available(iOS 26.0, *) { tabs.tabBarMinimizeBehavior(.never) }
@@ -884,11 +968,11 @@ struct PlannerView: View {
         folded ? foldedLayout.minute(at: y) : CGFloat(plans.hours.start) + y / scale
     }
     private func movedStart(_ task: Sticky, delta: CGFloat) -> Int {
-        PlannerMath.start(PlannerMath.snap(Double(timelineMinute(timelineY(task.start!) + delta))),
+        PlannerMath.start(task.start! + dragScale.minutes(for: delta),
                           duration: task.minutes, from: plans.hours.start, to: plans.hours.end)
     }
     private func resizedDuration(_ task: Sticky, delta: CGFloat) -> Int {
-        PlannerMath.duration(PlannerMath.snap(Double(timelineMinute(timelineY(task.start! + task.minutes) + delta))) - task.start!,
+        PlannerMath.duration(task.minutes + dragScale.minutes(for: delta),
                              start: task.start!, to: plans.hours.end)
     }
     private func placedCard(_ task: Sticky, availableWidth: CGFloat) -> some View {
@@ -917,16 +1001,6 @@ struct PlannerView: View {
             }
             .clipped()
             .accessibilityAction(named: "詳細メモ") { UIAccessibility.post(notification: .announcement, argument: preview(.sticky(task.id)).spoken) }
-            .overlay(alignment: .top) {
-                if moving == task.id && !returningToInbox {
-                    let start = movedStart(task, delta: shift)
-                    Text("\(clockText(start)) – \(clockText(start + task.minutes))")
-                        .plannerFont(size: 11, weight: .semibold, design: .monospaced)
-                        .padding(.horizontal, 10).padding(.vertical, 5)
-                        .background(ink, in: Capsule()).foregroundStyle(.white)
-                        .offset(y: -29).allowsHitTesting(false)
-                }
-            }
             .offset(x: timeGutter - 2 + width * CGFloat(slot.column), y: timelineY(visibleStart) + 2 + (moving == task.id ? shift : 0))
             .zIndex(moving == task.id || stretching == task.id ? 5 : selected == task.id ? 3 : 1)
             .accessibilityElement(children: .contain)
@@ -1104,8 +1178,8 @@ struct PlannerView: View {
     }
     @ViewBuilder private func taskCard(_ task: Sticky, compact: Bool, height: CGFloat) -> some View {
         let textColor = plans.paletteColor(for: task.tone).textColor
-        let start = moving == task.id ? movedStart(task, delta: shift) : (task.start ?? 0)
-        let duration = stretching == task.id ? resizedDuration(task, delta: stretch) : task.minutes
+        let start = moving == task.id ? movedStart(task, delta: dragTranslation) : (task.start ?? 0)
+        let duration = stretching == task.id ? resizedDuration(task, delta: dragTranslation) : task.minutes
         if folded {
             FoldedCardTitle(title: task.title, weight: .semibold)
                 .foregroundStyle(textColor)
@@ -1133,9 +1207,12 @@ struct PlannerView: View {
     private func resizeHandle(_ task: Sticky) -> some View {
         ZStack { Color.clear; Capsule().fill(plans.paletteColor(for: task.tone).textColor.opacity(selected == task.id ? 0.6 : 0.35)).frame(width: 24, height: 3) }
             .frame(width: 44, height: 22).contentShape(Rectangle())
-            .highPriorityGesture(DragGesture(minimumDistance: 0, coordinateSpace: .global).onChanged { value in
+            .highPriorityGesture(DragGesture(minimumDistance: 0, coordinateSpace: .global)
+                .updating($resizingGestureActive) { _, active, _ in active = true }.onChanged { value in
                 guard pinchBase == nil else { return }
+                if stretching != task.id { beginTimeAdjustment(task, resizing: true) }
                 selected = task.id; stretching = task.id
+                dragTranslation = value.translation.height; dragLocation = value.location
                 let newDuration = resizedDuration(task, delta: value.translation.height)
                 stretch = timelineY(task.start! + newDuration) - timelineY(task.start! + task.minutes)
             }.onEnded { value in
@@ -1162,9 +1239,22 @@ struct PlannerView: View {
             .accessibilityHint("上下にドラッグして移動します")
             .accessibilityIdentifier("move-\(task.title)")
     }
+    private func cancelTimeAdjustment() {
+        moving = nil; stretching = nil; shift = 0; stretch = 0; returningToInbox = false
+    }
+    private func beginTimeAdjustment(_ task: Sticky, resizing: Bool) {
+        let minute = task.start! + (resizing ? task.minutes : 0)
+        let lower = max(plans.hours.start, minute - 5)
+        let upper = min(plans.hours.end, minute + 5)
+        let localScale = (timelineY(upper) - timelineY(lower)) / CGFloat(max(1, upper - lower))
+        dragScale = TimeDragScale(timelinePointsPerMinute: localScale)
+        dragTranslation = 0
+    }
     private func updateMove(_ task: Sticky, delta: CGFloat, location: CGPoint) {
         guard pinchBase == nil, let start = task.start else { return }
+        if moving != task.id { beginTimeAdjustment(task, resizing: false) }
         selected = task.id; moving = task.id
+        dragTranslation = delta; dragLocation = location
         returningToInbox = inboxFrame.contains(location)
         let newStart = movedStart(task, delta: delta)
         shift = timelineY(newStart) - timelineY(start)

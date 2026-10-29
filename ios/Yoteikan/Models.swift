@@ -320,7 +320,19 @@ struct FoldedTimeline {
         return CGFloat(band.start) + (position - band.y) / band.height * CGFloat(band.end - band.start)
     }
 }
+/// Freeze this scale for a gesture so compressed gaps cannot cause time jumps.
+struct TimeDragScale {
+    let pointsPerMinute: CGFloat
+    init(timelinePointsPerMinute: CGFloat) {
+        pointsPerMinute = max(4.8, timelinePointsPerMinute.isFinite ? timelinePointsPerMinute : 4.8)
+    }
+    func minutes(for translation: CGFloat) -> Int {
+        PlannerMath.snap(Double(translation / pointsPerMinute))
+    }
+}
+
 enum PlannerMath {
+
     static let first = 5 * 60
     static let last = 24 * 60
     static let totalMinutes = last - first
