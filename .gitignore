@@ -13,5 +13,5 @@
 # Swift package state
 .swiftpm/
 
-# Developer-specific Google OAuth configuration
+# Legacy local OAuth configuration (unused; never commit)
 /ios/Google.local.xcconfig

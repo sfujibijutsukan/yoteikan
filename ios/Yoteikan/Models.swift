@@ -1,4 +1,5 @@
 import Foundation
+import CryptoKit
 import SwiftUI
 import UserNotifications
 
@@ -238,6 +239,11 @@ struct SavedPlan: Codable, Equatable {
         try values.encode(hours, forKey: .hours)
         try values.encode(dailyPresetCounts, forKey: .dailyPresetCounts)
     }
+    private static func dailyStickyID(preset: UUID, day: String, index: Int) -> UUID {
+        let bytes = Array(SHA256.hash(data: Data("yoteikan.daily.v1/\(preset.uuidString)/\(day)/\(index)".utf8)))
+        return UUID(uuid: (bytes[0], bytes[1], bytes[2], bytes[3], bytes[4], bytes[5], bytes[6], bytes[7],
+                           bytes[8], bytes[9], bytes[10], bytes[11], bytes[12], bytes[13], bytes[14], bytes[15]))
+    }
     @discardableResult mutating func populateDailyPresets(for day: String) -> Bool {
         var counts = dailyPresetCounts[day] ?? [:]
         var changed = false
@@ -246,7 +252,7 @@ struct SavedPlan: Codable, Equatable {
             let generated = max(0, counts[preset.id.uuidString] ?? 0)
             guard target > generated else { continue }
             for index in generated..<target {
-                let id = SyncCodec.dailyStickyID(preset: preset.id, day: day, index: index)
+                let id = Self.dailyStickyID(preset: preset.id, day: day, index: index)
                 if !stickies.contains(where: { $0.id == id }) {
                     stickies.append(Sticky(id: id, title: preset.title, minutes: preset.minutes, tone: preset.tone, memo: preset.memo, day: day))
                 }
@@ -403,12 +409,6 @@ let tones: [Color] = [Color(red: 0.88, green: 0.93, blue: 0.80), Color(red: 0.97
     func setHours(_ hours: PlanningHours) {
         guard hours.isValid, hours != plan.hours else { return }
         change { $0.hours = hours }
-    }
-    func acceptSyncedPlan(_ incoming: SavedPlan) {
-        guard incoming != plan else { return }
-        undo = nil; plan = incoming
-        plan.populateDailyPresets(for: dayKey(date))
-        save()
     }
     func save() { if !demo, let data = try? JSONEncoder().encode(plan) { defaults.set(data, forKey: key) } }
     func prepareDay() { if plan.populateDailyPresets(for: dayKey(date)) { save() } }

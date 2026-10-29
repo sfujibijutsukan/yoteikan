@@ -1,17 +1,15 @@
 # Mac版（Mac Catalyst）
 
-予定館をMac CatalystでMacアプリとしてビルドします。iPhoneと予定・プリセット・Google Drive同期・カレンダー読み込みの実装を共有します。macOS 14以降が対象です。Web版と異なり、Mac自身のカレンダーを固定予定として読み込み、Mac上で通知を予約できます。
+予定館をMac CatalystでMacアプリとしてビルドします。iPhoneと予定・プリセット・カレンダー読み込みの実装を共有します。macOS 14以降が対象です。Mac自身のカレンダーを固定予定として読み込み、Mac上で通知を予約できます。
 
 ## Xcodeで起動
 
 1. `ios/Yoteikan.xcodeproj` を開き、Schemeを **Yoteikan** にします。
 2. 実行先を **My Mac (Mac Catalyst)** にします。
 3. Signing & Capabilitiesで自身のDevelopment Teamを選びます。署名チームはリポジトリに固定しません。
-4. ビルド・実行します。初回はGoogleログインなしでも、予定を作成できます。
+4. ビルド・実行します。アカウント登録なしで予定を作成できます。
 
-バンドルIDはiPhoneと同じ **`org.sfuji.yoteikan`** を維持し、`maccatalyst.` の接頭辞を自動付与しません。Google設定は [Google同期の手順](google-sync.md) と同じiOSクライアントIDを使います。新プロジェクトの `398026852680-…` を組み込んでいます。Mac CatalystのGoogle認証にはKeychain Sharingが必要なため、Mac用entitlementsにKeychainアクセスグループを指定しています。Xcodeの署名でApp Identifier Prefixを解決してください。未署名ビルドはコンパイル確認用であり、実Googleログイン確認用には使わないでください。
-
-Google公式：[Mac CatalystとKeychain設定](https://github.com/google/GoogleSignIn-iOS#mac-catalyst)
+バンドルIDはiPhoneと同じ **`org.sfuji.yoteikan`** を維持し、`maccatalyst.` の接頭辞を自動付与しません。Googleログイン・Drive同期・Webからの参照や編集はありません。
 
 ## Macでの操作
 
@@ -34,8 +32,7 @@ Google公式：[Mac CatalystとKeychain設定](https://github.com/google/GoogleS
 
 - カレンダー接続時にMacのカレンダーアクセスを許可します。Mac用のサンドボックス権限を設定しており、予定は読み取りのみです。許可の変更はシステム設定 → プライバシーとセキュリティ → カレンダーから行えます。
 - 通知の許可はMac側で行います。iPhoneの通知許可はMacへ同期されません。
-- Google Driveへの接続用に、Macサンドボックスの外向きネットワーク通信を許可しています。
-- ローカル保存先はMacアプリのコンテナー内です。iPhoneの端末内データが自動的にMacへコピーされるわけではありません。同じGoogleアカウントで同期を開始し、クラウドの予定を読み込みます。
+- ローカル保存先はMacアプリのコンテナー内です。iPhoneの端末内データが自動的にMacへコピーされるわけではありません。端末ごとに計画を保存します。
 - Mac用の派生ビルドを有効にするため、Xcodeの対象デバイスをiPhone/iPadにしています。画面サイズに応じた既存のゾーン配置を利用します。
 
 ## コマンドでビルド
@@ -54,20 +51,16 @@ xcodebuild -project ios/Yoteikan.xcodeproj -scheme Yoteikan \
   -only-testing:YoteikanTests test
 ```
 
-実Google認証・実Drive同期は、署名したMacビルドでログイン・許可操作を行って確認してください。Mac App Storeへの配信やDeveloper IDによる公証・インストーラーの作成はこのPRには含めません。
+Mac App Storeへの配信やDeveloper IDによる公証・インストーラーの作成はこのPRには含めません。
 
 ## 確認状況
 
-- Mac CatalystのDebug / Releaseビルド成功。ReleaseはApple Silicon（arm64）・Intel（x86_64）の両アーキテクチャを確認。Mac上のユニットテスト45件成功。
-- iPhoneシミュレーターでユニットテスト45件と、ドラッグ・伸縮・未配置へ戻す操作テスト1件成功。
-- Macのサンプルで、⌘Nからの付箋作成、マウスでの開始時刻変更、伸縮つまみによる長さ変更、日本語メモの編集・保存、⌘2の1日表示、⌘,の設定画面、アカウント・同期画面の表示を実操作で確認。
-- ユーザー承認後、XcodeからMac Catalyst開発プロファイルを取得し、Apple Developmentによる署名を確認。署名付きMacビルドでもユニットテスト45件成功。署名の整合性とKeychainグループ・ネットワーク・カレンダー権限も確認済みです。
-- Mac UIテストは署名付きランナーの起動まで進みましたが、`Timed out while enabling automation mode` で自動操作モードを開始できませんでした。`DevToolsSecurity -status` は無効を返しています。UIテスト本体は実行されておらず、成功とは扱っていません。Mac本体の開発ツール認可が必要です。
-- 実Googleログイン・Drive送受信・Macの実カレンダー接続・通知の配信は未確認です。サンプル画面や代替Driveのテストと区別してください。
+- 同期削除前はMac Debug / Release（arm64 / x86_64）ビルド、署名付きMacユニットテスト45件が成功。Macサンプルで付箋作成・マウス移動・伸縮・日本語メモ保存・画面切替を実操作で確認しました。
+- Google同期削除後のiPhoneシミュレーターでは単体28件・UI2件とReleaseビルドが成功。Mac側も同期処理・画面と、不要になったKeychain・外向き通信の権限を削除しました。
+- Macの自動UIテストは、前回 `Timed out while enabling automation mode` で初期化に失敗しています。ユーザーの待機指示後、認証待ちの処理を取り消し、DevToolsSecurityが無効のままであることを確認しました。今回、OSの認可設定は変更しません。
+- Macの実カレンダー接続・通知配信は未確認です。
 
 ![Mac版・サンプルの編集確認](screenshots/56-mac-planner.png)
-
-![Mac版・Googleログイン画面](screenshots/57-mac-sync.png)
 
 ### Mac UIテストが自動操作開始前に止まる場合
 
