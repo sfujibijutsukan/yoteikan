@@ -96,7 +96,7 @@ private final class MemoPreviewPresenter {
                                      (content.time, .caption1, 1),
                                      (content.memo.isEmpty ? "メモはありません" : content.memo, .subheadline, 5)] {
             let label = UILabel()
-            label.text = text; label.font = .preferredFont(forTextStyle: style)
+            label.text = text; label.font = PlannerTypography.uiFont(for: style)
             label.adjustsFontForContentSizeCategory = true
             label.numberOfLines = lines; label.lineBreakMode = .byTruncatingTail
             label.textColor = style == .caption1 ? .secondaryLabel : .label
@@ -126,7 +126,7 @@ private struct FoldedCardTitle: View {
     let title: String
     var weight: Font.Weight = .medium
     var body: some View {
-        Text(title).font(.system(size: 13, weight: weight)).lineLimit(2)
+        Text(title).plannerFont(size: 13, weight: weight).lineLimit(2)
             .padding(.horizontal, 10).padding(.vertical, 6)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading).clipped()
     }
@@ -136,7 +136,7 @@ private struct ScheduleTimeText: View {
     let text: String
     var size: CGFloat = 12
     var body: some View {
-        Text(text).font(.system(size: size, weight: .semibold)).monospacedDigit()
+        Text(text).plannerFont(size: size, weight: .semibold).monospacedDigit()
             .lineLimit(1).minimumScaleFactor(0.9)
     }
 }
@@ -144,6 +144,11 @@ private struct ScheduleTimeText: View {
 private struct FullDayOverview: View {
     @Environment(\.dismiss) private var dismiss
     @Binding var date: Date
+    @AppStorage(PlannerTypography.key) private var requestedFontScale = 1.0
+    @ScaledMetric(relativeTo: .body) private var baseTimeLabelWidth: CGFloat = 44
+    private var timeLabelWidth: CGFloat { baseTimeLabelWidth * PlannerTypography.clamp(requestedFontScale) }
+    private var timeGutter: CGFloat { timeLabelWidth + 10 }
+    private var minimumCardHeight: CGFloat { max(48, 48 * timeLabelWidth / 44) }
     let hours: PlanningHours
     let stickies: [Sticky]
     let fixed: [FixedEvent]
@@ -190,7 +195,7 @@ VStack(spacing: 8) {
         Button { moveDay(-1) } label: { Image(systemName: "chevron.left").frame(width: 44, height: 44) }
             .accessibilityLabel("前の日").accessibilityIdentifier("overviewPreviousDay")
         Text(date, format: .dateTime.month().day().weekday(.abbreviated))
-            .font(.subheadline.weight(.semibold)).accessibilityIdentifier("overviewDate")
+            .plannerFont(.subheadline, weight: .semibold).accessibilityIdentifier("overviewDate")
         Button { moveDay(1) } label: { Image(systemName: "chevron.right").frame(width: 44, height: 44) }
             .accessibilityLabel("次の日").accessibilityIdentifier("overviewNextDay")
         Spacer(minLength: 0)
@@ -200,7 +205,7 @@ VStack(spacing: 8) {
                 if !fixed.filter(\.allDay).isEmpty {
                     ScrollView(.horizontal, showsIndicators: false) {
                         HStack { ForEach(fixed.filter(\.allDay)) { event in
-                            Label(event.title, systemImage: "sun.max").font(.caption).padding(6).background(.white, in: Capsule())
+                            Label(event.title, systemImage: "sun.max").plannerFont(.caption).padding(6).background(.white, in: Capsule())
                                 .overlay(MemoHold { preview(.fixed(event)) })
                                 .accessibilityAction(named: "詳細メモ") { UIAccessibility.post(notification: .announcement, argument: preview(.fixed(event)).spoken) }
                         } }
@@ -208,7 +213,7 @@ VStack(spacing: 8) {
                 }
                 fittedTimeline
                 Text("空き時間を省略・\(hours.label)・未配置 \(unplaced.count)枚\(allItems.count == items.count ? "" : "・時間外 \(allItems.count - items.count)件")")
-                    .font(.caption2).foregroundStyle(.secondary).padding(.bottom, 4)
+                    .plannerFont(.caption2).foregroundStyle(.secondary).padding(.bottom, 4)
             }.background(paper).foregroundStyle(ink)
                 .navigationTitle("1日表示")
                 .navigationBarTitleDisplayMode(.inline)
@@ -224,31 +229,31 @@ VStack(spacing: 8) {
     private var fittedTimeline: some View {
         GeometryReader { geometry in
             let timelineItems = items.map { TimelineItem(id: $0.id, start: max(hours.start, $0.start), end: min(hours.end, $0.end)) }
-            let folded = FoldedTimeline(items: timelineItems, start: hours.start, end: hours.end)
+            let folded = FoldedTimeline(items: timelineItems, start: hours.start, end: hours.end, minimumEventHeight: minimumCardHeight)
             let slots = PlannerMath.layout(timelineItems)
             ScrollView {
                 ZStack(alignment: .topLeading) {
                     ForEach(folded.bands.indices, id: \.self) { index in
                         let band = folded.bands[index]
                         HStack(spacing: 6) {
-                            ScheduleTimeText(text: clockText(band.start)).frame(width: 44, alignment: .trailing)
+                            ScheduleTimeText(text: clockText(band.start)).frame(width: timeLabelWidth, alignment: .trailing)
                             Rectangle().fill(ink.opacity(0.12)).frame(height: 1)
                         }.frame(height: 14).offset(y: band.y)
                         if !band.occupied {
                             Text("空き \(durationText(band.end - band.start))")
-                                .font(.system(size: 10)).foregroundStyle(.secondary)
-                                .frame(width: max(1, geometry.size.width - 58), height: band.height)
-                                .offset(x: 54, y: band.y + 7)
+                                .plannerFont(size: 10).foregroundStyle(.secondary)
+                                .frame(width: max(1, geometry.size.width - timeGutter - 4), height: band.height)
+                                .offset(x: timeGutter, y: band.y + 7)
                         }
                     }
                     HStack(spacing: 6) {
-                        ScheduleTimeText(text: clockText(hours.end)).frame(width: 44, alignment: .trailing)
+                        ScheduleTimeText(text: clockText(hours.end)).frame(width: timeLabelWidth, alignment: .trailing)
                         Rectangle().fill(ink.opacity(0.12)).frame(height: 1)
                     }.frame(height: 14).offset(y: folded.height)
                     ForEach(items) { item in
                         let start = max(hours.start, item.start)
                         let slot = slots[item.id] ?? TimelineSlot(column: 0, columns: 1)
-                        let width = max(1, geometry.size.width - 54) / CGFloat(slot.columns)
+                        let width = max(1, geometry.size.width - timeGutter) / CGFloat(slot.columns)
                         let cardHeight = folded.position(min(hours.end, item.end)) - folded.position(start) - 2
                         FoldedCardTitle(title: item.title).frame(width: max(1, width - 2), height: cardHeight)
                             .foregroundStyle(textColor(item))
@@ -257,13 +262,13 @@ VStack(spacing: 8) {
                                 else { RoundedRectangle(cornerRadius: 5).fill(color(item)) }
                             }
                             .clipped().overlay(MemoHold { preview(item.target) })
-                            .offset(x: 52 + width * CGFloat(slot.column), y: folded.position(start) + 7)
+                            .offset(x: timeGutter - 2 + width * CGFloat(slot.column), y: folded.position(start) + 7)
                             .accessibilityLabel("\(clockText(item.start))〜\(clockText(item.end))、\(item.title)")
                             .accessibilityIdentifier("fullDayBlock-\(item.title)")
                             .accessibilityHint("長押しして詳細メモを表示")
                             .accessibilityAction(named: "詳細メモ") { UIAccessibility.post(notification: .announcement, argument: preview(item.target).spoken) }
                     }
-                    if items.isEmpty { Text("予定を配置するとここに表示されます").font(.caption).foregroundStyle(.secondary).frame(maxWidth: .infinity).offset(y: folded.height + 28) }
+                    if items.isEmpty { Text("予定を配置するとここに表示されます").plannerFont(.caption).foregroundStyle(.secondary).frame(maxWidth: .infinity).offset(y: folded.height + 28) }
                 }.frame(height: max(folded.height + 60, geometry.size.height), alignment: .topLeading)
             }.accessibilityIdentifier("fullDayTimeline")
         }.padding(.horizontal, 12)
@@ -502,6 +507,11 @@ struct PlannerView: View {
     @EnvironmentObject private var plans: PlanStore
     @EnvironmentObject private var calendar: CalendarStore
     @Environment(\.scenePhase) private var phase
+    @AppStorage(PlannerTypography.key) private var requestedFontScale = 1.0
+    @ScaledMetric(relativeTo: .body) private var baseTimeLabelWidth: CGFloat = 42
+    private var timeLabelWidth: CGFloat { baseTimeLabelWidth * PlannerTypography.clamp(requestedFontScale) }
+    private var timeGutter: CGFloat { timeLabelWidth + 8 }
+    private var minimumCardHeight: CGFloat { max(48, 48 * timeLabelWidth / 42) }
     @State private var showPresets = false
     @State private var showCalendar = false
     @State private var showNew = false
@@ -560,7 +570,7 @@ struct PlannerView: View {
         PlannerMath.layout(placed.map { TimelineItem(id: $0.id.uuidString, start: max(plans.hours.start, $0.start!), end: min(plans.hours.end, $0.start! + $0.minutes)) } + visibleFixed.map { TimelineItem(id: "fixed-" + $0.id, start: max(plans.hours.start, $0.start), end: min(plans.hours.end, $0.end)) })
     }
     var body: some View {
-        nativeTabs
+        nativeTabs.plannerFont(.body)
             #if targetEnvironment(macCatalyst)
             .focusedSceneValue(\.macPlannerActions, MacPlannerActions(
                 create: { showNew = true }, selectTab: { tab = $0 },
@@ -593,11 +603,11 @@ struct PlannerView: View {
             stats
             if !calendar.connected && !plans.demo {
                 Button { showCalendar = true } label: {
-                    HStack(spacing: 8) { Image(systemName: "calendar.badge.plus"); Text("カレンダーを接続").font(.system(size: 11, weight: .medium)); Spacer(); Image(systemName: "chevron.right") }.padding(.horizontal, 12).padding(.vertical, 5).foregroundStyle(accent)
+                    HStack(spacing: 8) { Image(systemName: "calendar.badge.plus"); Text("カレンダーを接続").plannerFont(size: 11, weight: .medium); Spacer(); Image(systemName: "chevron.right") }.padding(.horizontal, 12).padding(.vertical, 5).foregroundStyle(accent)
                 }.accessibilityIdentifier("calendarConnectBanner")
             }
             if !fixed.filter(\.allDay).isEmpty {
-                ScrollView(.horizontal, showsIndicators: false) { HStack { ForEach(fixed.filter(\.allDay)) { event in Label(event.title, systemImage: "sun.max").font(.caption2).padding(7).background(.white.opacity(0.6), in: Capsule()).overlay(MemoHold { preview(.fixed(event)) }).accessibilityAction(named: "詳細メモ") { UIAccessibility.post(notification: .announcement, argument: preview(.fixed(event)).spoken) } } }.padding(.horizontal, 20) }
+                ScrollView(.horizontal, showsIndicators: false) { HStack { ForEach(fixed.filter(\.allDay)) { event in Label(event.title, systemImage: "sun.max").plannerFont(.caption2).padding(7).background(.white.opacity(0.6), in: Capsule()).overlay(MemoHold { preview(.fixed(event)) }).accessibilityAction(named: "詳細メモ") { UIAccessibility.post(notification: .announcement, argument: preview(.fixed(event)).spoken) } } }.padding(.horizontal, 20) }
             }
             let zones = sidebarLeading ? (wide && !sideShowsDetails ? ["side", "memo", "schedule"] : ["side", "schedule"]) : (wide && !sideShowsDetails ? ["schedule", "memo", "side"] : ["schedule", "side"])
             HStack(spacing: 0) {
@@ -613,7 +623,7 @@ struct PlannerView: View {
                                     withTransaction(transaction) { folded.toggle() }
                                 } label: {
                                     Label(folded ? "広げる" : "空きをたたむ", systemImage: folded ? "arrow.up.and.down" : "arrow.down.and.line.horizontal.and.arrow.up")
-                                        .font(.system(size: 11, weight: .medium)).padding(.horizontal, 8).frame(minHeight: 28)
+                                        .plannerFont(size: 11, weight: .medium).padding(.horizontal, 8).frame(minHeight: 28)
                                 }.buttonStyle(.plain).foregroundStyle(accent)
                                     .accessibilityIdentifier("foldPlanner")
                                     .accessibilityValue(folded ? "折りたたみ中" : "通常表示")
@@ -649,16 +659,16 @@ struct PlannerView: View {
         }.tint(accent)
     }
     private func zoneTitle(_ title: String) -> some View {
-        Text(title).font(.system(size: 12, weight: .semibold)).frame(maxWidth: .infinity, alignment: .leading)
+        Text(title).plannerFont(size: 12, weight: .semibold).frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, 12).frame(height: 35).background(paper)
             .overlay(alignment: .bottom) { Rectangle().fill(ink.opacity(0.1)).frame(height: 1) }
     }
     private var memoPane: some View {
         VStack(alignment: .leading, spacing: 12) {
             if let task = selectedTask {
-                Text(task.title).font(.system(size: 15, weight: .semibold)).lineLimit(2)
+                Text(task.title).plannerFont(size: 15, weight: .semibold).lineLimit(2)
                 TextEditor(text: Binding(get: { memoDrafts[task.id] ?? task.memo }, set: { memoDrafts[task.id] = $0 }))
-                    .font(.system(size: 14)).scrollContentBackground(.hidden)
+                    .plannerFont(size: 14).scrollContentBackground(.hidden)
                     .focused($memoFocused)
                     .background(.white, in: RoundedRectangle(cornerRadius: 8))
                     .accessibilityIdentifier("detailMemo")
@@ -670,8 +680,8 @@ struct PlannerView: View {
                     .accessibilityIdentifier("saveDetailMemo")
             } else {
                 Spacer()
-                Image(systemName: "note.text").font(.title2)
-                Text("付箋を選択").font(.subheadline)
+                Image(systemName: "note.text").plannerFont(.title2)
+                Text("付箋を選択").plannerFont(.subheadline)
                 Spacer()
             }
         }.padding(12).frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading).background(paper)
@@ -687,11 +697,11 @@ struct PlannerView: View {
                     if let task = selectedTask {
                         VStack(alignment: .leading, spacing: 7) {
                             Text(task.start.map { "\(clockText($0))〜\(clockText($0 + task.minutes))" } ?? "未配置")
-                                .font(.system(size: 10, weight: .medium))
-                            Text(durationText(task.minutes)).font(.system(size: 11))
-                            Button("予定を編集") { editing = task }.font(.system(size: 11))
+                                .plannerFont(size: 10, weight: .medium)
+                            Text(durationText(task.minutes)).plannerFont(size: 11)
+                            Button("予定を編集") { editing = task }.plannerFont(size: 11)
                                 .accessibilityIdentifier("editSideDetail")
-                            Button("未配置に戻す") { plans.put(task.id, at: nil); sideShowsDetails = false }.font(.system(size: 11))
+                            Button("未配置に戻す") { plans.put(task.id, at: nil); sideShowsDetails = false }.plannerFont(size: 11)
                                 .accessibilityIdentifier("unplaceButton")
                         }.frame(maxWidth: .infinity, alignment: .leading).padding(.horizontal, 12).padding(.top, 10)
                     }
@@ -716,7 +726,7 @@ struct PlannerView: View {
             if details && selectedTask == nil { selected = placed.first?.id ?? trayTasks.first?.id }
             sideShowsDetails = details
         } label: {
-            Text(title).font(.system(size: 11, weight: .semibold)).frame(maxWidth: .infinity, minHeight: 34)
+            Text(title).plannerFont(size: 11, weight: .semibold).lineLimit(1).minimumScaleFactor(0.8).frame(maxWidth: .infinity, minHeight: 34)
                 .background(sideShowsDetails == details ? accent : .clear, in: RoundedRectangle(cornerRadius: 6))
                 .foregroundStyle(sideShowsDetails == details ? .white : ink)
         }.buttonStyle(.plain).accessibilityIdentifier(identifier)
@@ -725,20 +735,20 @@ struct PlannerView: View {
     private var dateBar: some View {
         HStack(spacing: 0) {
             Button { changeDay(-1) } label: { Image(systemName: "chevron.left").frame(width: 28, height: 44) }.accessibilityLabel("前の日")
-            Text(plans.date, format: .dateTime.month().day().weekday(.abbreviated)).font(.system(size: 12, weight: .semibold)).lineLimit(1).minimumScaleFactor(0.75).accessibilityIdentifier("selectedDate")
+            Text(plans.date, format: .dateTime.month().day().weekday(.abbreviated)).plannerFont(size: 12, weight: .semibold).lineLimit(1).minimumScaleFactor(0.75).accessibilityIdentifier("selectedDate")
             Button { changeDay(1) } label: { Image(systemName: "chevron.right").frame(width: 28, height: 44) }.accessibilityLabel("次の日")
             Spacer(minLength: 0)
             Button {
                 plans.restore(); selected = nil; memoFocused = false; memoDrafts.removeAll()
                 moving = nil; stretching = nil; shift = 0; stretch = 0
             } label: {
-                Label("元に戻す", systemImage: "arrow.uturn.backward").font(.system(size: 11, weight: .semibold))
+                Label("元に戻す", systemImage: "arrow.uturn.backward").plannerFont(size: 11, weight: .semibold)
                     .frame(minWidth: 44, minHeight: 44)
             }
             .disabled(plans.undo == nil)
             .foregroundStyle(plans.undo == nil ? ink.opacity(0.3) : accent)
             .accessibilityIdentifier("undoPlan")
-            Button { plans.date = Date() } label: { Text("今日").font(.system(size: 10, weight: .semibold)).frame(width: 36, height: 44) }.accessibilityIdentifier("todayButton")
+            Button { plans.date = Date() } label: { Text("今日").plannerFont(size: 10, weight: .semibold).frame(width: 36, height: 44) }.accessibilityIdentifier("todayButton")
         }
             .contentShape(Rectangle())
             .simultaneousGesture(daySwipeGesture)
@@ -750,15 +760,15 @@ struct PlannerView: View {
     }
     private func timeBar(_ title: String, minutes: Int, color: Color, identifier: String) -> some View {
         HStack(spacing: 8) {
-            Text(title).frame(width: 44, alignment: .leading)
+            Text(title).frame(width: 44 * timeLabelWidth / 42, alignment: .leading)
             GeometryReader { proxy in
                 Capsule().fill(ink.opacity(0.07))
                     .overlay(alignment: .leading) {
                         Capsule().fill(color).frame(width: proxy.size.width * min(1, max(0, CGFloat(minutes) / CGFloat(plans.hours.totalMinutes))))
                     }
             }.frame(height: 5).accessibilityHidden(true)
-            Text(durationText(minutes)).monospacedDigit().frame(width: 78, alignment: .trailing)
-        }.font(.system(size: 10, weight: .medium)).foregroundStyle(ink.opacity(0.7))
+            Text(durationText(minutes)).monospacedDigit().frame(width: 78 * timeLabelWidth / 42, alignment: .trailing)
+        }.plannerFont(size: 10, weight: .medium).foregroundStyle(ink.opacity(0.7))
             .accessibilityElement(children: .contain).accessibilityIdentifier(identifier).accessibilityValue(durationText(minutes))
     }
     private func cardHeight(_ minutes: Int) -> CGFloat {
@@ -794,13 +804,13 @@ struct PlannerView: View {
     private func hourRow(_ hour: Int) -> some View {
         ZStack(alignment: .topLeading) {
             HStack(spacing: 6) {
-                ScheduleTimeText(text: String(format: "%02d:00", hour)).foregroundStyle(ink.opacity(0.75)).frame(width: 42, alignment: .trailing)
+                ScheduleTimeText(text: String(format: "%02d:00", hour)).foregroundStyle(ink.opacity(0.75)).frame(width: timeLabelWidth, alignment: .trailing)
                 Rectangle().fill(ink.opacity(0.09)).frame(height: 1)
             }
             if !overview && zoomFactor >= 4 && hour < plans.hours.end / 60 {
                 ForEach(1..<12) { step in
                     HStack(spacing: 6) {
-                        ScheduleTimeText(text: String(format: ":%02d", step * 5), size: 10).frame(width: 42, alignment: .trailing)
+                        ScheduleTimeText(text: String(format: ":%02d", step * 5), size: 10).frame(width: timeLabelWidth, alignment: .trailing)
                         Rectangle().frame(height: 0.5)
                     }.foregroundStyle(ink.opacity(0.45)).offset(y: CGFloat(step * 5) * scale)
                 }
@@ -812,7 +822,7 @@ struct PlannerView: View {
     private var foldedLayout: FoldedTimeline {
         FoldedTimeline(items: placed.map { TimelineItem(id: $0.id.uuidString, start: $0.start!, end: $0.start! + $0.minutes) }
                        + visibleFixed.map { TimelineItem(id: "fixed-" + $0.id, start: $0.start, end: $0.end) },
-                       start: plans.hours.start, end: plans.hours.end)
+                       start: plans.hours.start, end: plans.hours.end, minimumEventHeight: minimumCardHeight)
     }
     private func timelineY(_ minute: Int) -> CGFloat {
         folded ? foldedLayout.position(minute) : CGFloat(minute - plans.hours.start) * scale
@@ -834,7 +844,7 @@ struct PlannerView: View {
         let collision = conflicts(task)
         let slot = slots[task.id.uuidString] ?? TimelineSlot(column: 0, columns: 1)
         let slotCount = slot.columns
-        let width = (availableWidth - 50) / CGFloat(slotCount)
+        let width = (availableWidth - timeGutter) / CGFloat(slotCount)
         let height = max(0, timelineY(visibleEnd) - timelineY(visibleStart) - (folded ? 2 : min(4, CGFloat(visibleEnd - visibleStart) * scale * 0.25)) + (stretching == task.id ? stretch : 0))
         return taskCard(task, compact: overview || slotCount > 1, height: height)
             .frame(width: width - 3, height: height)
@@ -858,13 +868,13 @@ struct PlannerView: View {
                 if moving == task.id && !returningToInbox {
                     let start = movedStart(task, delta: shift)
                     Text("\(clockText(start)) – \(clockText(start + task.minutes))")
-                        .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                        .plannerFont(size: 11, weight: .semibold, design: .monospaced)
                         .padding(.horizontal, 10).padding(.vertical, 5)
                         .background(ink, in: Capsule()).foregroundStyle(.white)
                         .offset(y: -29).allowsHitTesting(false)
                 }
             }
-            .offset(x: 48 + width * CGFloat(slot.column), y: timelineY(visibleStart) + 2 + (moving == task.id ? shift : 0))
+            .offset(x: timeGutter - 2 + width * CGFloat(slot.column), y: timelineY(visibleStart) + 2 + (moving == task.id ? shift : 0))
             .zIndex(moving == task.id || stretching == task.id ? 5 : selected == task.id ? 3 : 1)
             .accessibilityElement(children: .contain)
             .accessibilityIdentifier("task-\(task.title)")
@@ -886,21 +896,21 @@ struct PlannerView: View {
                     ForEach(layout.bands.indices, id: \.self) { index in
                         let band = layout.bands[index]
                         HStack(spacing: 6) {
-                            ScheduleTimeText(text: clockText(band.start)).frame(width: 42, alignment: .trailing)
+                            ScheduleTimeText(text: clockText(band.start)).frame(width: timeLabelWidth, alignment: .trailing)
                             Rectangle().fill(ink.opacity(0.12)).frame(height: 1)
                         }.frame(height: 12).offset(y: band.y)
                         if !band.occupied {
-                            Text("空き \(durationText(band.end - band.start))").font(.system(size: 9)).foregroundStyle(.secondary)
-                                .frame(width: max(1, geometry.size.width - 50), height: band.height)
-                                .offset(x: 48, y: band.y + 6).allowsHitTesting(false)
+                            Text("空き \(durationText(band.end - band.start))").plannerFont(size: 9).foregroundStyle(.secondary)
+                                .frame(width: max(1, geometry.size.width - timeGutter), height: band.height)
+                                .offset(x: timeGutter - 2, y: band.y + 6).allowsHitTesting(false)
                         }
                     }
                     ScheduleTimeText(text: clockText(plans.hours.end))
-                        .frame(width: 42, alignment: .trailing).offset(y: layout.height)
+                        .frame(width: timeLabelWidth, alignment: .trailing).offset(y: layout.height)
                     ForEach(visibleFixed) { event in
                         let start = max(plans.hours.start, event.start)
                         let slot = slots["fixed-" + event.id] ?? TimelineSlot(column: 0, columns: 1)
-                        let width = (geometry.size.width - 50) / CGFloat(slot.columns)
+                        let width = (geometry.size.width - timeGutter) / CGFloat(slot.columns)
                         let height = timelineY(min(event.end, plans.hours.end)) - timelineY(start) - 2
                         fixedCard(event, height: height).frame(width: width - 3, height: height).clipped()
                             .overlay(MemoHold { preview(.fixed(event)) })
@@ -908,7 +918,7 @@ struct PlannerView: View {
                             .accessibilityLabel("\(event.title)、\(clockText(event.start))から\(clockText(event.end))、カレンダーの固定予定")
                             .accessibilityIdentifier("fixed-\(event.title)")
                             .accessibilityAction(named: "詳細メモ") { UIAccessibility.post(notification: .announcement, argument: preview(.fixed(event)).spoken) }
-                            .offset(x: 48 + width * CGFloat(slot.column), y: timelineY(start) + 2)
+                            .offset(x: timeGutter - 2 + width * CGFloat(slot.column), y: timelineY(start) + 2)
                     }
                     ForEach(placed) { task in placedCard(task, availableWidth: geometry.size.width) }
                 }
@@ -938,7 +948,7 @@ struct PlannerView: View {
                         ForEach(visibleFixed) { event in
                             let start = max(plans.hours.start, event.start)
                             let slot = slots["fixed-" + event.id] ?? TimelineSlot(column: 0, columns: 1)
-                            let width = (geometry.size.width - 50) / CGFloat(slot.columns)
+                            let width = (geometry.size.width - timeGutter) / CGFloat(slot.columns)
                             let height = cardHeight(min(event.end, plans.hours.end) - start)
                             fixedCard(event, height: height).frame(width: width - 3, height: height).clipped()
                                 .overlay(MemoHold { preview(.fixed(event)) })
@@ -946,7 +956,7 @@ struct PlannerView: View {
                                 .accessibilityLabel("\(event.title)、\(clockText(event.start))から\(clockText(event.end))、カレンダーの固定予定")
                                 .accessibilityIdentifier("fixed-\(event.title)")
                                 .accessibilityAction(named: "詳細メモ") { UIAccessibility.post(notification: .announcement, argument: preview(.fixed(event)).spoken) }
-                                .offset(x: 48 + width * CGFloat(slot.column), y: CGFloat(start - plans.hours.start) * scale + 2)
+                                .offset(x: timeGutter - 2 + width * CGFloat(slot.column), y: CGFloat(start - plans.hours.start) * scale + 2)
                         }
                         ForEach(placed) { task in
                             placedCard(task, availableWidth: geometry.size.width)
@@ -1015,10 +1025,10 @@ struct PlannerView: View {
         } else {
             VStack(alignment: .leading, spacing: overview ? 0 : 5) {
                 if height < 44 {
-                    if height >= 14 { Text(event.title).font(.system(size: folded ? 12 : 10, weight: .medium)).lineLimit(folded ? 2 : 1) }
-                } else if overview { Text(event.title).font(.system(size: 7, weight: .medium)).lineLimit(1) }
-                else { HStack { Image(systemName: "lock.fill").font(.system(size: 9)); Text("\(clockText(event.start)) – \(clockText(event.end))").font(.system(size: 12, weight: .semibold)).monospacedDigit().lineLimit(1).minimumScaleFactor(0.85); Spacer(minLength: 0) }.foregroundStyle(ink.opacity(0.75))
-                if !overview { Text(event.title).font(.system(size: 13, weight: .medium)).lineLimit(2) }
+                    if height >= 14 { Text(event.title).plannerFont(size: folded ? 12 : 10, weight: .medium).lineLimit(folded ? 2 : 1) }
+                } else if overview { Text(event.title).plannerFont(size: 7, weight: .medium).lineLimit(1) }
+                else { HStack { Image(systemName: "lock.fill").plannerFont(size: 9); Text("\(clockText(event.start)) – \(clockText(event.end))").plannerFont(size: 12, weight: .semibold).monospacedDigit().lineLimit(1).minimumScaleFactor(0.85); Spacer(minLength: 0) }.foregroundStyle(ink.opacity(0.75))
+                if !overview { Text(event.title).plannerFont(size: 13, weight: .medium).lineLimit(2) }
                 Spacer(minLength: 0)
                 }
             }.padding(height < 44 ? min(height / 2, 2) : 10).frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading).background(Color(red: 0.89, green: 0.91, blue: 0.89), in: RoundedRectangle(cornerRadius: 9)).overlay(alignment: .leading) { RoundedRectangle(cornerRadius: 2).fill(ink.opacity(0.25)).frame(width: 3).padding(.vertical, 9) }.clipped()
@@ -1037,12 +1047,12 @@ struct PlannerView: View {
         } else {
             VStack(alignment: .leading, spacing: 4) {
             if height < 44 {
-                if height >= 14 { Text(task.title).font(.system(size: folded ? 12 : 10, weight: .semibold)).lineLimit(folded ? 2 : 1) }
+                if height >= 14 { Text(task.title).plannerFont(size: folded ? 12 : 10, weight: .semibold).lineLimit(folded ? 2 : 1) }
             } else if overview {
-                if duration >= 45 { Text(task.title).font(.system(size: 7, weight: .semibold)).lineLimit(1) }
+                if duration >= 45 { Text(task.title).plannerFont(size: 7, weight: .semibold).lineLimit(1) }
             } else {
-            if !compact { Text("\(clockText(start)) – \(clockText(start + duration))").font(.system(size: 12, weight: .semibold)).monospacedDigit().lineLimit(1).minimumScaleFactor(0.85).foregroundStyle(textColor.opacity(0.8)) }
-            HStack(spacing: 4) { Text(task.title).font(.system(size: compact ? 10 : 12, weight: .semibold)).lineLimit(2); Spacer(minLength: 0); if compact { Text("\(duration)分").font(.system(size: 9)) } }.padding(.trailing, selected == task.id ? 29 : 0)
+            if !compact { Text("\(clockText(start)) – \(clockText(start + duration))").plannerFont(size: 12, weight: .semibold).monospacedDigit().lineLimit(1).minimumScaleFactor(0.85).foregroundStyle(textColor.opacity(0.8)) }
+            HStack(spacing: 4) { Text(task.title).plannerFont(size: compact ? 10 : 12, weight: .semibold).lineLimit(2); Spacer(minLength: 0); if compact { Text("\(duration)分").plannerFont(size: 9) } }.padding(.trailing, selected == task.id ? 29 : 0)
             Spacer(minLength: 0)
             }
         }.padding(.horizontal, overview ? 3 : 7).padding(.top, height < 44 ? 1 : (compact ? 5 : 7)).frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
@@ -1068,7 +1078,7 @@ struct PlannerView: View {
     }
     private func moveHandle(_ task: Sticky) -> some View {
         Image(systemName: "arrow.up.and.down")
-            .font(.system(size: 12, weight: .semibold))
+            .plannerFont(size: 12, weight: .semibold)
             .frame(width: 36, height: 26)
             .background(.white.opacity(0.75), in: Capsule())
             .contentShape(Rectangle())
@@ -1111,8 +1121,8 @@ struct PlannerView: View {
                     }
                         ForEach(trayTasks) { task in
                             VStack(alignment: .leading, spacing: 8) {
-                                Text(task.title).font(.system(size: 12, weight: .semibold)).lineLimit(3)
-                                Text(task.start.map { "時間外 \(clockText($0))" } ?? durationText(task.minutes)).font(.system(size: 10))
+                                Text(task.title).plannerFont(size: 12, weight: .semibold).lineLimit(3)
+                                Text(task.start.map { "時間外 \(clockText($0))" } ?? durationText(task.minutes)).plannerFont(size: 10)
                             }.frame(maxWidth: .infinity, minHeight: 52, alignment: .topLeading).padding(10)
                                 .background(StickyPaper(color: plans.paletteColor(for: task.tone).color,
                                                         selected: selected == task.id))
@@ -1127,8 +1137,8 @@ struct PlannerView: View {
                 }.padding(8).frame(maxWidth: .infinity, minHeight: 100, alignment: .top)
             }
             VStack(spacing: 4) {
-                Button { showPresets = true } label: { Label("プリセット", systemImage: "square.stack").font(.system(size: 11)).frame(maxWidth: .infinity, minHeight: 40) }.accessibilityIdentifier("presetsButton")
-                Button { showNew = true } label: { Label("つくる", systemImage: "plus").font(.system(size: 12, weight: .semibold)).frame(maxWidth: .infinity, minHeight: 40).background(accent, in: RoundedRectangle(cornerRadius: 8)).foregroundStyle(.white) }.accessibilityLabel("付箋をつくる").accessibilityIdentifier("newStickyButton")
+                Button { showPresets = true } label: { Label("プリセット", systemImage: "square.stack").plannerFont(size: 11).frame(maxWidth: .infinity, minHeight: 40) }.accessibilityIdentifier("presetsButton")
+                Button { showNew = true } label: { Label("つくる", systemImage: "plus").plannerFont(size: 12, weight: .semibold).frame(maxWidth: .infinity, minHeight: 40).background(accent, in: RoundedRectangle(cornerRadius: 8)).foregroundStyle(.white) }.accessibilityLabel("付箋をつくる").accessibilityIdentifier("newStickyButton")
             }.padding(8)
         }
             .background(returningToInbox ? tones[0] : paper)

@@ -225,3 +225,11 @@ iPhone 17eシミュレーター / iOS 27.0でXCTestを使って実際に操作�
 ## 端末内保存の設定画面
 
 <img src="58-local-settings.png" width="300" alt="アカウント・同期を削除した設定画面">
+
+## Issue #52〜#57
+
+[1日表示の日付移動](64-overview-date-navigation.png) / [付箋のコピー](65-copy-sticky.png) / [計画上部のUndo](66-undo-plan.png)
+
+<img src="67-font-settings.png" width="260" alt="文字サイズ150%の設定">
+<img src="68-large-font-plan.png" width="260" alt="文字サイズに合わせて予定高さと時刻欄も広がった計画画面">
+<img src="69-large-font-day.png" width="260" alt="文字サイズ150%の1日表示">

@@ -223,3 +223,14 @@ Googleログイン・同期削除（2026-10-29）
 記録: artifacts/LocalOnly.xcresult / artifacts/local-only.log
 単体28件・UI2件成功、失敗0件。
 Release: artifacts/local-only-release.log — BUILD SUCCEEDED
+
+Issue #52〜#57（2026-10-29）
+Issue52.xcresult: UI45成功（日付移動・計画との共有）。
+Issue53Accept.xcresult: UI31/46成功（長押しと両領域のコピー）。
+Issue54.xcresult: UI20/45成功（時刻欄・拡大・日付移動）。
+Issue55Drag.xcresult: UI35成功（折りたたみの移動・伸縮）。
+Issue56Undo.xcresult: UI48成功（直前への復元と無効化）。
+Issue57.xcresult: 最終単体31件、UI35/48/49成功（文字サイズ保持・標準復帰を含む）。
+Issues52-57FinalUI.xcresult: 最終UI03/36/45成功（通常ドラッグ・5分予定・日付移動）。
+Issues52-57Mac.xcresult: Mac Catalyst単体31件成功。
+issues52-57-release.log: iPhone実機向けReleaseビルド成功（署名なし、実機操作は未確認）。

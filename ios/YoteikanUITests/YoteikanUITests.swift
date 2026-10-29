@@ -119,6 +119,29 @@ func test45OverviewDateNavigationSharesPlanningDate() {
         XCTAssertFalse(app.buttons["undoPlan"].isEnabled)
     }
 
+    func test49FontSizePersistsAndGrowsFoldedCards() {
+        launch(["--demo", "--reset-test-data"])
+        app.buttons["foldPlanner"].tap()
+        let normalHeight = app.otherElements["task-朝の読書"].frame.height
+        selectTab("設定")
+        XCTAssertEqual(app.staticTexts["fontScaleValue"].label, "100%")
+        app.sliders["fontSizeSlider"].adjust(toNormalizedSliderPosition: 1)
+        XCTAssertEqual(app.staticTexts["fontScaleValue"].label, "150%")
+        shot("67-font-settings")
+        selectTab("計画")
+        XCTAssertGreaterThan(app.otherElements["task-朝の読書"].frame.height, normalHeight)
+        shot("68-large-font-plan")
+        selectTab("1日表示")
+        XCTAssertTrue(app.descendants(matching: .any).matching(identifier: "fullDayBlock-朝の読書").firstMatch.exists)
+        shot("69-large-font-day")
+        app.terminate(); app.launchArguments = ["--demo"]; app.launch()
+        XCTAssertTrue(app.buttons["presetsButton"].waitForExistence(timeout: 5))
+        selectTab("設定")
+        XCTAssertEqual(app.staticTexts["fontScaleValue"].label, "150%")
+        app.buttons["resetFontSize"].tap()
+        XCTAssertEqual(app.staticTexts["fontScaleValue"].label, "100%")
+    }
+
     private func selectTab(_ name: String) {
         #if os(macOS) || targetEnvironment(macCatalyst)
         app.radioButtons[name].click()
