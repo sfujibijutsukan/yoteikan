@@ -301,7 +301,7 @@ struct FoldedTimeline {
         var y: CGFloat = 0
         for (a, b) in zip(boundaries, boundaries.dropFirst()) {
             let occupied = clipped.contains { $0.start < b && $0.end > a }
-            let height: CGFloat = occupied ? max(44, min(100, CGFloat(b - a))) : 32
+            let height: CGFloat = occupied ? max(48, min(100, CGFloat(b - a))) : 32
             result.append(Band(start: a, end: b, occupied: occupied, y: y, height: height))
             y += height
         }

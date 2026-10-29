@@ -982,6 +982,7 @@ func test45OverviewDateNavigationSharesPlanningDate() {
         XCTAssertEqual(work.value as? String, "09:20|80")
         XCTAssertEqual(reading.value as? String, "08:00|30")
         work.press(forDuration: 1)
+        if app.buttons.matching(identifier: "copyStickyAction").firstMatch.exists { app.coordinate(withNormalizedOffset: CGVector(dx: 0.95, dy: 0.12)).tap() }
         XCTAssertFalse(app.otherElements["memoPreview"].exists)
         XCTAssertFalse(app.buttons["closeScheduleMemo"].exists)
         app.buttons["foldPlanner"].tap()
