@@ -11,4 +11,5 @@
 <key>UILaunchScreen</key><dict/>
 <key>UISupportedInterfaceOrientations</key><array><string>UIInterfaceOrientationPortrait</string><string>UIInterfaceOrientationLandscapeLeft</string><string>UIInterfaceOrientationLandscapeRight</string></array>
 <key>NSCalendarsFullAccessUsageDescription</key><string>会議などの予定を読み込み、固定予定として時間割に表示します。カレンダーの予定は変更しません。</string>
+<key>CFBundleURLTypes</key><array><dict><key>CFBundleURLSchemes</key><array><string>yoteikan</string></array></dict></array>
 </dict></plist>

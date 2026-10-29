@@ -14,9 +14,13 @@ import SwiftUI
     }
     var body: some Scene {
         WindowGroup { PlannerView().environmentObject(plans).environmentObject(calendar).environmentObject(reminders)
-            .onReceive(plans.$plan) { reminders.update(plans.demo ? [] : $0.stickies) }
-            .onChange(of: phase) { _, value in if value == .active { reminders.update(plans.demo ? [] : plans.plan.stickies) } }
-            .preferredColorScheme(.light).tint(accent) }
+            .onReceive(plans.$plan) { reminders.update(plans.demo ? [] : $0.stickies); WidgetPublisher.publish($0, demo: plans.demo) }
+            .onChange(of: phase) { _, value in if value == .active { reminders.update(plans.demo ? [] : plans.plan.stickies); WidgetPublisher.publish(plans.plan, demo: plans.demo) } }
+            .preferredColorScheme(.light).tint(accent)
+            #if DEBUG && targetEnvironment(simulator)
+            .sheet(isPresented: .constant(ProcessInfo.processInfo.arguments.contains("--widget-gallery"))) { WidgetGallery() }
+            #endif
+        }
         #if targetEnvironment(macCatalyst)
         .commands { MacPlannerCommands() }
         #endif

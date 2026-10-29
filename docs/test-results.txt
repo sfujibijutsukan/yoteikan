@@ -224,6 +224,12 @@ Googleログイン・同期削除（2026-10-29）
 単体28件・UI2件成功、失敗0件。
 Release: artifacts/local-only-release.log — BUILD SUCCEEDED
 
+現在時刻・iPhoneウィジェット（2026-10-29）
+TimeWidgetFinal.xcresult: 単体33件、UI03/42/43成功。
+WidgetLink.xcresult: UI22/43/44成功、スキップ0件。
+TimeWidgetMac.xcresult: Mac単体33件成功。
+time-widget-release.log: アプリ・拡張のRelease BUILD SUCCEEDED。
+
 Issue #52〜#57（2026-10-29）
 Issue52.xcresult: UI45成功（日付移動・計画との共有）。
 Issue53Accept.xcresult: UI31/46成功（長押しと両領域のコピー）。
@@ -234,3 +240,9 @@ Issue57.xcresult: 最終単体31件、UI35/48/49成功（文字サイズ保持�
 Issues52-57FinalUI.xcresult: 最終UI03/36/45成功（通常ドラッグ・5分予定・日付移動）。
 Issues52-57Mac.xcresult: Mac Catalyst単体31件成功。
 issues52-57-release.log: iPhone実機向けReleaseビルド成功（署名なし、実機操作は未確認）。
+
+PR #51 main競合解消（2026-10-30）
+PR51Resolved.xcresult: iPhone単体36件＋UI42/43/44/45/48/49、計42件成功・スキップ0件。
+PR51ResolvedMac.xcresult: Mac Catalyst単体36件成功。
+PR51FontRule.xcresult: ラベル追従調整後のUI42/49成功。
+pr51-final-mac.log / pr51-final-release.log: 最終ビルド成功。

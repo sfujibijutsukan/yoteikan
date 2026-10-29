@@ -66,6 +66,61 @@ final class YoteikanUITests: XCTestCase {
         XCTAssertTrue(app.buttons["hoursSettings"].exists)
         shot("58-local-settings")
     }
+    #if targetEnvironment(simulator)
+    func test42CurrentTimeVisibleOnLaunchAndAcrossTimelineModes() {
+        launch(["--demo", "--now-test"])
+        func marker() -> XCUIElement { app.descendants(matching: .any).matching(identifier: "currentTimeIndicator").firstMatch }
+        XCTAssertTrue(marker().waitForExistence(timeout: 5))
+        XCTAssertEqual(marker().value as? String, "13:17")
+        XCTAssertGreaterThan(marker().frame.minY, app.buttons["foldPlanner"].frame.maxY)
+        XCTAssertLessThan(marker().frame.maxY, app.tabBars.firstMatch.frame.minY)
+        shot("59-now-planner")
+        app.buttons["前の日"].tap()
+        XCTAssertFalse(marker().exists)
+        app.buttons["todayButton"].tap()
+        XCTAssertTrue(marker().waitForExistence(timeout: 3))
+        app.buttons["foldPlanner"].tap()
+        XCTAssertTrue(marker().waitForExistence(timeout: 3))
+        XCTAssertEqual(marker().value as? String, "13:17")
+        shot("60-now-folded")
+        selectTab("1日表示")
+        XCTAssertTrue(marker().waitForExistence(timeout: 3))
+        XCTAssertEqual(marker().value as? String, "13:17")
+        shot("61-now-day")
+    }
+
+    func test43WidgetSmallAndMediumLayouts() {
+        app = XCUIApplication(); app.launchArguments = ["--demo", "--widget-gallery", "--widget-publish-test"]; app.launchEnvironment["YOTEIKAN_UI_TEST"] = "1"; app.launch()
+        XCTAssertTrue(app.otherElements["widgetGallery"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["中サイズ"].exists)
+        XCTAssertTrue(app.staticTexts["widgetFixtureSaved"].waitForExistence(timeout: 5))
+        shot("62-widget-layouts")
+    }
+
+    func test44WidgetLinkReturnsToToday() throws {
+        #if targetEnvironment(simulator)
+        let springboard = XCUIApplication(bundleIdentifier: "com.apple.springboard")
+        if springboard.alerts.buttons["開く"].exists { springboard.alerts.buttons["開く"].tap() }
+        launch(["--demo", "--now-test"])
+        app.buttons["前の日"].tap()
+        selectTab("設定")
+        XCUIDevice.shared.press(.home)
+        let widget = springboard.descendants(matching: .any).matching(NSPredicate(format: "label CONTAINS %@", "朝の読書")).firstMatch
+        guard widget.waitForExistence(timeout: 5) else { throw XCTSkip("この検証用シミュレーターには予定館のホーム画面ウィジェットが追加されていません") }
+        widget.tap()
+        if springboard.alerts.buttons["開く"].waitForExistence(timeout: 2) { springboard.alerts.buttons["開く"].tap() }
+        XCTAssertTrue(app.buttons["presetsButton"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.tabBars.buttons["計画"].isSelected)
+        let marker = app.descendants(matching: .any).matching(identifier: "currentTimeIndicator").firstMatch
+        XCTAssertTrue(marker.waitForExistence(timeout: 3))
+        XCTAssertEqual(marker.value as? String, "13:17")
+        shot("63-widget-open-today")
+        #endif
+    }
+
+    #endif
+
+
 func test45OverviewDateNavigationSharesPlanningDate() {
     launch()
     selectTab("1日表示")

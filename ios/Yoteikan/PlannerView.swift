@@ -122,6 +122,37 @@ private final class MemoPreviewPresenter {
     deinit { hide() }
 }
 
+private struct TimeScrollAnchor: View {
+    let y: CGFloat
+    let name: String
+    var body: some View {
+        VStack(spacing: 0) {
+            Color.clear.frame(height: max(0, y))
+            Color.clear.frame(height: 1).id(name)
+        }.frame(width: 1).allowsHitTesting(false).accessibilityHidden(true)
+    }
+}
+
+private struct CurrentTimeRule: View {
+    let minute: Int
+    let labelWidth: CGFloat
+    @AppStorage(PlannerTypography.key) private var requestedFontScale = 1.0
+    @ScaledMetric(relativeTo: .body) private var baseHeight: CGFloat = 16
+    private var height: CGFloat { baseHeight * PlannerTypography.clamp(requestedFontScale) }
+    var body: some View {
+        HStack(spacing: 0) {
+            Text(clockText(minute)).plannerFont(size: 8, weight: .bold, design: .monospaced).lineLimit(1).minimumScaleFactor(0.8)
+                .foregroundStyle(.white).frame(width: labelWidth, height: height).background(.red, in: Capsule())
+            Circle().fill(.red).frame(width: 5, height: 5)
+            Rectangle().fill(.red).frame(height: 1.5)
+        }
+        .frame(height: height).offset(y: -height / 2)
+        .allowsHitTesting(false)
+        .accessibilityElement(children: .ignore).accessibilityLabel("現在時刻")
+        .accessibilityValue(clockText(minute)).accessibilityIdentifier("currentTimeIndicator")
+    }
+}
+
 private struct FoldedCardTitle: View {
     let title: String
     var weight: Font.Weight = .medium
@@ -149,6 +180,8 @@ private struct FullDayOverview: View {
     private var timeLabelWidth: CGFloat { baseTimeLabelWidth * PlannerTypography.clamp(requestedFontScale) }
     private var timeGutter: CGFloat { timeLabelWidth + 10 }
     private var minimumCardHeight: CGFloat { max(48, 48 * timeLabelWidth / 44) }
+    let now: Date
+    let focusRequest: Int
     let hours: PlanningHours
     let stickies: [Sticky]
     let fixed: [FixedEvent]
@@ -231,6 +264,7 @@ VStack(spacing: 8) {
             let timelineItems = items.map { TimelineItem(id: $0.id, start: max(hours.start, $0.start), end: min(hours.end, $0.end)) }
             let folded = FoldedTimeline(items: timelineItems, start: hours.start, end: hours.end, minimumEventHeight: minimumCardHeight)
             let slots = PlannerMath.layout(timelineItems)
+            ScrollViewReader { reader in
             ScrollView {
                 ZStack(alignment: .topLeading) {
                     ForEach(folded.bands.indices, id: \.self) { index in
@@ -268,9 +302,17 @@ VStack(spacing: 8) {
                             .accessibilityHint("長押しして詳細メモを表示")
                             .accessibilityAction(named: "詳細メモ") { UIAccessibility.post(notification: .announcement, argument: preview(item.target).spoken) }
                     }
+                    if let minute = PlannerClock.minute(on: date, now: now, start: hours.start, end: hours.end) {
+                        CurrentTimeRule(minute: minute, labelWidth: timeLabelWidth).offset(y: folded.position(minute) + 7).zIndex(20)
+                    }
+                    TimeScrollAnchor(y: folded.position(PlannerClock.focusMinute(on: date, now: now, start: hours.start, end: hours.end)), name: "overview-now")
                     if items.isEmpty { Text("予定を配置するとここに表示されます").plannerFont(.caption).foregroundStyle(.secondary).frame(maxWidth: .infinity).offset(y: folded.height + 28) }
                 }.frame(height: max(folded.height + 60, geometry.size.height), alignment: .topLeading)
             }.accessibilityIdentifier("fullDayTimeline")
+                .task { await Task.yield(); reader.scrollTo("overview-now", anchor: UnitPoint(x: 0.5, y: 0.25)) }
+                .onChange(of: focusRequest) { _, _ in reader.scrollTo("overview-now", anchor: UnitPoint(x: 0.5, y: 0.25)) }
+                .onChange(of: date) { _, _ in reader.scrollTo("overview-now", anchor: UnitPoint(x: 0.5, y: 0.25)) }
+            }
         }.padding(.horizontal, 12)
     }
 
@@ -528,6 +570,8 @@ struct PlannerView: View {
     @State private var minuteAtTop: CGFloat = 480
     @State private var visibleHour: Int?
     @State private var positionedTimeline = false
+    @State private var now = PlannerClock.now
+    @State private var focusRequest = 0
     @State private var zoomAnchor = 8
     @State private var viewportTop: CGFloat = 0
     @State private var viewportFrame = CGRect.zero
@@ -564,7 +608,9 @@ struct PlannerView: View {
     private var outside: [Sticky] { plans.today.filter { task in task.start.map { !plans.hours.overlaps(start: $0, end: $0 + task.minutes) } ?? false } }
     private var trayTasks: [Sticky] { inbox + outside }
     private var visibleFixed: [FixedEvent] { fixed.filter { !$0.allDay && plans.hours.overlaps(start: $0.start, end: $0.end) } }
-    private var initialHour: Int { min(max(8, plans.hours.start / 60), plans.hours.end / 60 - 1) }
+    private var focusMinute: Int { PlannerClock.focusMinute(on: plans.date, now: now, start: plans.hours.start, end: plans.hours.end) }
+    private var initialHour: Int { focusMinute / 60 }
+    private var currentMinute: Int? { PlannerClock.minute(on: plans.date, now: now, start: plans.hours.start, end: plans.hours.end) }
     private var occupied: Int { PlannerMath.occupied(placed.map { ($0.start!, $0.start! + $0.minutes) } + visibleFixed.map { ($0.start, $0.end) }, from: plans.hours.start, to: plans.hours.end) }
     private var slots: [String: TimelineSlot] {
         PlannerMath.layout(placed.map { TimelineItem(id: $0.id.uuidString, start: max(plans.hours.start, $0.start!), end: min(plans.hours.end, $0.start! + $0.minutes)) } + visibleFixed.map { TimelineItem(id: "fixed-" + $0.id, start: max(plans.hours.start, $0.start), end: min(plans.hours.end, $0.end)) })
@@ -574,7 +620,7 @@ struct PlannerView: View {
             #if targetEnvironment(macCatalyst)
             .focusedSceneValue(\.macPlannerActions, MacPlannerActions(
                 create: { showNew = true }, selectTab: { tab = $0 },
-                changeDay: { changeDay($0) }, today: { plans.date = Date() },
+                changeDay: { changeDay($0) }, today: { now = PlannerClock.now; plans.date = now; focusRequest += 1 },
                 zoom: { factor in setZoom(min(8, max(1, zoomFactor * factor))) }
             ))
             .background(MacWindowSetup())
@@ -585,8 +631,15 @@ struct PlannerView: View {
         .sheet(isPresented: $showNew) { StickyEditor(task: Sticky(title: "", minutes: 30, day: dayKey(plans.date)), isNew: true) }
         .sheet(item: $editing) { StickyEditor(task: $0, isNew: false) }
         .onChange(of: plans.date) { _, value in calendar.refresh(date: value); selected = nil }
-        .onChange(of: phase) { _, value in if value == .active { plans.refreshDay(); calendar.refresh(date: plans.date) } }
-        .onReceive(NotificationCenter.default.publisher(for: UIApplication.significantTimeChangeNotification)) { _ in plans.refreshDay(); calendar.refresh(date: plans.date) }
+        .onChange(of: phase) { _, value in if value == .active { now = PlannerClock.now; plans.refreshDay(); calendar.refresh(date: plans.date); focusRequest += 1 } }
+        .onReceive(NotificationCenter.default.publisher(for: UIApplication.significantTimeChangeNotification)) { _ in now = PlannerClock.now; plans.refreshDay(); calendar.refresh(date: plans.date) }
+        .onReceive(Timer.publish(every: 30, on: .main, in: .common).autoconnect()) { _ in
+            now = PlannerClock.now; plans.refreshDay()
+        }
+        .onOpenURL { url in
+            guard url.scheme == "yoteikan", url.host == "today" else { return }
+            now = PlannerClock.now; plans.date = now; tab = 0; focusRequest += 1
+        }
         .confirmationDialog("付箋の操作", isPresented: $showCopyMenu, titleVisibility: .hidden) {
             Button("コピー") { if let id = copyID { copySticky(id) } }.accessibilityIdentifier("copyStickyAction")
             Button("キャンセル", role: .cancel) { }
@@ -653,7 +706,7 @@ struct PlannerView: View {
     private var tabs: some View {
         TabView(selection: $tab) {
             plannerContent.tabItem { Label("計画", systemImage: "calendar.day.timeline.left") }.tag(0)
-            FullDayOverview(date: $plans.date, hours: plans.hours, stickies: plans.today, fixed: fixed, colors: plans.plan.colors, drafts: $memoDrafts, showsClose: false)
+            FullDayOverview(date: $plans.date, now: now, focusRequest: focusRequest, hours: plans.hours, stickies: plans.today, fixed: fixed, colors: plans.plan.colors, drafts: $memoDrafts, showsClose: false)
                 .tabItem { Label("1日表示", systemImage: "rectangle.expand.vertical") }.tag(1)
             PlannerSettingsTab(onFinished: { tab = 0 }).tabItem { Label("設定", systemImage: "gearshape") }.tag(2)
         }.tint(accent)
@@ -748,7 +801,7 @@ struct PlannerView: View {
             .disabled(plans.undo == nil)
             .foregroundStyle(plans.undo == nil ? ink.opacity(0.3) : accent)
             .accessibilityIdentifier("undoPlan")
-            Button { plans.date = Date() } label: { Text("今日").plannerFont(size: 10, weight: .semibold).frame(width: 36, height: 44) }.accessibilityIdentifier("todayButton")
+            Button { now = PlannerClock.now; plans.date = now; focusRequest += 1 } label: { Text("今日").plannerFont(size: 10, weight: .semibold).frame(width: 36, height: 44) }.accessibilityIdentifier("todayButton")
         }
             .contentShape(Rectangle())
             .simultaneousGesture(daySwipeGesture)
@@ -891,6 +944,7 @@ struct PlannerView: View {
     private var foldedPlanningTimeline: some View {
         GeometryReader { geometry in
             let layout = foldedLayout
+            ScrollViewReader { reader in
             ScrollView {
                 ZStack(alignment: .topLeading) {
                     ForEach(layout.bands.indices, id: \.self) { index in
@@ -921,6 +975,10 @@ struct PlannerView: View {
                             .offset(x: timeGutter - 2 + width * CGFloat(slot.column), y: timelineY(start) + 2)
                     }
                     ForEach(placed) { task in placedCard(task, availableWidth: geometry.size.width) }
+                    if let minute = currentMinute {
+                        CurrentTimeRule(minute: minute, labelWidth: timeLabelWidth).offset(y: timelineY(minute) + 6).zIndex(20)
+                    }
+                    TimeScrollAnchor(y: timelineY(focusMinute), name: "folded-now")
                 }
                 .frame(width: geometry.size.width, height: max(layout.height + 18, geometry.size.height), alignment: .topLeading)
                 .background(Color.white.opacity(0.01))
@@ -933,6 +991,10 @@ struct PlannerView: View {
                 .padding(.top, 12)
             }.scrollDisabled(moving != nil || stretching != nil)
                 .accessibilityIdentifier("foldedPlannerTimeline")
+                .task { await Task.yield(); reader.scrollTo("folded-now", anchor: UnitPoint(x: 0.5, y: 0.25)) }
+                .onChange(of: focusRequest) { _, _ in reader.scrollTo("folded-now", anchor: UnitPoint(x: 0.5, y: 0.25)) }
+                .onChange(of: plans.date) { _, _ in reader.scrollTo("folded-now", anchor: UnitPoint(x: 0.5, y: 0.25)) }
+            }
         }.background(.white.opacity(0.62))
     }
     private var expandedTimeline: some View {
@@ -961,6 +1023,11 @@ struct PlannerView: View {
                         ForEach(placed) { task in
                             placedCard(task, availableWidth: geometry.size.width)
                         }
+                        if let minute = currentMinute {
+                            CurrentTimeRule(minute: minute, labelWidth: timeLabelWidth).offset(y: timelineY(minute) + 6).zIndex(20)
+                        }
+                        TimeScrollAnchor(y: timelineY(focusMinute), name: "timeline-now")
+
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
                     .contentShape(Rectangle())
@@ -984,8 +1051,9 @@ struct PlannerView: View {
                 .task {
                     guard !positionedTimeline else { return }
                     positionedTimeline = true
-                    await Task.yield(); reader.scrollTo("hour-\(initialHour)", anchor: .top)
+                    await Task.yield(); reader.scrollTo("timeline-now", anchor: UnitPoint(x: 0.5, y: 0.25))
                 }
+                .onChange(of: focusRequest) { _, _ in reader.scrollTo("timeline-now", anchor: UnitPoint(x: 0.5, y: 0.25)) }
                 .onChange(of: zoomFactor) { _, _ in
                     guard pinchMinute == nil else { return }
                     reader.scrollTo("hour-\(zoomAnchor)", anchor: .top)
@@ -993,7 +1061,7 @@ struct PlannerView: View {
                 .onChange(of: overview) { _, value in
                     if pinchBase == nil { reader.scrollTo("hour-\(value ? plans.hours.start / 60 : initialHour)", anchor: .top) }
                 }
-                .onChange(of: plans.date) { _, _ in reader.scrollTo("hour-\(overview ? plans.hours.start / 60 : initialHour)", anchor: .top) }
+                .onChange(of: plans.date) { _, _ in reader.scrollTo("timeline-now", anchor: UnitPoint(x: 0.5, y: 0.25)) }
                 .onChange(of: plans.hours) { _, _ in
                     selected = nil; moving = nil; stretching = nil; shift = 0; stretch = 0
                     reader.scrollTo("hour-\(overview ? plans.hours.start / 60 : initialHour)", anchor: .top)
