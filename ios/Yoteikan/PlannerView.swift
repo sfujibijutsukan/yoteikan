@@ -122,6 +122,15 @@ private final class MemoPreviewPresenter {
     deinit { hide() }
 }
 
+private struct ScheduleTimeText: View {
+    let text: String
+    var size: CGFloat = 12
+    var body: some View {
+        Text(text).font(.system(size: size, weight: .semibold)).monospacedDigit()
+            .lineLimit(1).minimumScaleFactor(0.9)
+    }
+}
+
 private struct FullDayOverview: View {
     @Environment(\.dismiss) private var dismiss
     @Binding var date: Date
@@ -212,24 +221,24 @@ VStack(spacing: 8) {
                     ForEach(folded.bands.indices, id: \.self) { index in
                         let band = folded.bands[index]
                         HStack(spacing: 6) {
-                            Text(clockText(band.start)).font(.system(size: 10, design: .monospaced)).frame(width: 38, alignment: .trailing)
+                            ScheduleTimeText(text: clockText(band.start)).frame(width: 44, alignment: .trailing)
                             Rectangle().fill(ink.opacity(0.12)).frame(height: 1)
                         }.frame(height: 14).offset(y: band.y)
                         if !band.occupied {
                             Text("空き \(durationText(band.end - band.start))")
                                 .font(.system(size: 10)).foregroundStyle(.secondary)
-                                .frame(width: max(1, geometry.size.width - 52), height: band.height)
-                                .offset(x: 48, y: band.y + 7)
+                                .frame(width: max(1, geometry.size.width - 58), height: band.height)
+                                .offset(x: 54, y: band.y + 7)
                         }
                     }
                     HStack(spacing: 6) {
-                        Text(clockText(hours.end)).font(.system(size: 10, design: .monospaced)).frame(width: 38, alignment: .trailing)
+                        ScheduleTimeText(text: clockText(hours.end)).frame(width: 44, alignment: .trailing)
                         Rectangle().fill(ink.opacity(0.12)).frame(height: 1)
                     }.frame(height: 14).offset(y: folded.height)
                     ForEach(items) { item in
                         let start = max(hours.start, item.start)
                         let slot = slots[item.id] ?? TimelineSlot(column: 0, columns: 1)
-                        let width = max(1, geometry.size.width - 48) / CGFloat(slot.columns)
+                        let width = max(1, geometry.size.width - 54) / CGFloat(slot.columns)
                         let cardHeight = folded.position(min(hours.end, item.end)) - folded.position(start) - 2
                         Text(item.title)
                             .font(.system(size: 13, weight: .medium)).lineLimit(2)
@@ -240,7 +249,7 @@ VStack(spacing: 8) {
                                 else { RoundedRectangle(cornerRadius: 5).fill(color(item)) }
                             }
                             .clipped().overlay(MemoHold { preview(item.target) })
-                            .offset(x: 46 + width * CGFloat(slot.column), y: folded.position(start) + 7)
+                            .offset(x: 52 + width * CGFloat(slot.column), y: folded.position(start) + 7)
                             .accessibilityLabel("\(clockText(item.start))〜\(clockText(item.end))、\(item.title)")
                             .accessibilityIdentifier("fullDayBlock-\(item.title)")
                             .accessibilityHint("長押しして詳細メモを表示")
@@ -767,15 +776,15 @@ struct PlannerView: View {
     private func hourRow(_ hour: Int) -> some View {
         ZStack(alignment: .topLeading) {
             HStack(spacing: 6) {
-                Text(String(format: "%02d:00", hour)).font(.system(size: 9, weight: .medium, design: .monospaced)).foregroundStyle(ink.opacity(0.55)).frame(width: 34, alignment: .trailing)
+                ScheduleTimeText(text: String(format: "%02d:00", hour)).foregroundStyle(ink.opacity(0.75)).frame(width: 42, alignment: .trailing)
                 Rectangle().fill(ink.opacity(0.09)).frame(height: 1)
             }
             if !overview && zoomFactor >= 4 && hour < plans.hours.end / 60 {
                 ForEach(1..<12) { step in
                     HStack(spacing: 6) {
-                        Text(String(format: ":%02d", step * 5)).font(.system(size: 8, design: .monospaced)).frame(width: 34, alignment: .trailing)
+                        ScheduleTimeText(text: String(format: ":%02d", step * 5), size: 10).frame(width: 42, alignment: .trailing)
                         Rectangle().frame(height: 0.5)
-                    }.foregroundStyle(ink.opacity(0.22)).offset(y: CGFloat(step * 5) * scale)
+                    }.foregroundStyle(ink.opacity(0.45)).offset(y: CGFloat(step * 5) * scale)
                 }
             }
         }.frame(height: 60 * scale, alignment: .top).id("hour-\(hour)")
@@ -807,7 +816,7 @@ struct PlannerView: View {
         let collision = conflicts(task)
         let slot = slots[task.id.uuidString] ?? TimelineSlot(column: 0, columns: 1)
         let slotCount = slot.columns
-        let width = (availableWidth - 42) / CGFloat(slotCount)
+        let width = (availableWidth - 50) / CGFloat(slotCount)
         let height = max(0, timelineY(visibleEnd) - timelineY(visibleStart) - (folded ? 2 : min(4, CGFloat(visibleEnd - visibleStart) * scale * 0.25)) + (stretching == task.id ? stretch : 0))
         return taskCard(task, compact: overview || slotCount > 1, height: height)
             .frame(width: width - 3, height: height)
@@ -837,7 +846,7 @@ struct PlannerView: View {
                         .offset(y: -29).allowsHitTesting(false)
                 }
             }
-            .offset(x: 40 + width * CGFloat(slot.column), y: timelineY(visibleStart) + 2 + (moving == task.id ? shift : 0))
+            .offset(x: 48 + width * CGFloat(slot.column), y: timelineY(visibleStart) + 2 + (moving == task.id ? shift : 0))
             .zIndex(moving == task.id || stretching == task.id ? 5 : selected == task.id ? 3 : 1)
             .accessibilityElement(children: .contain)
             .accessibilityIdentifier("task-\(task.title)")
@@ -859,21 +868,21 @@ struct PlannerView: View {
                     ForEach(layout.bands.indices, id: \.self) { index in
                         let band = layout.bands[index]
                         HStack(spacing: 6) {
-                            Text(clockText(band.start)).font(.system(size: 9, design: .monospaced)).frame(width: 34, alignment: .trailing)
+                            ScheduleTimeText(text: clockText(band.start)).frame(width: 42, alignment: .trailing)
                             Rectangle().fill(ink.opacity(0.12)).frame(height: 1)
                         }.frame(height: 12).offset(y: band.y)
                         if !band.occupied {
                             Text("空き \(durationText(band.end - band.start))").font(.system(size: 9)).foregroundStyle(.secondary)
-                                .frame(width: max(1, geometry.size.width - 42), height: band.height)
-                                .offset(x: 40, y: band.y + 6).allowsHitTesting(false)
+                                .frame(width: max(1, geometry.size.width - 50), height: band.height)
+                                .offset(x: 48, y: band.y + 6).allowsHitTesting(false)
                         }
                     }
-                    Text(clockText(plans.hours.end)).font(.system(size: 9, design: .monospaced))
-                        .frame(width: 34, alignment: .trailing).offset(y: layout.height)
+                    ScheduleTimeText(text: clockText(plans.hours.end))
+                        .frame(width: 42, alignment: .trailing).offset(y: layout.height)
                     ForEach(visibleFixed) { event in
                         let start = max(plans.hours.start, event.start)
                         let slot = slots["fixed-" + event.id] ?? TimelineSlot(column: 0, columns: 1)
-                        let width = (geometry.size.width - 42) / CGFloat(slot.columns)
+                        let width = (geometry.size.width - 50) / CGFloat(slot.columns)
                         let height = timelineY(min(event.end, plans.hours.end)) - timelineY(start) - 2
                         fixedCard(event, height: height).frame(width: width - 3, height: height).clipped()
                             .overlay(MemoHold { preview(.fixed(event)) })
@@ -881,7 +890,7 @@ struct PlannerView: View {
                             .accessibilityLabel("\(event.title)、\(clockText(event.start))から\(clockText(event.end))、カレンダーの固定予定")
                             .accessibilityIdentifier("fixed-\(event.title)")
                             .accessibilityAction(named: "詳細メモ") { UIAccessibility.post(notification: .announcement, argument: preview(.fixed(event)).spoken) }
-                            .offset(x: 40 + width * CGFloat(slot.column), y: timelineY(start) + 2)
+                            .offset(x: 48 + width * CGFloat(slot.column), y: timelineY(start) + 2)
                     }
                     ForEach(placed) { task in placedCard(task, availableWidth: geometry.size.width) }
                 }
@@ -911,7 +920,7 @@ struct PlannerView: View {
                         ForEach(visibleFixed) { event in
                             let start = max(plans.hours.start, event.start)
                             let slot = slots["fixed-" + event.id] ?? TimelineSlot(column: 0, columns: 1)
-                            let width = (geometry.size.width - 42) / CGFloat(slot.columns)
+                            let width = (geometry.size.width - 50) / CGFloat(slot.columns)
                             let height = cardHeight(min(event.end, plans.hours.end) - start)
                             fixedCard(event, height: height).frame(width: width - 3, height: height).clipped()
                                 .overlay(MemoHold { preview(.fixed(event)) })
@@ -919,7 +928,7 @@ struct PlannerView: View {
                                 .accessibilityLabel("\(event.title)、\(clockText(event.start))から\(clockText(event.end))、カレンダーの固定予定")
                                 .accessibilityIdentifier("fixed-\(event.title)")
                                 .accessibilityAction(named: "詳細メモ") { UIAccessibility.post(notification: .announcement, argument: preview(.fixed(event)).spoken) }
-                                .offset(x: 40 + width * CGFloat(slot.column), y: CGFloat(start - plans.hours.start) * scale + 2)
+                                .offset(x: 48 + width * CGFloat(slot.column), y: CGFloat(start - plans.hours.start) * scale + 2)
                         }
                         ForEach(placed) { task in
                             placedCard(task, availableWidth: geometry.size.width)
@@ -985,7 +994,7 @@ struct PlannerView: View {
             if height < 44 {
                 if height >= 14 { Text(event.title).font(.system(size: folded ? 12 : 10, weight: .medium)).lineLimit(folded ? 2 : 1) }
             } else if overview { Text(event.title).font(.system(size: 7, weight: .medium)).lineLimit(1) }
-            else { HStack { Image(systemName: "lock.fill").font(.system(size: 9)); Text("\(clockText(event.start)) – \(clockText(event.end))").font(.system(size: 10, weight: .medium)); Spacer(minLength: 0) }.foregroundStyle(ink.opacity(0.55))
+            else { HStack { Image(systemName: "lock.fill").font(.system(size: 9)); Text("\(clockText(event.start)) – \(clockText(event.end))").font(.system(size: 12, weight: .semibold)).monospacedDigit().lineLimit(1).minimumScaleFactor(0.85); Spacer(minLength: 0) }.foregroundStyle(ink.opacity(0.75))
             if !overview { Text(event.title).font(.system(size: 13, weight: .medium)).lineLimit(2) }
             Spacer(minLength: 0)
             }
@@ -1001,7 +1010,7 @@ struct PlannerView: View {
             } else if overview {
                 if duration >= 45 { Text(task.title).font(.system(size: 7, weight: .semibold)).lineLimit(1) }
             } else {
-            if !compact { Text("\(clockText(start)) – \(clockText(start + duration))").font(.system(size: 10, weight: .medium)).foregroundStyle(textColor.opacity(0.8)) }
+            if !compact { Text("\(clockText(start)) – \(clockText(start + duration))").font(.system(size: 12, weight: .semibold)).monospacedDigit().lineLimit(1).minimumScaleFactor(0.85).foregroundStyle(textColor.opacity(0.8)) }
             HStack(spacing: 4) { Text(task.title).font(.system(size: compact ? 10 : 12, weight: .semibold)).lineLimit(2); Spacer(minLength: 0); if compact { Text("\(duration)分").font(.system(size: 9)) } }.padding(.trailing, selected == task.id ? 29 : 0)
             Spacer(minLength: 0)
             }
