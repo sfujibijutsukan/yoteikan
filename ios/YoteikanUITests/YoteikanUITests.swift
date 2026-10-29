@@ -65,6 +65,25 @@ final class YoteikanUITests: XCTestCase {
         XCTAssertTrue(app.buttons["hoursSettings"].exists)
         shot("58-local-settings")
     }
+func test45OverviewDateNavigationSharesPlanningDate() {
+    launch()
+    selectTab("1日表示")
+    let before = app.staticTexts["overviewDate"].label
+    app.buttons["overviewNextDay"].tap()
+    let next = app.staticTexts["overviewDate"].label
+    XCTAssertNotEqual(next, before)
+    selectTab("計画")
+    XCTAssertEqual(app.staticTexts["selectedDate"].label, next)
+    selectTab("1日表示")
+    app.buttons["overviewPreviousDay"].tap()
+    XCTAssertEqual(app.staticTexts["overviewDate"].label, before)
+    app.buttons["overviewPreviousDay"].tap()
+    app.buttons["overviewToday"].tap()
+    XCTAssertEqual(app.staticTexts["overviewDate"].label, before)
+    XCTAssertTrue(app.descendants(matching: .any).matching(identifier: "fullDayBlock-朝の読書").firstMatch.exists)
+    shot("64-overview-date-navigation")
+}
+
     private func selectTab(_ name: String) {
         #if os(macOS) || targetEnvironment(macCatalyst)
         app.radioButtons[name].click()

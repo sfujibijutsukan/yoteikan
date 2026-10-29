@@ -124,7 +124,7 @@ private final class MemoPreviewPresenter {
 
 private struct FullDayOverview: View {
     @Environment(\.dismiss) private var dismiss
-    let date: Date
+    @Binding var date: Date
     let hours: PlanningHours
     let stickies: [Sticky]
     let fixed: [FixedEvent]
@@ -166,7 +166,18 @@ private struct FullDayOverview: View {
     }
     var body: some View {
         NavigationStack {
-            VStack(spacing: 8) {
+VStack(spacing: 8) {
+    HStack(spacing: 4) {
+        Button { moveDay(-1) } label: { Image(systemName: "chevron.left").frame(width: 44, height: 44) }
+            .accessibilityLabel("前の日").accessibilityIdentifier("overviewPreviousDay")
+        Text(date, format: .dateTime.month().day().weekday(.abbreviated))
+            .font(.subheadline.weight(.semibold)).accessibilityIdentifier("overviewDate")
+        Button { moveDay(1) } label: { Image(systemName: "chevron.right").frame(width: 44, height: 44) }
+            .accessibilityLabel("次の日").accessibilityIdentifier("overviewNextDay")
+        Spacer(minLength: 0)
+        Button("今日") { date = Date() }.frame(minWidth: 44, minHeight: 44).accessibilityIdentifier("overviewToday")
+    }.padding(.horizontal, 8)
+
                 if !fixed.filter(\.allDay).isEmpty {
                     ScrollView(.horizontal, showsIndicators: false) {
                         HStack { ForEach(fixed.filter(\.allDay)) { event in
@@ -180,13 +191,16 @@ private struct FullDayOverview: View {
                 Text("空き時間を省略・\(hours.label)・未配置 \(unplaced.count)枚\(allItems.count == items.count ? "" : "・時間外 \(allItems.count - items.count)件")")
                     .font(.caption2).foregroundStyle(.secondary).padding(.bottom, 4)
             }.background(paper).foregroundStyle(ink)
-                .navigationTitle(date.formatted(.dateTime.month().day().weekday(.wide)))
+                .navigationTitle("1日表示")
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar { if showsClose { ToolbarItem(placement: .confirmationAction) {
                     Button("閉じる") { dismiss() }.accessibilityIdentifier("closeFullDay")
                 } } }
                 .accessibilityElement(children: .contain).accessibilityIdentifier("fullDayOverview")
         }.tint(accent)
+    }
+    private func moveDay(_ offset: Int) {
+        if let next = Calendar.current.date(byAdding: .day, value: offset, to: date) { date = next }
     }
     private var fittedTimeline: some View {
         GeometryReader { geometry in
@@ -605,7 +619,7 @@ struct PlannerView: View {
     private var tabs: some View {
         TabView(selection: $tab) {
             plannerContent.tabItem { Label("計画", systemImage: "calendar.day.timeline.left") }.tag(0)
-            FullDayOverview(date: plans.date, hours: plans.hours, stickies: plans.today, fixed: fixed, colors: plans.plan.colors, drafts: $memoDrafts, showsClose: false)
+            FullDayOverview(date: $plans.date, hours: plans.hours, stickies: plans.today, fixed: fixed, colors: plans.plan.colors, drafts: $memoDrafts, showsClose: false)
                 .tabItem { Label("1日表示", systemImage: "rectangle.expand.vertical") }.tag(1)
             PlannerSettingsTab(onFinished: { tab = 0 }).tabItem { Label("設定", systemImage: "gearshape") }.tag(2)
         }.tint(accent)
