@@ -122,6 +122,16 @@ private final class MemoPreviewPresenter {
     deinit { hide() }
 }
 
+private struct FoldedCardTitle: View {
+    let title: String
+    var weight: Font.Weight = .medium
+    var body: some View {
+        Text(title).font(.system(size: 13, weight: weight)).lineLimit(2)
+            .padding(.horizontal, 10).padding(.vertical, 6)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading).clipped()
+    }
+}
+
 private struct ScheduleTimeText: View {
     let text: String
     var size: CGFloat = 12
@@ -240,9 +250,7 @@ VStack(spacing: 8) {
                         let slot = slots[item.id] ?? TimelineSlot(column: 0, columns: 1)
                         let width = max(1, geometry.size.width - 54) / CGFloat(slot.columns)
                         let cardHeight = folded.position(min(hours.end, item.end)) - folded.position(start) - 2
-                        Text(item.title)
-                            .font(.system(size: 13, weight: .medium)).lineLimit(2)
-                            .padding(.horizontal, 6).frame(width: max(1, width - 2), height: cardHeight, alignment: .leading)
+                        FoldedCardTitle(title: item.title).frame(width: max(1, width - 2), height: cardHeight)
                             .foregroundStyle(textColor(item))
                             .background {
                                 if item.tone != nil { StickyPaper(color: color(item)) }
@@ -989,22 +997,35 @@ struct PlannerView: View {
         .background { GeometryReader { proxy in Color.clear.onAppear { viewportHeight = proxy.size.height; viewportFrame = proxy.frame(in: .global); viewportTop = viewportFrame.minY }.onChange(of: proxy.frame(in: .global)) { _, frame in viewportHeight = frame.height; viewportFrame = frame; viewportTop = frame.minY } } }
         .overlay(alignment: .top) { Rectangle().fill(ink.opacity(0.06)).frame(height: 1) }
     }
-    private func fixedCard(_ event: FixedEvent, height: CGFloat) -> some View {
-        VStack(alignment: .leading, spacing: overview ? 0 : 5) {
-            if height < 44 {
-                if height >= 14 { Text(event.title).font(.system(size: folded ? 12 : 10, weight: .medium)).lineLimit(folded ? 2 : 1) }
-            } else if overview { Text(event.title).font(.system(size: 7, weight: .medium)).lineLimit(1) }
-            else { HStack { Image(systemName: "lock.fill").font(.system(size: 9)); Text("\(clockText(event.start)) – \(clockText(event.end))").font(.system(size: 12, weight: .semibold)).monospacedDigit().lineLimit(1).minimumScaleFactor(0.85); Spacer(minLength: 0) }.foregroundStyle(ink.opacity(0.75))
-            if !overview { Text(event.title).font(.system(size: 13, weight: .medium)).lineLimit(2) }
-            Spacer(minLength: 0)
-            }
-        }.padding(height < 44 ? min(height / 2, 2) : 10).frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading).background(Color(red: 0.89, green: 0.91, blue: 0.89), in: RoundedRectangle(cornerRadius: 9)).overlay(alignment: .leading) { RoundedRectangle(cornerRadius: 2).fill(ink.opacity(0.25)).frame(width: 3).padding(.vertical, 9) }.clipped()
+    @ViewBuilder private func fixedCard(_ event: FixedEvent, height: CGFloat) -> some View {
+        if folded {
+            FoldedCardTitle(title: event.title)
+                .background(Color(red: 0.89, green: 0.91, blue: 0.89), in: RoundedRectangle(cornerRadius: 5))
+                .overlay(alignment: .leading) { Rectangle().fill(ink.opacity(0.25)).frame(width: 3).padding(.vertical, 8) }
+        } else {
+            VStack(alignment: .leading, spacing: overview ? 0 : 5) {
+                if height < 44 {
+                    if height >= 14 { Text(event.title).font(.system(size: folded ? 12 : 10, weight: .medium)).lineLimit(folded ? 2 : 1) }
+                } else if overview { Text(event.title).font(.system(size: 7, weight: .medium)).lineLimit(1) }
+                else { HStack { Image(systemName: "lock.fill").font(.system(size: 9)); Text("\(clockText(event.start)) – \(clockText(event.end))").font(.system(size: 12, weight: .semibold)).monospacedDigit().lineLimit(1).minimumScaleFactor(0.85); Spacer(minLength: 0) }.foregroundStyle(ink.opacity(0.75))
+                if !overview { Text(event.title).font(.system(size: 13, weight: .medium)).lineLimit(2) }
+                Spacer(minLength: 0)
+                }
+            }.padding(height < 44 ? min(height / 2, 2) : 10).frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading).background(Color(red: 0.89, green: 0.91, blue: 0.89), in: RoundedRectangle(cornerRadius: 9)).overlay(alignment: .leading) { RoundedRectangle(cornerRadius: 2).fill(ink.opacity(0.25)).frame(width: 3).padding(.vertical, 9) }.clipped()
+        }
     }
-    private func taskCard(_ task: Sticky, compact: Bool, height: CGFloat) -> some View {
+    @ViewBuilder private func taskCard(_ task: Sticky, compact: Bool, height: CGFloat) -> some View {
         let textColor = plans.paletteColor(for: task.tone).textColor
         let start = moving == task.id ? movedStart(task, delta: shift) : (task.start ?? 0)
         let duration = stretching == task.id ? resizedDuration(task, delta: stretch) : task.minutes
-        return VStack(alignment: .leading, spacing: 4) {
+        if folded {
+            FoldedCardTitle(title: task.title, weight: .semibold)
+                .foregroundStyle(textColor)
+                .background(StickyPaper(color: plans.paletteColor(for: task.tone).color,
+                                        selected: selected == task.id, lifted: moving == task.id))
+                .accessibilityLabel("\(task.title)、\(clockText(start))から\(duration)分")
+        } else {
+            VStack(alignment: .leading, spacing: 4) {
             if height < 44 {
                 if height >= 14 { Text(task.title).font(.system(size: folded ? 12 : 10, weight: .semibold)).lineLimit(folded ? 2 : 1) }
             } else if overview {
@@ -1019,6 +1040,7 @@ struct PlannerView: View {
             .background(StickyPaper(color: plans.paletteColor(for: task.tone).color,
                                     selected: selected == task.id, lifted: moving == task.id))
             .accessibilityLabel("\(task.title)、\(clockText(start))から\(duration)分")
+        }
     }
     private func resizeHandle(_ task: Sticky) -> some View {
         ZStack { Color.clear; Capsule().fill(plans.paletteColor(for: task.tone).textColor.opacity(selected == task.id ? 0.6 : 0.35)).frame(width: 24, height: 3) }
