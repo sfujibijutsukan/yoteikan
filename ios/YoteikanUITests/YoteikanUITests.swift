@@ -270,6 +270,38 @@ func test45OverviewDateNavigationSharesPlanningDate() {
         XCUIDevice.shared.orientation = .portrait
     }
 
+    func test55LargeHistoryKeepsMoveResizePinchScrollAndDateChangesWorking() {
+        launch(["--demo", "--reset-test-data", "--performance-test"])
+        let task = app.otherElements["task-操作確認"]
+        XCTAssertEqual(task.value as? String, "08:00|60")
+        task.tap()
+        let move = app.otherElements["move-操作確認"].coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+        move.press(forDuration: 0.1, thenDragTo: move.withOffset(CGVector(dx: 0, dy: 24)))
+        XCTAssertEqual(task.value as? String, "08:05|60")
+        let resize = app.otherElements["resize-操作確認"].coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+        resize.press(forDuration: 0.1, thenDragTo: resize.withOffset(CGVector(dx: 0, dy: 24)))
+        XCTAssertEqual(task.value as? String, "08:05|65")
+        app.buttons["undoPlan"].tap()
+        XCTAssertEqual(task.value as? String, "08:05|60")
+        pinch(1.6); pinch(0.625)
+        XCTAssertEqual(task.value as? String, "08:05|60")
+        app.scrollViews["timeline"].swipeUp(); app.scrollViews["timeline"].swipeDown()
+        app.buttons["foldPlanner"].tap()
+        task.tap()
+        let folded = app.otherElements["move-操作確認"].coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+        folded.press(forDuration: 0.1, thenDragTo: folded.withOffset(CGVector(dx: 0, dy: -24)))
+        XCTAssertEqual(task.value as? String, "08:00|60")
+        XCTAssertEqual(app.otherElements["task-検証作業01"].value as? String, "09:30|10")
+        shot("76-performance-plan")
+        selectTab("1日表示")
+        XCTAssertTrue(app.descendants(matching: .any).matching(identifier: "fullDayBlock-操作確認").firstMatch.exists)
+        app.buttons["overviewNextDay"].tap()
+        XCTAssertFalse(app.descendants(matching: .any).matching(identifier: "fullDayBlock-操作確認").firstMatch.exists)
+        app.buttons["overviewToday"].tap()
+        selectTab("計画")
+        XCTAssertEqual(task.value as? String, "08:00|60")
+    }
+
     private func selectTab(_ name: String) {
 
 

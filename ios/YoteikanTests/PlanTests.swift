@@ -1,4 +1,5 @@
 import XCTest
+import Combine
 import UserNotifications
 
 @testable import Yoteikan
@@ -13,6 +14,113 @@ import UserNotifications
         defaults.set(try! JSONEncoder().encode(manual), forKey: "yoteikan.plan.v1")
     }
     override func tearDown() { defaults.removePersistentDomain(forName: suite); super.tearDown() }
+    func testDayIndexUpdatesForEditsUndoAndDateWithoutNoOpPlanPublications() {
+        let store = PlanStore(defaults: defaults)
+        let tomorrow = Calendar.current.date(byAdding: .day, value: 1, to: store.date)!
+        var plan = SavedPlan(); plan.presets = []
+        let a = Sticky(title: "今日", minutes: 30, day: dayKey(store.date), start: 480)
+        let b = Sticky(title: "明日", minutes: 30, day: dayKey(tomorrow), start: 540)
+        plan.stickies = [a, b]; store.plan = plan
+        var publications = 0
+        let subscription = store.$plan.dropFirst().sink { _ in publications += 1 }
+        defer { subscription.cancel() }
+        store.prepareDay(); store.refreshDay()
+        XCTAssertEqual(publications, 0)
+        XCTAssertEqual(store.today, [a])
+        store.setMemo(a.id, memo: "更新")
+        XCTAssertEqual(store.today.first?.memo, "更新")
+        XCTAssertEqual(publications, 1)
+        store.restore()
+        XCTAssertEqual(store.today, [a]); XCTAssertEqual(publications, 2)
+        store.date = tomorrow
+        XCTAssertEqual(store.today, [b]); XCTAssertEqual(publications, 2)
+        store.plan.stickies[1].title = "明日の編集"
+        XCTAssertEqual(store.today.first?.title, "明日の編集")
+    }
+    func testLayoutCacheReusesGeometryAndInvalidatesForPlanCalendarRangeAndFont() {
+        let key = dayKey(Date())
+        var notes = [Sticky(title: "A", minutes: 60, day: key, start: 480),
+                     Sticky(title: "B", minutes: 30, day: key, start: 510),
+                     Sticky(title: "C", minutes: 15, day: key, start: 600),
+                     Sticky(title: "時間外", minutes: 15, day: key, start: 300),
+                     Sticky(title: "未配置", minutes: 15, day: key)]
+        var fixed = [FixedEvent(id: "fixed", title: "会議", start: 510, end: 570)]
+        let hours = PlanningHours(start: 480, end: 720)
+        let cache = PlannerLayoutCache()
+        let original = cache.layout(notes: notes, fixed: fixed, hours: hours, minimumHeight: 48)
+        XCTAssertEqual(original.placed.count, 3); XCTAssertEqual(original.inbox.count, 1); XCTAssertEqual(original.outside.count, 1)
+        XCTAssertEqual(original.occupied, 105)
+        XCTAssertEqual(original.slots[notes[0].id.uuidString]?.columns, 3)
+        XCTAssertEqual(original.conflicting, Set(notes.prefix(2).map(\.id)))
+        for _ in 0..<200 { _ = cache.layout(notes: notes, fixed: fixed, hours: hours, minimumHeight: 48) }
+        XCTAssertEqual(cache.rebuildCount, 1)
+        notes[0].start = 660
+        let moved = cache.layout(notes: notes, fixed: fixed, hours: hours, minimumHeight: 48)
+        XCTAssertEqual(cache.rebuildCount, 2)
+        XCTAssertEqual(moved.slots[notes[0].id.uuidString]?.columns, 1)
+        fixed[0].end = 690
+        XCTAssertTrue(cache.layout(notes: notes, fixed: fixed, hours: hours, minimumHeight: 48).conflicting.contains(notes[0].id))
+        XCTAssertEqual(cache.rebuildCount, 3)
+        let cropped = cache.layout(notes: notes, fixed: fixed, hours: PlanningHours(start: 600, end: 720), minimumHeight: 48)
+        XCTAssertEqual(cropped.placed.count, 2); XCTAssertEqual(cache.rebuildCount, 4)
+        let large = cache.layout(notes: notes, fixed: fixed, hours: PlanningHours(start: 600, end: 720), minimumHeight: 72)
+        XCTAssertGreaterThan(large.folded.height, cropped.folded.height)
+        XCTAssertEqual(cache.rebuildCount, 5)
+        for task in large.placed {
+            let start = task.start!
+            XCTAssertEqual(large.folded.minute(at: large.folded.position(start)), CGFloat(start), accuracy: 0.001)
+        }
+    }
+    func testCachedConflictFlagsMatchActualOverlapsAcrossPlanningEdges() {
+        let key = dayKey(Date())
+        let notes = (0..<30).map { i in Sticky(title: String(i), minutes: 5 + (i % 5) * 10, day: key, start: 450 + i * 7) }
+        let fixed = [FixedEvent(id: "before", title: "時間外", start: 450, end: 480),
+                     FixedEvent(id: "meeting", title: "会議", start: 600, end: 630),
+                     FixedEvent(id: "all-day", title: "終日", start: 0, end: 1440, allDay: true)]
+        let layout = PlannerDayLayout(notes: notes, fixed: fixed, hours: PlanningHours(start: 480, end: 720), minimumHeight: 48)
+        for task in layout.placed {
+            let start = task.start!, end = start + task.minutes
+            let overlaps = layout.placed.contains { $0.id != task.id && PlannerMath.overlaps(start, end, $0.start!, $0.start! + $0.minutes) }
+                || fixed.contains { !$0.allDay && PlannerMath.overlaps(start, end, $0.start, $0.end) }
+            XCTAssertEqual(layout.conflicting.contains(task.id), overlaps)
+        }
+    }
+    func testBackgroundWidgetWriterKeepsLatestRevisionAndSkipsUnchangedData() async throws {
+        let writer = WidgetSnapshotWriter()
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: url) }
+        var newer = SavedPlan(); newer.presets = []
+        newer.stickies = [Sticky(title: "最新", minutes: 30, day: dayKey(Date()), start: 600)]
+        let firstWrite = try await writer.write(newer, fixed: [], revision: 2, to: url)
+        XCTAssertTrue(firstWrite)
+        var older = newer; older.stickies[0].title = "古い予定"
+        let stale = try await writer.write(older, fixed: [], revision: 1, to: url)
+        XCTAssertFalse(stale)
+        XCTAssertEqual(WidgetSnapshotStore.read(from: url)?.events.first?.title, "最新")
+        let duplicate = try await writer.write(newer, fixed: [], revision: 3, to: url)
+        XCTAssertFalse(duplicate)
+        newer.stickies.removeAll()
+        let removed = try await writer.write(newer, fixed: [], revision: 4, to: url)
+        XCTAssertTrue(removed); XCTAssertTrue(WidgetSnapshotStore.read(from: url)!.events.isEmpty)
+    }
+
+    func testPerformanceDayLookupWithLongHistory() {
+        var plan = SavedPlan(); plan.presets = []
+        let today = dayKey(Date())
+        for day in 1...100 {
+            let key = dayKey(Calendar.current.date(byAdding: .day, value: -day, to: Date())!)
+            for index in 0..<10 { plan.stickies.append(Sticky(title: "履歴\(index)", minutes: 30, day: key, start: 480 + index * 30)) }
+        }
+        for index in 0..<40 { plan.stickies.append(Sticky(title: "今日\(index)", minutes: 10, day: today, start: 480 + index * 15)) }
+        let store = PlanStore(defaults: defaults); store.plan = plan
+        let options = XCTMeasureOptions(); options.iterationCount = 3
+        measure(metrics: [XCTClockMetric()], options: options) {
+            var count = 0
+            for _ in 0..<5 { count += store.today.count }
+            XCTAssertEqual(count, 200)
+        }
+    }
+
     func testPrecisionDragProvidesStableFiveMinuteStepsAndKeepsHigherZoom() {
         let normal = TimeDragScale(timelinePointsPerMinute: 1.55)
         let folded = TimeDragScale(timelinePointsPerMinute: 0.1)

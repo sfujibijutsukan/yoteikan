@@ -264,3 +264,10 @@ WidgetNearNowVerified.xcresult: UI05/43/44成功（実EventKit読み込み）。
 WidgetNearNowMacFinal.xcresult: 最終Mac単体41件成功。
 widget-near-now-release-final.log: アプリ・拡張のReleaseビルド成功。
 初回UI43の要素数検証はコンテナー識別子が子へ継承されて失敗。アクセシビリティのグループを明示し、最終成功。
+
+操作の引っかかり軽減 / 2026-10-30
+iPhone単体46件 + UI9件、Mac Catalyst単体46件: 失敗0・スキップ0。Releaseビルド成功。
+PlannerPerformanceUI.xcresult / PlannerPerformanceWidget.xcresult / PlannerPerformanceMac.xcresult
+同一条件の当日一覧5回取得（履歴1000件+当日40件、3反復）: 変更前平均155ms、変更後各回0.01ms未満。画面全体の速度ではなく当日取得だけの計測。
+ウィジェット共有JSON検査: TODAY固定予定2件、DISABLED固定予定0件、両方PASS。
+実機のフレームレートは未計測。詳細はdocs/verification.md。
