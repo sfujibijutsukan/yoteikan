@@ -4,6 +4,7 @@ import EventKit
 @MainActor final class CalendarStore: ObservableObject {
     private let store = EKEventStore()
     @Published var events: [FixedEvent] = []
+    @Published private(set) var widgetEvents: [ScheduleEvent] = []
     @Published var calendars: [EKCalendar] = []
     @Published var enabled: Set<String>
     @Published var connected = false
@@ -39,19 +40,27 @@ import EventKit
     }
     func reload() {
         connected = EKEventStore.authorizationStatus(for: .event) == .fullAccess
-        guard connected else { events = []; return }
+        guard connected else { events = []; widgetEvents = []; return }
         calendars = store.calendars(for: .event).sorted { $0.title < $1.title }
         if UserDefaults.standard.object(forKey: "calendar.enabled") == nil {
             enabled = Set(calendars.map(\.calendarIdentifier)); UserDefaults.standard.set(Array(enabled), forKey: "calendar.enabled")
         }
         let selected = calendars.filter { enabled.contains($0.calendarIdentifier) }
-        guard !selected.isEmpty else { events = []; return }
+        guard !selected.isEmpty else { events = []; widgetEvents = []; return }
         let start = Calendar.current.startOfDay(for: date)
         let end = Calendar.current.date(byAdding: .day, value: 1, to: start)!
         let predicate = store.predicateForEvents(withStart: start, end: end, calendars: selected)
         events = store.events(matching: predicate).map {
             FixedEvent(id: $0.eventIdentifier ?? UUID().uuidString, title: $0.title ?? "予定", start: max(0, Int($0.startDate.timeIntervalSince(start) / 60)), end: min(1440, Int($0.endDate.timeIntervalSince(start) / 60)), allDay: $0.isAllDay, memo: $0.notes ?? "")
         }.sorted { $0.start < $1.start }
+        // The widget always shows today, even while the user browses another date.
+        let today = Calendar.current.startOfDay(for: Date())
+        let widgetEnd = Calendar.current.date(byAdding: .day, value: 2, to: today)!
+        let widgetPredicate = store.predicateForEvents(withStart: today, end: widgetEnd, calendars: selected)
+        widgetEvents = store.events(matching: widgetPredicate).filter { !$0.isAllDay }.map { event in
+            ScheduleEvent(id: "calendar-\(event.eventIdentifier ?? event.title ?? "event")-\(event.startDate.timeIntervalSince1970)",
+                          title: event.title ?? "予定", start: event.startDate, end: event.endDate, hex: "E3E8E3")
+        }.sorted { $0.id < $1.id }
     }
     #if DEBUG && targetEnvironment(simulator)
     private func seedCalendar() throws {

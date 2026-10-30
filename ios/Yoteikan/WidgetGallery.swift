@@ -9,6 +9,8 @@ struct WidgetGallery: View {
     private func sample(at now: Date) -> ScheduleSnapshot {
         ScheduleSnapshot(events: [
             ScheduleEvent(id: "reading", title: "朝の読書", start: now.addingTimeInterval(-300), end: now.addingTimeInterval(1500), hex: "E0EDCC"),
+            ScheduleEvent(id: "short", title: "連絡5分", start: now.addingTimeInterval(600), end: now.addingTimeInterval(900), hex: "DBE6F7"),
+            ScheduleEvent(id: "past", title: "準備", start: now.addingTimeInterval(-1200), end: now.addingTimeInterval(-600), hex: "E3E8E3"),
             ScheduleEvent(id: "work", title: "資料作成", start: now.addingTimeInterval(1800), end: now.addingTimeInterval(5400), hex: "F7E3B3"),
             ScheduleEvent(id: "break", title: "ひと休み", start: now.addingTimeInterval(5700), end: now.addingTimeInterval(6600), hex: "F5D9CF")
         ])

@@ -256,3 +256,11 @@ PrecisionBaselineDrop.xcresult: 未変更mainでも既存UI04がコピー操作�
 初回UI50はUndoで選択解除された後のハンドル操作で失敗。再選択を入れ最終成功。UI09はスイッチのつまみを操作し、UI51は回転後のレイアウト完了を待って最終成功。
 
 PrecisionLabelsRemoved.xcresult: 拡大画面の説明文言を削除後、UI50/51成功。
+
+現在時刻付近の時間割ウィジェット（2026-10-30）
+WidgetNearNowAccept.xcresult: 最終単体41件＋UI43/44成功・スキップ0件。
+WidgetNearNowFinal.xcresult: 単体40件＋UI43/44/54成功。カレンダー共有検査 TODAY/DISABLED とも成功。
+WidgetNearNowVerified.xcresult: UI05/43/44成功（実EventKit読み込み）。
+WidgetNearNowMacFinal.xcresult: 最終Mac単体41件成功。
+widget-near-now-release-final.log: アプリ・拡張のReleaseビルド成功。
+初回UI43の要素数検証はコンテナー識別子が子へ継承されて失敗。アクセシビリティのグループを明示し、最終成功。

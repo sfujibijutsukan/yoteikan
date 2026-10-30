@@ -94,7 +94,8 @@ final class YoteikanUITests: XCTestCase {
         XCTAssertTrue(app.otherElements["widgetGallery"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.staticTexts["中サイズ"].exists)
         XCTAssertTrue(app.staticTexts["widgetFixtureSaved"].waitForExistence(timeout: 5))
-        shot("62-widget-layouts")
+        XCTAssertEqual(app.otherElements.matching(identifier: "widgetPlanTimeline").count, 2)
+        shot("74-widget-near-now-layouts")
     }
 
     func test44WidgetLinkReturnsToToday() throws {
@@ -107,6 +108,7 @@ final class YoteikanUITests: XCTestCase {
         XCUIDevice.shared.press(.home)
         let widget = springboard.descendants(matching: .any).matching(NSPredicate(format: "label CONTAINS %@", "朝の読書")).firstMatch
         guard widget.waitForExistence(timeout: 5) else { throw XCTSkip("この検証用シミュレーターには予定館のホーム画面ウィジェットが追加されていません") }
+        let home = XCTAttachment(screenshot: XCUIScreen.main.screenshot()); home.name = "75-widget-near-now-home"; home.lifetime = .keepAlways; add(home)
         widget.tap()
         if springboard.alerts.buttons["開く"].waitForExistence(timeout: 2) { springboard.alerts.buttons["開く"].tap() }
         XCTAssertTrue(app.buttons["presetsButton"].waitForExistence(timeout: 5))
@@ -116,6 +118,24 @@ final class YoteikanUITests: XCTestCase {
         XCTAssertEqual(marker.value as? String, "13:17")
         shot("63-widget-open-today")
         #endif
+    }
+
+    func test54WidgetCalendarCacheFollowsSelectionWhileBrowsingAnotherDay() {
+        launch(["--calendar-test"])
+        XCTAssertTrue(app.descendants(matching: .any).matching(identifier: "fixed-チームミーティング").firstMatch.waitForExistence(timeout: 5))
+        app.buttons["次の日"].tap()
+        XCTAssertFalse(app.descendants(matching: .any).matching(identifier: "fixed-チームミーティング").firstMatch.exists)
+        print("WIDGET_CACHE_VERIFY_TODAY")
+        Thread.sleep(forTimeInterval: 3)
+        openSetting("calendarSettings")
+        let toggle = app.switches["calendar-予定館・動作確認用"].firstMatch
+        XCTAssertEqual(toggle.value as? String, "1")
+        toggle.coordinate(withNormalizedOffset: CGVector(dx: 0.9, dy: 0.5)).tap()
+        XCTAssertEqual(toggle.value as? String, "0")
+        print("WIDGET_CACHE_VERIFY_DISABLED")
+        Thread.sleep(forTimeInterval: 3)
+        toggle.coordinate(withNormalizedOffset: CGVector(dx: 0.9, dy: 0.5)).tap()
+        app.buttons["closeCalendar"].tap()
     }
 
     #endif

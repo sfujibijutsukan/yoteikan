@@ -12,18 +12,29 @@ struct ScheduleEvent: Codable, Equatable, Identifiable {
 struct ScheduleSnapshot: Codable, Equatable {
     var version = 1
     var events: [ScheduleEvent] = []
+    var planningStart: Int? = nil
+    var planningEnd: Int? = nil
     func events(on date: Date, calendar: Calendar = .current) -> [ScheduleEvent] {
         let start = calendar.startOfDay(for: date)
         guard let end = calendar.date(byAdding: .day, value: 1, to: start) else { return [] }
         return events.filter { $0.start < end && $0.end > start && $0.end > date }
             .sorted { $0.start == $1.start ? $0.id < $1.id : $0.start < $1.start }
     }
-    /// Precompute event boundaries and midnight, rather than relying on per-minute widget refreshes.
+    /// Timeline entries need only these two days; keep the saved cache intact.
+    func timelineSnapshot(from date: Date, calendar: Calendar = .current) -> ScheduleSnapshot {
+        let first = calendar.startOfDay(for: date)
+        let last = calendar.date(byAdding: .day, value: 2, to: first)!
+        var copy = self
+        copy.events = events.filter { $0.end > first && $0.start < last }
+        return copy
+    }
+    /// Prepare 24 hours of five-minute views; WidgetKit controls actual delivery.
     func dates(from date: Date, calendar: Calendar = .current) -> [Date] {
+        let end = date.addingTimeInterval(86400)
+        let next = (date.timeIntervalSince1970 / 300).rounded(.down) * 300 + 300
+        let regular = stride(from: next, through: end.timeIntervalSince1970, by: 300).map { Date(timeIntervalSince1970: $0) }
         let midnight = calendar.date(byAdding: .day, value: 1, to: calendar.startOfDay(for: date))!
-        let end = calendar.date(byAdding: .day, value: 1, to: date)!
-        let boundaries = events.flatMap { [$0.start, $0.end] }.filter { $0 > date && $0 <= end }
-        return Array(Set([date, midnight] + boundaries)).sorted().prefix(256).map { $0 }
+        return Array(Set([date, midnight] + regular)).filter { $0 <= end }.sorted()
     }
 }
 
@@ -67,5 +78,73 @@ enum PlannerClock {
         guard calendar.isDate(date, inSameDayAs: now) else { return min(max(480, start), end - 1) }
         let parts = calendar.dateComponents([.hour, .minute], from: now)
         return min(max((parts.hour ?? 0) * 60 + (parts.minute ?? 0), start), end - 1)
+    }
+}
+
+/// A bounded slice of today's plan, shared by the app preview and the extension.
+struct WidgetTimeWindow {
+    let start: Date
+    let end: Date
+    let now: Date
+    let events: [ScheduleEvent]
+    init(snapshot: ScheduleSnapshot, now: Date, span: TimeInterval = 7200, calendar: Calendar = .current) {
+        self.now = now
+        let day = calendar.startOfDay(for: now)
+        let nextDay = calendar.date(byAdding: .day, value: 1, to: day)!
+        let first = min(1380, max(0, snapshot.planningStart ?? 0))
+        let last = min(1440, max(first + 60, snapshot.planningEnd ?? 1440))
+        let lower = calendar.date(bySettingHour: first / 60, minute: first % 60, second: 0, of: day)!
+        let upper = last == 1440 ? nextDay : calendar.date(bySettingHour: last / 60, minute: last % 60, second: 0, of: day)!
+        let duration = min(max(60, span), upper.timeIntervalSince(lower))
+        let windowStart = min(max(now.addingTimeInterval(-duration / 4), lower), upper.addingTimeInterval(-duration))
+        let windowEnd = windowStart.addingTimeInterval(duration)
+        start = windowStart; end = windowEnd
+        events = snapshot.events.filter { $0.start < windowEnd && $0.end > windowStart && $0.end > $0.start }
+            .sorted { $0.start == $1.start ? $0.id < $1.id : $0.start < $1.start }
+    }
+    func position(_ date: Date) -> Double {
+        min(1, max(0, date.timeIntervalSince(start) / max(1, end.timeIntervalSince(start))))
+    }
+    var currentPosition: Double? { now >= start && now < end ? position(now) : nil }
+    func ticks(calendar: Calendar = .current) -> [Date] {
+        var tick = calendar.dateInterval(of: .hour, for: start)!.start
+        var result: [Date] = []
+        while tick <= end {
+            if tick >= start { result.append(tick) }
+            tick = tick.addingTimeInterval(1800)
+        }
+        return result
+    }
+    struct Placement: Identifiable {
+        let event: ScheduleEvent
+        let y: Double
+        let height: Double
+        let column: Int
+        var columns: Int
+        var id: String { event.id }
+    }
+    /// Short notes get readable heights; visual overlaps use separate columns.
+    func placements(height: Double, minimumHeight: Double = 20) -> [Placement] {
+        guard height > 0 else { return [] }
+        let minimum = min(height, max(1, minimumHeight))
+        let cards: [(event: ScheduleEvent, y: Double, height: Double)] = events.map { event -> (event: ScheduleEvent, y: Double, height: Double) in
+            let y = min(height - minimum, position(event.start) * height)
+            return (event: event, y: y, height: max(minimum, position(event.end) * height - y))
+        }.sorted { a, b in a.y == b.y ? a.event.id < b.event.id : a.y < b.y }
+        var result: [Placement] = [], group: [Placement] = []
+        var lanes: [Double] = [], groupEnd = -Double.infinity
+        func flush() {
+            result += group.map { card in var copy = card; copy.columns = lanes.count; return copy }
+            group.removeAll(); lanes.removeAll(); groupEnd = -Double.infinity
+        }
+        for (event, y, cardHeight) in cards {
+            if y >= groupEnd { flush() }
+            let lane = lanes.firstIndex(where: { $0 <= y }) ?? lanes.count
+            if lane == lanes.count { lanes.append(y + cardHeight) } else { lanes[lane] = y + cardHeight }
+            group.append(Placement(event: event, y: y, height: cardHeight, column: lane, columns: 1))
+            groupEnd = max(groupEnd, y + cardHeight)
+        }
+        flush()
+        return result
     }
 }
