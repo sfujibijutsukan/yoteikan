@@ -229,6 +229,8 @@ private struct TimeAdjustmentLoupe: View {
 }
 
 private struct FullDayOverview: View {
+    @State private var layoutCache = PlannerLayoutCache()
+    private var dayLayout: PlannerDayLayout { layoutCache.layout(notes: stickies, fixed: fixed, hours: hours, minimumHeight: minimumCardHeight) }
 
     @Environment(\.dismiss) private var dismiss
     @Binding var date: Date
@@ -318,9 +320,8 @@ VStack(spacing: 8) {
     }
     private var fittedTimeline: some View {
         GeometryReader { geometry in
-            let timelineItems = items.map { TimelineItem(id: $0.id, start: max(hours.start, $0.start), end: min(hours.end, $0.end)) }
-            let folded = FoldedTimeline(items: timelineItems, start: hours.start, end: hours.end, minimumEventHeight: minimumCardHeight)
-            let slots = PlannerMath.layout(timelineItems)
+            let folded = dayLayout.folded
+            let slots = dayLayout.slots
             ScrollViewReader { reader in
             ScrollView {
                 ZStack(alignment: .topLeading) {
@@ -597,12 +598,19 @@ private struct StickyTouch: UIViewRepresentable {
 
 }
 
+private final class TimelineScrollPosition {
+    var minuteAtTop: CGFloat = 480
+    var visibleHour: Int?
+}
+
 private struct HourPositions: PreferenceKey {
     static var defaultValue: [Int: CGFloat] = [:]
     static func reduce(value: inout [Int: CGFloat], nextValue: () -> [Int: CGFloat]) { value.merge(nextValue(), uniquingKeysWith: { _, new in new }) }
 }
 
 struct PlannerView: View {
+    @State private var layoutCache = PlannerLayoutCache()
+    private var dayLayout: PlannerDayLayout { layoutCache.layout(notes: plans.today, fixed: fixed, hours: plans.hours, minimumHeight: minimumCardHeight) }
     @EnvironmentObject private var plans: PlanStore
     @EnvironmentObject private var calendar: CalendarStore
     @Environment(\.scenePhase) private var phase
@@ -624,8 +632,7 @@ struct PlannerView: View {
     @State private var pinchBase: CGFloat?
     @State private var pinchMinute: CGFloat?
     @State private var pinchAnchor = UnitPoint.center
-    @State private var minuteAtTop: CGFloat = 480
-    @State private var visibleHour: Int?
+    @State private var scrollPosition = TimelineScrollPosition()
     @State private var positionedTimeline = false
     @State private var now = PlannerClock.now
     @State private var focusRequest = 0
@@ -653,7 +660,7 @@ struct PlannerView: View {
     private var selectedTask: Sticky? { plans.today.first { $0.id == selected } }
     private var scale: CGFloat { overview ? max(0.15, (viewportHeight - 32) / CGFloat(plans.hours.totalMinutes)) : 1.55 * zoomFactor }
     private var fixed: [FixedEvent] {
-        if plans.demo, dayKey(plans.date) == dayKey(Date()) {
+        if plans.demo, Calendar.current.isDateInToday(plans.date) {
             #if DEBUG && targetEnvironment(simulator)
             if ProcessInfo.processInfo.arguments.contains("--short-events-test") {
                 return [FixedEvent(id: "short1", title: "会議5分", start: 495, end: 500), FixedEvent(id: "short2", title: "連絡5分", start: 500, end: 505)]
@@ -664,18 +671,16 @@ struct PlannerView: View {
         return calendar.events
     }
     private func preview(_ target: ScheduleMemoTarget) -> MemoPreviewContent { MemoPreviewContent(target: target, stickies: plans.plan.stickies, drafts: memoDrafts) }
-    private var placed: [Sticky] { plans.today.filter { task in task.start.map { plans.hours.overlaps(start: $0, end: $0 + task.minutes) } ?? false }.sorted { $0.start! < $1.start! } }
-    private var inbox: [Sticky] { plans.today.filter { $0.start == nil } }
-    private var outside: [Sticky] { plans.today.filter { task in task.start.map { !plans.hours.overlaps(start: $0, end: $0 + task.minutes) } ?? false } }
+    private var placed: [Sticky] { dayLayout.placed }
+    private var inbox: [Sticky] { dayLayout.inbox }
+    private var outside: [Sticky] { dayLayout.outside }
     private var trayTasks: [Sticky] { inbox + outside }
-    private var visibleFixed: [FixedEvent] { fixed.filter { !$0.allDay && plans.hours.overlaps(start: $0.start, end: $0.end) } }
+    private var visibleFixed: [FixedEvent] { dayLayout.visibleFixed }
     private var focusMinute: Int { PlannerClock.focusMinute(on: plans.date, now: now, start: plans.hours.start, end: plans.hours.end) }
     private var initialHour: Int { focusMinute / 60 }
     private var currentMinute: Int? { PlannerClock.minute(on: plans.date, now: now, start: plans.hours.start, end: plans.hours.end) }
-    private var occupied: Int { PlannerMath.occupied(placed.map { ($0.start!, $0.start! + $0.minutes) } + visibleFixed.map { ($0.start, $0.end) }, from: plans.hours.start, to: plans.hours.end) }
-    private var slots: [String: TimelineSlot] {
-        PlannerMath.layout(placed.map { TimelineItem(id: $0.id.uuidString, start: max(plans.hours.start, $0.start!), end: min(plans.hours.end, $0.start! + $0.minutes)) } + visibleFixed.map { TimelineItem(id: "fixed-" + $0.id, start: max(plans.hours.start, $0.start), end: min(plans.hours.end, $0.end)) })
-    }
+    private var occupied: Int { dayLayout.occupied }
+    private var slots: [String: TimelineSlot] { dayLayout.slots }
     var body: some View {
         nativeTabs.plannerFont(.body)
             #if targetEnvironment(macCatalyst)
@@ -910,7 +915,7 @@ struct PlannerView: View {
     }
     private func setZoom(_ factor: CGFloat) {
         pinchMinute = nil
-        zoomAnchor = selectedTask?.start.map { $0 / 60 } ?? visibleHour ?? initialHour
+        zoomAnchor = selectedTask?.start.map { $0 / 60 } ?? scrollPosition.visibleHour ?? initialHour
         zoomFactor = factor
     }
     private func updatePinch(_ magnification: CGFloat, anchor: CGFloat) {
@@ -918,7 +923,7 @@ struct PlannerView: View {
         if pinchBase == nil {
             pinchBase = scale / 1.55
             pinchAnchor = UnitPoint(x: 0.5, y: min(1, max(0, anchor)))
-            pinchMinute = min(CGFloat(plans.hours.end), max(CGFloat(plans.hours.start), minuteAtTop + pinchAnchor.y * viewportHeight / scale))
+            pinchMinute = min(CGFloat(plans.hours.end), max(CGFloat(plans.hours.start), scrollPosition.minuteAtTop + pinchAnchor.y * viewportHeight / scale))
             moving = nil; stretching = nil; shift = 0; stretch = 0
             overview = false
         }
@@ -952,11 +957,7 @@ struct PlannerView: View {
             .background { GeometryReader { proxy in Color.clear.preference(key: HourPositions.self, value: [hour: proxy.frame(in: .global).minY]) } }
             .overlay(alignment: .topLeading) { pinchMarker(hour) }
     }
-    private var foldedLayout: FoldedTimeline {
-        FoldedTimeline(items: placed.map { TimelineItem(id: $0.id.uuidString, start: $0.start!, end: $0.start! + $0.minutes) }
-                       + visibleFixed.map { TimelineItem(id: "fixed-" + $0.id, start: $0.start, end: $0.end) },
-                       start: plans.hours.start, end: plans.hours.end, minimumEventHeight: minimumCardHeight)
-    }
+    private var foldedLayout: FoldedTimeline { dayLayout.folded }
     private func timelineY(_ minute: Int) -> CGFloat {
         folded ? foldedLayout.position(minute) : CGFloat(minute - plans.hours.start) * scale
     }
@@ -1113,9 +1114,9 @@ struct PlannerView: View {
             }.scrollDisabled(moving != nil || stretching != nil)
                 .coordinateSpace(name: "timelineViewport").accessibilityIdentifier("timeline")
                 .onPreferenceChange(HourPositions.self) { positions in
-                    visibleHour = positions.filter { $0.value <= viewportTop + 16 }.max(by: { $0.value < $1.value })?.key ?? initialHour
-                    if let hour = visibleHour, let y = positions[hour] {
-                        minuteAtTop = CGFloat(hour * 60) + (viewportTop - y) / scale
+                    scrollPosition.visibleHour = positions.filter { $0.value <= viewportTop + 16 }.max(by: { $0.value < $1.value })?.key ?? initialHour
+                    if let hour = scrollPosition.visibleHour, let y = positions[hour] {
+                        scrollPosition.minuteAtTop = CGFloat(hour * 60) + (viewportTop - y) / scale
                     }
                 }
                 .task {
@@ -1308,8 +1309,7 @@ struct PlannerView: View {
     }
     private func changeDay(_ offset: Int) { plans.date = Calendar.current.date(byAdding: .day, value: offset, to: plans.date)! }
     private func conflicts(_ task: Sticky) -> Bool {
-        guard let start = task.start else { return false }
-        return placed.contains { $0.id != task.id && PlannerMath.overlaps(start, start + task.minutes, $0.start!, $0.start! + $0.minutes) } || fixed.contains { !$0.allDay && PlannerMath.overlaps(start, start + task.minutes, $0.start, $0.end) }
+        dayLayout.conflicting.contains(task.id)
     }
 }
 

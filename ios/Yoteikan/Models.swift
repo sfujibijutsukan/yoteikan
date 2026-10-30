@@ -154,7 +154,7 @@ struct Preset: Identifiable, Codable, Equatable {
                   dailyCount: try values.decodeIfPresent(Int.self, forKey: .dailyCount) ?? 1)
     }
 }
-struct FixedEvent: Identifiable {
+struct FixedEvent: Identifiable, Equatable {
     var id: String
     var title: String
     var start: Int
@@ -380,13 +380,14 @@ let paper = Color(red: 0.97, green: 0.96, blue: 0.93)
 let tones: [Color] = [Color(red: 0.88, green: 0.93, blue: 0.80), Color(red: 0.97, green: 0.89, blue: 0.70), Color(red: 0.86, green: 0.90, blue: 0.97), Color(red: 0.96, green: 0.85, blue: 0.81)]
 
 @MainActor final class PlanStore: ObservableObject {
-    @Published var plan: SavedPlan
+    @Published var plan: SavedPlan { didSet { rebuildToday() } }
     @Published var date = Date() { didSet { prepareDay() } }
     @Published var undo: SavedPlan?
     @Published var notice: String?
     private let defaults: UserDefaults
     private let key = "yoteikan.plan.v1"
     private var lastRealDay = dayKey(Date())
+    private var todayNotes: [Sticky] = []
     let demo: Bool
     init(defaults: UserDefaults = .standard, demo: Bool = false) {
         self.defaults = defaults; self.demo = demo
@@ -408,6 +409,16 @@ let tones: [Color] = [Color(red: 0.88, green: 0.93, blue: 0.80), Color(red: 0.97
                     Sticky(title: "確認5分", minutes: 5, tone: 2, day: day, start: 490)
                 ]
             }
+            if ProcessInfo.processInfo.arguments.contains("--performance-test") {
+                sample.stickies = [Sticky(title: "操作確認", minutes: 60, tone: 0, day: day, start: 480)]
+                for index in 0..<40 {
+                    sample.stickies.append(Sticky(title: String(format: "検証作業%02d", index + 1), minutes: 10, tone: index % 4, day: day, start: 570 + index * 15))
+                }
+                for offset in 1...100 {
+                    let key = dayKey(Calendar.current.date(byAdding: .day, value: -offset, to: Date())!)
+                    for index in 0..<10 { sample.stickies.append(Sticky(title: "履歴\(index)", minutes: 30, day: key, start: 480 + index * 30)) }
+                }
+            }
             #endif
             sample.dailyPresetCounts[day] = Dictionary(uniqueKeysWithValues: sample.presets.map { ($0.id.uuidString, $0.dailyCount) })
             plan = sample
@@ -416,14 +427,22 @@ let tones: [Color] = [Color(red: 0.88, green: 0.93, blue: 0.80), Color(red: 0.97
         }
         prepareDay()
     }
-    var today: [Sticky] { plan.stickies.filter { $0.day == dayKey(date) } }
+    var today: [Sticky] { todayNotes }
+    private func rebuildToday() {
+        let key = dayKey(date)
+        todayNotes = plan.stickies.filter { $0.day == key }
+    }
     var hours: PlanningHours { plan.hours }
     func setHours(_ hours: PlanningHours) {
         guard hours.isValid, hours != plan.hours else { return }
         change { $0.hours = hours }
     }
     func save() { if !demo, let data = try? JSONEncoder().encode(plan) { defaults.set(data, forKey: key) } }
-    func prepareDay() { if plan.populateDailyPresets(for: dayKey(date)) { save() } }
+    func prepareDay() {
+        var updated = plan
+        if updated.populateDailyPresets(for: dayKey(date)) { plan = updated; save() }
+        rebuildToday()
+    }
     func refreshDay(now: Date = Date()) {
         let current = dayKey(now)
         let followsToday = dayKey(date) == lastRealDay
@@ -435,7 +454,10 @@ let tones: [Color] = [Color(red: 0.88, green: 0.93, blue: 0.80), Color(red: 0.97
         guard updated != plan else { return }
         undo = plan; plan = updated; save()
     }
-    func restore() { guard let old = undo else { return }; plan = old; undo = nil; plan.populateDailyPresets(for: dayKey(date)); save() }
+    func restore() {
+        guard var old = undo else { return }
+        old.populateDailyPresets(for: dayKey(date)); plan = old; undo = nil; save()
+    }
     func colorName(for tone: Int) -> String {
         paletteColor(for: tone).name
     }
@@ -497,5 +519,54 @@ let tones: [Color] = [Color(red: 0.88, green: 0.93, blue: 0.80), Color(red: 0.97
     func setMemo(_ id: UUID, memo: String) {
         guard let index = plan.stickies.firstIndex(where: { $0.id == id }), plan.stickies[index].memo != memo else { return }
         change { $0.stickies[index].memo = memo }
+    }
+}
+
+/// Geometry depends on the plan, not on every finger position or scroll offset.
+struct PlannerDayLayout {
+    let placed: [Sticky]
+    let inbox: [Sticky]
+    let outside: [Sticky]
+    let visibleFixed: [FixedEvent]
+    let slots: [String: TimelineSlot]
+    let folded: FoldedTimeline
+    let occupied: Int
+    let conflicting: Set<UUID>
+    init(notes: [Sticky], fixed: [FixedEvent], hours: PlanningHours, minimumHeight: CGFloat) {
+        placed = notes.filter { task in task.start.map { hours.overlaps(start: $0, end: $0 + task.minutes) } ?? false }
+            .sorted { $0.start! < $1.start! }
+        inbox = notes.filter { $0.start == nil }
+        outside = notes.filter { task in task.start.map { !hours.overlaps(start: $0, end: $0 + task.minutes) } ?? false }
+        visibleFixed = fixed.filter { !$0.allDay && hours.overlaps(start: $0.start, end: $0.end) }
+        let allNotes = placed.map { TimelineItem(id: $0.id.uuidString, start: $0.start!, end: $0.start! + $0.minutes) }
+        let visible = allNotes + visibleFixed.map { TimelineItem(id: "fixed-" + $0.id, start: $0.start, end: $0.end) }
+        slots = PlannerMath.layout(visible.map { TimelineItem(id: $0.id, start: max(hours.start, $0.start), end: min(hours.end, $0.end)) })
+        folded = FoldedTimeline(items: visible, start: hours.start, end: hours.end, minimumEventHeight: minimumHeight)
+        occupied = PlannerMath.occupied(visible.map { ($0.start, $0.end) }, from: hours.start, to: hours.end)
+        let collisionSlots = PlannerMath.layout(allNotes + fixed.filter { !$0.allDay }.map { TimelineItem(id: "fixed-" + $0.id, start: $0.start, end: $0.end) })
+        conflicting = Set(placed.compactMap { (collisionSlots[$0.id.uuidString]?.columns ?? 1) > 1 ? $0.id : nil })
+    }
+}
+
+@MainActor final class PlannerLayoutCache {
+    private struct Input: Equatable {
+        let notes: [Sticky]
+        let fixed: [FixedEvent]
+        let hours: PlanningHours
+        let minimumHeight: CGFloat
+    }
+    private var input: Input?
+    private var value: PlannerDayLayout?
+    private(set) var rebuildCount = 0
+    func layout(notes: [Sticky], fixed: [FixedEvent], hours: PlanningHours, minimumHeight: CGFloat) -> PlannerDayLayout {
+        let next = Input(notes: notes, fixed: fixed, hours: hours, minimumHeight: minimumHeight)
+        if input == next, let value {
+            // Adopt equal arrays' storage, so subsequent reads can use array identity.
+            input = next
+            return value
+        }
+        let value = PlannerDayLayout(notes: notes, fixed: fixed, hours: hours, minimumHeight: minimumHeight)
+        self.input = next; self.value = value; rebuildCount += 1
+        return value
     }
 }
