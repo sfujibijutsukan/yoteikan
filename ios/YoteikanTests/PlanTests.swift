@@ -13,6 +13,23 @@ import UserNotifications
         defaults.set(try! JSONEncoder().encode(manual), forKey: "yoteikan.plan.v1")
     }
     override func tearDown() { defaults.removePersistentDomain(forName: suite); super.tearDown() }
+    func testPrecisionDragProvidesStableFiveMinuteStepsAndKeepsHigherZoom() {
+        let normal = TimeDragScale(timelinePointsPerMinute: 1.55)
+        let folded = TimeDragScale(timelinePointsPerMinute: 0.1)
+        for scale in [normal, folded] {
+            XCTAssertEqual(scale.minutes(for: 10), 0)
+            XCTAssertEqual(scale.minutes(for: 24), 5)
+            XCTAssertEqual(scale.minutes(for: -24), -5)
+            XCTAssertEqual(scale.minutes(for: 144), 30)
+            XCTAssertEqual(PlannerMath.start(480 + scale.minutes(for: -240), duration: 30, from: 480, to: 600), 480)
+            XCTAssertEqual(PlannerMath.start(570 + scale.minutes(for: 240), duration: 30, from: 480, to: 600), 570)
+            XCTAssertEqual(PlannerMath.duration(30 + scale.minutes(for: -240), start: 480, to: 600), 5)
+            XCTAssertEqual(PlannerMath.duration(30 + scale.minutes(for: 960), start: 480, to: 600), 120)
+        }
+        let enlarged = TimeDragScale(timelinePointsPerMinute: 12.4)
+        XCTAssertEqual(enlarged.minutes(for: 62), 5)
+        XCTAssertEqual(TimeDragScale(timelinePointsPerMinute: .nan).minutes(for: 24), 5)
+    }
     func testCopyMakesIndependentUnplacedStickyAndPreservesOriginalAndUndo() throws {
         let store = PlanStore(defaults: defaults)
         store.add(Preset(title: "コピー元", minutes: 30, memo: "大切なメモ", dailyCount: 0))

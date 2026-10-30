@@ -244,3 +244,12 @@ iPhone 17eシミュレーター / iOS 27.0でXCTestを使って実際に操作�
 <img src="67-font-settings.png" width="260" alt="文字サイズ150%の設定">
 <img src="68-large-font-plan.png" width="260" alt="文字サイズに合わせて予定高さと時刻欄も広がった計画画面">
 <img src="69-large-font-day.png" width="260" alt="文字サイズ150%の1日表示">
+
+## ドラッグ中の時刻調整
+
+<img src="70-precision-move.png" width="300" alt="開始時刻を5分刻みの拡大ルーラーで調整">
+<img src="71-precision-resize.png" width="300" alt="終了時刻と所要時間を大きく表示して長さを調整">
+
+実際のUIテストでドラッグを継続している間にシミュレーターから直接撮影しました。指を離すと表示が消えて確定します。
+
+[文字150%での拡大表示](72-precision-large-text.png) / [横向きのコンパクト表示](73-precision-landscape.png)

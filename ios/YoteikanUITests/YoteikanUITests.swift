@@ -197,7 +197,62 @@ func test45OverviewDateNavigationSharesPlanningDate() {
         XCTAssertEqual(app.staticTexts["fontScaleValue"].label, "100%")
     }
 
+    func test50PrecisionDragInNormalAndFoldedTimeline() {
+        launch(["--demo", "--reset-test-data"])
+        let task = app.otherElements["task-資料作成"]
+        task.tap()
+        let move = app.otherElements["move-資料作成"].coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+        print("PRECISION_CAPTURE_MOVE")
+        move.press(forDuration: 0.1, thenDragTo: move.withOffset(CGVector(dx: 0, dy: 24)), withVelocity: .slow, thenHoldForDuration: 6)
+        XCTAssertEqual(task.value as? String, "09:05|60")
+        XCTAssertFalse(app.otherElements["timeAdjustmentLoupe"].exists)
+        let resize = app.otherElements["resize-資料作成"].coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+        print("PRECISION_CAPTURE_RESIZE")
+        resize.press(forDuration: 0.1, thenDragTo: resize.withOffset(CGVector(dx: 0, dy: 24)), withVelocity: .slow, thenHoldForDuration: 6)
+        XCTAssertEqual(task.value as? String, "09:05|65")
+        XCTAssertFalse(app.otherElements["timeAdjustmentLoupe"].exists)
+        XCTAssertEqual(app.otherElements["task-朝の読書"].value as? String, "08:00|30")
+        app.buttons["undoPlan"].tap()
+        XCTAssertEqual(task.value as? String, "09:05|60")
+        app.buttons["foldPlanner"].tap()
+        task.tap()
+        let foldedMove = app.otherElements["move-資料作成"].coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+        foldedMove.press(forDuration: 0.1, thenDragTo: foldedMove.withOffset(CGVector(dx: 0, dy: -24)))
+        XCTAssertEqual(task.value as? String, "09:00|60")
+        let foldedResize = app.otherElements["resize-資料作成"].coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+        foldedResize.press(forDuration: 0.1, thenDragTo: foldedResize.withOffset(CGVector(dx: 0, dy: -24)))
+        XCTAssertEqual(task.value as? String, "09:00|55")
+        XCTAssertFalse(app.otherElements["timeAdjustmentLoupe"].exists)
+    }
+
+    func test51PrecisionLoupeWithLargeTextAndLandscape() {
+        launch(["--demo", "--reset-test-data"])
+        selectTab("設定")
+        app.sliders["fontSizeSlider"].adjust(toNormalizedSliderPosition: 1)
+        selectTab("計画")
+        app.buttons["foldPlanner"].tap()
+        let task = app.otherElements["task-資料作成"]
+        task.tap()
+        let move = app.otherElements["move-資料作成"].coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+        print("PRECISION_CAPTURE_LARGE")
+        move.press(forDuration: 0.1, thenDragTo: move.withOffset(CGVector(dx: 0, dy: 24)), withVelocity: .slow, thenHoldForDuration: 6)
+        XCTAssertEqual(task.value as? String, "09:05|60")
+        XCTAssertFalse(app.otherElements["timeAdjustmentLoupe"].exists)
+        selectTab("設定"); app.buttons["resetFontSize"].tap(); selectTab("計画")
+        XCUIDevice.shared.orientation = .landscapeLeft
+        XCTAssertTrue(app.otherElements["memoZone"].waitForExistence(timeout: 3))
+        app.buttons["foldPlanner"].tap(); app.buttons["foldPlanner"].tap()
+        let landscapeMove = app.otherElements["move-資料作成"].coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+        print("PRECISION_CAPTURE_LANDSCAPE")
+        landscapeMove.press(forDuration: 0.1, thenDragTo: landscapeMove.withOffset(CGVector(dx: 0, dy: -24)), withVelocity: .slow, thenHoldForDuration: 6)
+        XCTAssertEqual(task.value as? String, "09:00|60")
+        XCTAssertFalse(app.otherElements["timeAdjustmentLoupe"].exists)
+        XCUIDevice.shared.orientation = .portrait
+    }
+
     private func selectTab(_ name: String) {
+
+
         #if os(macOS) || targetEnvironment(macCatalyst)
         app.radioButtons[name].click()
         #else
@@ -409,7 +464,7 @@ func test45OverviewDateNavigationSharesPlanningDate() {
         let task = app.otherElements["task-資料作成"]
         XCTAssertTrue(task.waitForExistence(timeout: 3))
         let from = task.coordinate(withNormalizedOffset: CGVector(dx: 0.45, dy: 0.30))
-        from.press(forDuration: 0.5, thenDragTo: from.withOffset(CGVector(dx: 0, dy: 46.5)))
+        from.press(forDuration: 0.5, thenDragTo: from.withOffset(CGVector(dx: 0, dy: 144)))
         XCTAssertEqual(task.value as? String, "09:30|60")
         XCTAssertEqual(app.otherElements["task-朝の読書"].value as? String, "08:00|30")
         shot("04-overlap-after-drag")
@@ -418,7 +473,7 @@ func test45OverviewDateNavigationSharesPlanningDate() {
         let handle = app.otherElements["resize-資料作成"]
         XCTAssertTrue(handle.exists)
         let point = handle.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
-        point.press(forDuration: 0.15, thenDragTo: point.withOffset(CGVector(dx: 0, dy: 46.5)))
+        point.press(forDuration: 0.15, thenDragTo: point.withOffset(CGVector(dx: 0, dy: 144)))
         XCTAssertEqual(task.value as? String, "09:00|90")
         shot("05-resize-overlap")
         unplaceSelected()
@@ -485,12 +540,22 @@ func test45OverviewDateNavigationSharesPlanningDate() {
         XCTAssertTrue(app.descendants(matching: .any).matching(identifier: "fixed-チームミーティング").firstMatch.waitForExistence(timeout: 3))
     }
 
-    private func createAndPlaceSticky() -> XCUIElement {
+    private func createAndPlaceSticky(directPlacement: Bool = false) -> XCUIElement {
         app.buttons["newStickyButton"].tap()
         app.textFields["stickyTitle"].tap()
-        app.textFields["stickyTitle"].typeText("移動の確認")
+        app.textFields["stickyTitle"].typeText("移動の確認\n")
         app.buttons["duration-60"].tap()
+        if directPlacement {
+            app.switches["placeToggle"].coordinate(withNormalizedOffset: CGVector(dx: 0.92, dy: 0.5)).tap()
+            XCTAssertEqual(app.switches["placeToggle"].value as? String, "1")
+        }
         app.buttons["saveSticky"].tap()
+        if directPlacement {
+            let task = app.otherElements["task-移動の確認"]
+            XCTAssertTrue(task.waitForExistence(timeout: 3))
+            task.tap()
+            return task
+        }
         let inbox = app.descendants(matching: .any).matching(identifier: "inbox-移動の確認").firstMatch
         XCTAssertTrue(inbox.waitForExistence(timeout: 3))
         revealInbox(inbox)
@@ -513,7 +578,7 @@ func test45OverviewDateNavigationSharesPlanningDate() {
         let task = createAndPlaceSticky()
         let before = placement(of: task)
         let point = task.coordinate(withNormalizedOffset: CGVector(dx: 0.8, dy: 0.6))
-        point.press(forDuration: 0.5, thenDragTo: point.withOffset(CGVector(dx: 0, dy: -46.5)))
+        point.press(forDuration: 0.5, thenDragTo: point.withOffset(CGVector(dx: 0, dy: -144)))
         let after = placement(of: task)
         XCTAssertEqual(after.start, before.start - 30)
         XCTAssertEqual(after.duration, 60)
@@ -521,12 +586,12 @@ func test45OverviewDateNavigationSharesPlanningDate() {
     }
     func test09MoveHandleChangesStartAndPersists() {
         launch(["--reset-test-data"])
-        let task = createAndPlaceSticky()
+        let task = createAndPlaceSticky(directPlacement: true)
         let before = placement(of: task)
         let handle = app.otherElements["move-移動の確認"]
         XCTAssertTrue(handle.waitForExistence(timeout: 3))
         let point = handle.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
-        point.press(forDuration: 0.05, thenDragTo: point.withOffset(CGVector(dx: 0, dy: -46.5)))
+        point.press(forDuration: 0.05, thenDragTo: point.withOffset(CGVector(dx: 0, dy: -144)))
         XCTAssertEqual(placement(of: task).start, before.start - 30)
         XCTAssertEqual(placement(of: task).duration, 60)
         shot("09-start-time-drag")
@@ -1069,11 +1134,11 @@ func test45OverviewDateNavigationSharesPlanningDate() {
         work.tap()
         let move = app.otherElements["move-資料作成"]
         let origin = move.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
-        origin.press(forDuration: 0.1, thenDragTo: origin.withOffset(CGVector(dx: 0, dy: 20)))
+        origin.press(forDuration: 0.1, thenDragTo: origin.withOffset(CGVector(dx: 0, dy: 96)))
         XCTAssertEqual(work.value as? String, "09:20|60")
         XCTAssertEqual(reading.value as? String, "08:00|30")
         let resize = app.otherElements["resize-資料作成"].coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
-        resize.press(forDuration: 0.15, thenDragTo: resize.withOffset(CGVector(dx: 0, dy: 22)))
+        resize.press(forDuration: 0.15, thenDragTo: resize.withOffset(CGVector(dx: 0, dy: 96)))
         XCTAssertEqual(work.value as? String, "09:20|80")
         XCTAssertEqual(reading.value as? String, "08:00|30")
         work.press(forDuration: 1)

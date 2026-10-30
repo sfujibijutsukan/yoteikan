@@ -246,3 +246,13 @@ PR51Resolved.xcresult: iPhone単体36件＋UI42/43/44/45/48/49、計42件成功�
 PR51ResolvedMac.xcresult: Mac Catalyst単体36件成功。
 PR51FontRule.xcresult: ラベル追従調整後のUI42/49成功。
 pr51-final-mac.log / pr51-final-release.log: 最終ビルド成功。
+
+ドラッグ中の時刻拡大・微調整（2026-10-30）
+PrecisionDragVerified.xcresult: 単体37件＋UI09/51成功（移動の永続化・文字150%・横向き）。
+PrecisionDragRegression.xcresult: 最終UI03/20/35/50の4件成功。
+PrecisionDragMac.xcresult: Mac単体37件成功。
+precision-drag-release-final.log / precision-drag-mac-accept.log: 最終ビルド成功。
+PrecisionBaselineDrop.xcresult: 未変更mainでも既存UI04がコピー操作となり失敗することを確認。今回の対象と分離して記録。
+初回UI50はUndoで選択解除された後のハンドル操作で失敗。再選択を入れ最終成功。UI09はスイッチのつまみを操作し、UI51は回転後のレイアウト完了を待って最終成功。
+
+PrecisionLabelsRemoved.xcresult: 拡大画面の説明文言を削除後、UI50/51成功。
