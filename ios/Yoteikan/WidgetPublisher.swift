@@ -2,11 +2,11 @@ import Foundation
 import WidgetKit
 
 @MainActor enum WidgetPublisher {
-    static func publish(_ plan: SavedPlan, demo: Bool) {
+    static func publish(_ plan: SavedPlan, demo: Bool, fixed: [ScheduleEvent] = []) {
         #if !targetEnvironment(macCatalyst)
         guard !demo else { return }
         do {
-            if try WidgetSnapshotStore.write(snapshot(for: plan), to: WidgetSnapshotStore.fileURL()) {
+            if try WidgetSnapshotStore.write(snapshot(for: plan, fixed: fixed), to: WidgetSnapshotStore.fileURL()) {
                 WidgetCenter.shared.reloadTimelines(ofKind: WidgetSnapshotStore.kind)
             }
         } catch {
@@ -14,7 +14,7 @@ import WidgetKit
         }
         #endif
     }
-    static func snapshot(for plan: SavedPlan) -> ScheduleSnapshot {
+    static func snapshot(for plan: SavedPlan, fixed: [ScheduleEvent] = []) -> ScheduleSnapshot {
         let calendar = Calendar.current
         let events = plan.stickies.compactMap { task -> ScheduleEvent? in
             guard let minute = task.start else { return nil }
@@ -25,6 +25,6 @@ import WidgetKit
             return ScheduleEvent(id: task.id.uuidString, title: task.title, start: start, end: end,
                                  hex: plan.colors.first { $0.id == task.tone }?.hex ?? "E0EDCC")
         }.sorted { $0.id < $1.id }
-        return ScheduleSnapshot(events: events)
+        return ScheduleSnapshot(events: (events + fixed).sorted { $0.id < $1.id }, planningStart: plan.hours.start, planningEnd: plan.hours.end)
     }
 }
