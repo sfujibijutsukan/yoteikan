@@ -186,11 +186,8 @@ private struct TimeAdjustmentLoupe: View {
     private var spanHeight: CGFloat { CGFloat(steps * 48) }
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Text(resizing ? "終了時刻を調整" : "開始時刻を調整").plannerFont(size: 12, weight: .semibold)
-                Spacer(minLength: 4)
-                Text(title).plannerFont(size: 12).lineLimit(1)
-            }.foregroundStyle(ink.opacity(0.8))
+            Text(title).plannerFont(size: 12).lineLimit(1).foregroundStyle(ink.opacity(0.8))
+                .frame(maxWidth: .infinity, alignment: .leading)
             HStack(alignment: .firstTextBaseline) {
                 Text("\(clockText(start)) – \(clockText(start + duration))")
                     .plannerFont(size: compact ? 15 : 21, weight: .bold, design: .monospaced).lineLimit(1).minimumScaleFactor(0.65)
@@ -219,7 +216,6 @@ private struct TimeAdjustmentLoupe: View {
                     }
                 }
             }.frame(height: spanHeight + 16)
-            if !compact { Text("5分刻み・指を離して確定").plannerFont(size: 10).foregroundStyle(ink.opacity(0.6)) }
         }
         .padding(14).foregroundStyle(ink)
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 18))
@@ -772,7 +768,7 @@ struct PlannerView: View {
                     let duration = resizing ? resizedDuration(task, delta: dragTranslation) : task.minutes
                     let fingerY = dragLocation.y - geometry.frame(in: .global).minY
                     let compact = geometry.size.height < 360
-                    let panelHeight: CGFloat = compact ? 200 : 310
+                    let panelHeight: CGFloat = compact ? 200 : 290
                     let above = fingerY - panelHeight / 2 - 54
                     let center = above >= panelHeight / 2 + 8 ? above : fingerY + panelHeight / 2 + 54
                     TimeAdjustmentLoupe(title: task.title, start: start, duration: duration, resizing: resizing, compact: compact,
